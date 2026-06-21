@@ -1,0 +1,26 @@
+# Binaries
+bin/
+*.exe
+*.out
+
+# Environment
+.env
+*.local.env
+
+# Go
+vendor/
+*.test
+*.prof
+coverage.out
+coverage.html
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# Docker
+*.log
+
+# SQLC generated (committed, but listed for clarity)
+# internal/db/sqlc/ is committed

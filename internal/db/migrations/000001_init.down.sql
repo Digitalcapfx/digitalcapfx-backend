@@ -1,0 +1,9 @@
+DROP TABLE IF EXISTS otps;
+DROP TABLE IF EXISTS hub2_payments;
+DROP TABLE IF EXISTS kyc_documents;
+DROP TABLE IF EXISTS crypto_transactions;
+DROP TABLE IF EXISTS caas_wallets;
+DROP TABLE IF EXISTS waas_wallets;
+DROP TABLE IF EXISTS transactions;
+DROP TABLE IF EXISTS accounts;
+DROP TABLE IF EXISTS users;
