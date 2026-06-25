@@ -41,8 +41,9 @@ func newRouter(cfg *config.Config, svc *services.Services, pool *pgxpool.Pool, l
 	transferH  := handlers.NewTransferHandler(svc)
 	kycH       := handlers.NewKYCHandler(svc)
 	adminH     := handlers.NewAdminHandler(svc)
-	dashboardH := handlers.NewDashboardHandler(svc)
-	webhookH   := handlers.NewWebhookHandler(svc, cfg.HUB2.SecretKey, logger)
+	dashboardH      := handlers.NewDashboardHandler(svc)
+	notificationH   := handlers.NewNotificationHandler(svc)
+	webhookH        := handlers.NewWebhookHandler(svc, cfg.HUB2.SecretKey, logger)
 
 	kycRequired := middleware.KYCRequired(pool)
 
@@ -143,6 +144,12 @@ func newRouter(cfg *config.Config, svc *services.Services, pool *pgxpool.Pool, l
 				r.Get("/activity", dashboardH.GetActivityFeed)
 				r.Get("/crypto/contacts", dashboardH.GetRecentContacts)
 			})
+
+			// Notifications (no KYC gate — available from day 1)
+			r.Get("/notifications", notificationH.List)
+			r.Get("/notifications/unread-count", notificationH.UnreadCount)
+			r.Patch("/notifications/read-all", notificationH.MarkAllRead)
+			r.Patch("/notifications/{id}/read", notificationH.MarkRead)
 
 			// ── Admin routes (JWT + admin role) ─────────────────────────────
 			r.Group(func(r chi.Router) {

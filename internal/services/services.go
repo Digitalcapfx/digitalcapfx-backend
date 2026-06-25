@@ -16,13 +16,14 @@ import (
 
 // Services bundles every domain service, passed to handlers as a single dependency.
 type Services struct {
-	Auth      *AuthService
-	Account   *AccountService
-	Wallet    *WalletService
-	Crypto    *CryptoService
-	KYC       *KYCService
-	HUB2      *HUB2Service
-	Dashboard *DashboardService
+	Auth          *AuthService
+	Account       *AccountService
+	Wallet        *WalletService
+	Crypto        *CryptoService
+	KYC           *KYCService
+	HUB2          *HUB2Service
+	Dashboard     *DashboardService
+	Notifications *NotificationService
 }
 
 func New(
@@ -37,13 +38,15 @@ func New(
 	cfg *config.Config,
 	logger *zap.Logger,
 ) *Services {
+	notif := NewNotificationService(pool, logger)
 	return &Services{
-		Auth:      NewAuthService(pool, rdb, cfg, logger, emailClient),
-		Account:   NewAccountService(pool, logger),
-		Wallet:    NewWalletService(pool, paymentsClient, hub2Client, logger),
-		Crypto:    NewCryptoService(pool, caasClient, hub2Client, logger),
-		KYC:       NewKYCService(pool, cfg, logger, metamapClient, emailClient),
-		HUB2:      NewHUB2Service(pool, hub2Client, caasClient, logger),
-		Dashboard: NewDashboardService(pool, nilosClient, paymentsClient, caasClient, logger),
+		Auth:          NewAuthService(pool, rdb, cfg, logger, emailClient),
+		Account:       NewAccountService(pool, logger),
+		Wallet:        NewWalletService(pool, paymentsClient, hub2Client, logger),
+		Crypto:        NewCryptoService(pool, caasClient, hub2Client, logger),
+		KYC:           NewKYCService(pool, cfg, logger, metamapClient, emailClient, notif),
+		HUB2:          NewHUB2Service(pool, hub2Client, caasClient, logger),
+		Dashboard:     NewDashboardService(pool, nilosClient, paymentsClient, caasClient, logger),
+		Notifications: notif,
 	}
 }

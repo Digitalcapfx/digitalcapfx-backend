@@ -3,6 +3,7 @@ package handlers
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
@@ -11,6 +12,7 @@ import (
 	"github.com/rachfinance/digitalfx/internal/api/middleware"
 	"github.com/rachfinance/digitalfx/internal/config"
 	"github.com/rachfinance/digitalfx/internal/pkg/response"
+	"github.com/rachfinance/digitalfx/internal/pkg/token"
 	"github.com/rachfinance/digitalfx/internal/services"
 )
 
@@ -123,6 +125,11 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 		response.InternalError(w)
 		return
 	}
+	notifyFromPair(r, pair.AccessToken, h.cfg.JWT.Secret, h.svc, services.CreateNotificationInput{
+		Type:  services.NotifWelcome,
+		Title: "Welcome to DigitalFX",
+		Body:  "Your account is set up. Complete identity verification to unlock transfers and wallets.",
+	})
 	response.Created(w, pair)
 }
 
@@ -164,6 +171,12 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	case err != nil:
 		response.InternalError(w)
 	default:
+		notifyFromPair(r, pair.AccessToken, h.cfg.JWT.Secret, h.svc, services.CreateNotificationInput{
+			Type:  services.NotifLoginDetected,
+			Title: "New Login Detected",
+			Body:  fmt.Sprintf("A sign-in was detected from %s. Not you? Change your PIN immediately.", realIP(r)),
+			Metadata: map[string]string{"ip": realIP(r), "device": r.UserAgent()},
+		})
 		response.OK(w, pair)
 	}
 }
@@ -260,6 +273,19 @@ func (h *AuthHandler) GoogleSignIn(w http.ResponseWriter, r *http.Request) {
 		response.InternalError(w)
 		return
 	}
+
+	nType, nTitle, nBody := services.NotifLoginDetected,
+		"New Sign-In Detected",
+		fmt.Sprintf("Sign-in via Google from %s.", realIP(r))
+	if result.IsNewUser {
+		nType, nTitle, nBody = services.NotifWelcome,
+			"Welcome to DigitalFX",
+			"Your Google account is linked. Complete identity verification to unlock full access."
+	}
+	notifyFromPair(r, result.Pair.AccessToken, h.cfg.JWT.Secret, h.svc, services.CreateNotificationInput{
+		Type: nType, Title: nTitle, Body: nBody,
+		Metadata: map[string]string{"ip": realIP(r), "provider": "google"},
+	})
 
 	response.JSON(w, http.StatusOK, GoogleSignInResponse{
 		Success:   true,
@@ -517,5 +543,21 @@ func derefStr(s *string, def string) string {
 		return def
 	}
 	return *s
+}
+
+// notifyFromPair extracts the userID from a freshly issued access token and
+// fires a notification. Errors are swallowed — a notification must never fail a
+// primary auth operation.
+func notifyFromPair(r *http.Request, accessToken, jwtSecret string, svc *services.Services, in services.CreateNotificationInput) {
+	claims, err := token.Parse(accessToken, jwtSecret)
+	if err != nil {
+		return
+	}
+	uid, err := uuid.Parse(claims.UserID)
+	if err != nil {
+		return
+	}
+	in.UserID = uid
+	svc.Notifications.Create(r.Context(), in)
 }
 

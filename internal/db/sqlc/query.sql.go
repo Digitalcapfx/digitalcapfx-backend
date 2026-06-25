@@ -4,6 +4,7 @@ package db
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"time"
 
@@ -735,4 +736,54 @@ type ActivityItem struct {
 
 func (q *Queries) ListRecentActivity(ctx context.Context, arg ListRecentActivityParams) ([]ActivityItem, error) {
 	return nil, errNotImplemented
+}
+
+// ─── Notification queries ──────────────────────────────────────────────────────
+
+type CreateNotificationParams struct {
+	UserID   uuid.UUID       `json:"user_id"`
+	Type     string          `json:"type"`
+	Title    string          `json:"title"`
+	Body     string          `json:"body"`
+	Metadata json.RawMessage `json:"metadata"`
+}
+
+type ListNotificationsParams struct {
+	UserID     uuid.UUID `json:"user_id"`
+	UnreadOnly bool      `json:"unread_only"`
+	Limit      int32     `json:"limit"`
+	Offset     int32     `json:"offset"`
+}
+
+type MarkNotificationReadParams struct {
+	ID     uuid.UUID `json:"id"`
+	UserID uuid.UUID `json:"user_id"`
+}
+
+func (q *Queries) CreateNotification(ctx context.Context, arg CreateNotificationParams) (Notification, error) {
+	return Notification{}, errNotImplemented
+}
+
+func (q *Queries) ListNotifications(ctx context.Context, arg ListNotificationsParams) ([]Notification, error) {
+	return nil, errNotImplemented
+}
+
+func (q *Queries) CountNotifications(ctx context.Context, userID uuid.UUID, unreadOnly bool) (int64, error) {
+	return 0, errNotImplemented
+}
+
+func (q *Queries) GetUnreadNotificationCount(ctx context.Context, userID uuid.UUID) (int64, error) {
+	return 0, errNotImplemented
+}
+
+func (q *Queries) MarkNotificationRead(ctx context.Context, arg MarkNotificationReadParams) (Notification, error) {
+	return Notification{}, errNotImplemented
+}
+
+func (q *Queries) MarkAllNotificationsRead(ctx context.Context, userID uuid.UUID) error {
+	return errNotImplemented
+}
+
+func (q *Queries) GetNotificationByID(ctx context.Context, id uuid.UUID) (Notification, error) {
+	return Notification{}, errNotImplemented
 }

@@ -21,10 +21,11 @@ type KYCService struct {
 	logger        *zap.Logger
 	metamapClient *metamap.Client
 	emailClient   *email.Client
+	notif         *NotificationService
 }
 
-func NewKYCService(pool *pgxpool.Pool, cfg *config.Config, logger *zap.Logger, metamapClient *metamap.Client, emailClient *email.Client) *KYCService {
-	return &KYCService{pool: pool, cfg: cfg, logger: logger, metamapClient: metamapClient, emailClient: emailClient}
+func NewKYCService(pool *pgxpool.Pool, cfg *config.Config, logger *zap.Logger, metamapClient *metamap.Client, emailClient *email.Client, notif *NotificationService) *KYCService {
+	return &KYCService{pool: pool, cfg: cfg, logger: logger, metamapClient: metamapClient, emailClient: emailClient, notif: notif}
 }
 
 func (s *KYCService) GetStatus(ctx context.Context, userID uuid.UUID) (string, error) {
@@ -168,6 +169,15 @@ func (s *KYCService) HandleMetaMapWebhook(ctx context.Context, payload metamap.W
 		zap.String("status", updated.Status),
 	)
 
+	if status == "under_review" {
+		s.notif.Create(ctx, CreateNotificationInput{
+			UserID: verification.UserID,
+			Type:   NotifKYCSubmitted,
+			Title:  "Identity Verification Submitted",
+			Body:   "Your documents are under review. We'll notify you once a decision is made.",
+		})
+	}
+
 	// Promote user KYC status when MetaMap approves.
 	if status == "approved" {
 		if _, err := q.UpdateUserKYCStatus(ctx, db.UpdateUserKYCStatusParams{
@@ -240,6 +250,13 @@ func (s *KYCService) AdminApproveKYC(ctx context.Context, userID, adminID uuid.U
 		}()
 	}
 
+	s.notif.Create(ctx, CreateNotificationInput{
+		UserID: userID,
+		Type:   NotifKYCApproved,
+		Title:  "Identity Verified ✓",
+		Body:   "Your identity has been verified. You now have full access to transfers, wallets, and crypto.",
+	})
+
 	s.logger.Info("kyc approved by admin", zap.String("user_id", userID.String()), zap.String("admin_id", adminID.String()))
 	return nil
 }
@@ -275,6 +292,14 @@ func (s *KYCService) AdminRejectKYC(ctx context.Context, userID, adminID uuid.UU
 			}
 		}()
 	}
+
+	s.notif.Create(ctx, CreateNotificationInput{
+		UserID: userID,
+		Type:   NotifKYCRejected,
+		Title:  "Identity Verification Unsuccessful",
+		Body:   fmt.Sprintf("Your verification was not approved: %s. Please resubmit your documents.", reason),
+		Metadata: map[string]string{"reason": reason},
+	})
 
 	s.logger.Info("kyc rejected by admin", zap.String("user_id", userID.String()), zap.String("reason", reason))
 	return nil

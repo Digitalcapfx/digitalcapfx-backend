@@ -260,3 +260,16 @@ type AccountWithNilos struct {
 	BIC              *string   `json:"bic"`
 	CreatedAt        time.Time `json:"created_at"`
 }
+
+// ─── Migration 000006 models ───────────────────────────────────────────────────
+
+type Notification struct {
+	ID        uuid.UUID       `json:"id"`
+	UserID    uuid.UUID       `json:"user_id"`
+	Type      string          `json:"type"`
+	Title     string          `json:"title"`
+	Body      string          `json:"body"`
+	IsRead    bool            `json:"is_read"`
+	Metadata  json.RawMessage `json:"metadata,omitempty"`
+	CreatedAt time.Time       `json:"created_at"`
+}

@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strconv"
 
@@ -186,6 +187,18 @@ func (h *CryptoHandler) Send(w http.ResponseWriter, r *http.Request) {
 		response.InternalError(w)
 		return
 	}
+
+	h.svc.Notifications.Create(r.Context(), services.CreateNotificationInput{
+		UserID: userID,
+		Type:   services.NotifCryptoSent,
+		Title:  "Crypto Sent",
+		Body:   fmt.Sprintf("You sent %s %s to %s.", body.Amount, body.Token, body.ReceiverPhone),
+		Metadata: map[string]string{
+			"token":          body.Token,
+			"amount":         body.Amount,
+			"receiver_phone": body.ReceiverPhone,
+		},
+	})
 
 	response.Created(w, tx)
 }
