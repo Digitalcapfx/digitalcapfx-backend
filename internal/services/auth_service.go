@@ -16,6 +16,8 @@ import (
 	"github.com/redis/go-redis/v9"
 	"go.uber.org/zap"
 
+	"github.com/pquerna/otp/totp"
+
 	"github.com/rachfinance/digitalfx/internal/clients/google"
 	"github.com/rachfinance/digitalfx/internal/config"
 	db "github.com/rachfinance/digitalfx/internal/db/sqlc"
@@ -34,6 +36,14 @@ var (
 	ErrInvalidToken    = errors.New("invalid or expired token")
 	ErrSocialAuthUser  = errors.New("account uses social login — PIN not set")
 )
+
+// LoginResult is returned by Login. When Requires2FA is true the client must
+// call CompleteTOTPLogin with TOTPRef + a valid TOTP code to get a token pair.
+type LoginResult struct {
+	Pair        *token.Pair
+	Requires2FA bool
+	TOTPRef     string
+}
 
 type AuthService struct {
 	pool        *pgxpool.Pool
@@ -161,7 +171,7 @@ type LoginInput struct {
 	DeviceUA string
 }
 
-func (s *AuthService) Login(ctx context.Context, in LoginInput) (*token.Pair, error) {
+func (s *AuthService) Login(ctx context.Context, in LoginInput) (*LoginResult, error) {
 	q := db.New(s.pool)
 
 	user, err := q.GetUserByPhone(ctx, in.Phone)
@@ -176,6 +186,14 @@ func (s *AuthService) Login(ctx context.Context, in LoginInput) (*token.Pair, er
 	}
 	if !hash.CheckPIN(*user.PinHash, in.PIN) {
 		return nil, ErrInvalidPIN
+	}
+
+	// If the user has 2FA enabled, issue a short-lived pending ref instead of
+	// a full session. The client must complete the TOTP step before getting tokens.
+	if sec, err := q.GetUserSecurity(ctx, user.ID); err == nil && sec.TOTPEnabled {
+		ref := generateSecureToken()[:16]
+		_ = s.rdb.Set(ctx, "2fa:pending:"+ref, user.ID.String(), 5*time.Minute)
+		return &LoginResult{Requires2FA: true, TOTPRef: ref}, nil
 	}
 
 	pair, err := s.createSession(ctx, q, user.ID, user.PhoneNumber, user.Role, in.DeviceIP, in.DeviceUA)
@@ -199,7 +217,39 @@ func (s *AuthService) Login(ctx context.Context, in LoginInput) (*token.Pair, er
 		}()
 	}
 
-	return pair, nil
+	return &LoginResult{Pair: pair}, nil
+}
+
+// CompleteTOTPLogin exchanges a pending 2FA ref + a valid TOTP code for a full JWT pair.
+func (s *AuthService) CompleteTOTPLogin(ctx context.Context, ref, code, deviceIP, deviceUA string) (*token.Pair, error) {
+	redisKey := "2fa:pending:" + ref
+	userIDStr, err := s.rdb.Get(ctx, redisKey).Result()
+	if err != nil {
+		return nil, ErrInvalidToken
+	}
+
+	userID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		return nil, ErrUserNotFound
+	}
+
+	q := db.New(s.pool)
+	user, err := q.GetUserByID(ctx, userID)
+	if err != nil {
+		return nil, ErrUserNotFound
+	}
+
+	sec, err := q.GetUserSecurity(ctx, userID)
+	if err != nil || !sec.TOTPEnabled || sec.TOTPSecret == nil {
+		return nil, ErrInvalidToken
+	}
+	if !totp.Validate(code, *sec.TOTPSecret) {
+		return nil, ErrInvalidToken
+	}
+
+	s.rdb.Del(ctx, redisKey)
+
+	return s.createSession(ctx, q, user.ID, user.PhoneNumber, user.Role, deviceIP, deviceUA)
 }
 
 // ─── Google Sign-In ───────────────────────────────────────────────────────────

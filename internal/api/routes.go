@@ -33,18 +33,21 @@ func newRouter(cfg *config.Config, svc *services.Services, pool *pgxpool.Pool, l
 	}))
 
 	// Handlers
-	authH      := handlers.NewAuthHandler(svc, cfg)
-	profileH   := handlers.NewProfileHandler(svc)
-	accountH   := handlers.NewAccountHandler(svc)
-	walletH    := handlers.NewWalletHandler(svc)
-	cryptoH    := handlers.NewCryptoHandler(svc)
-	transferH  := handlers.NewTransferHandler(svc)
-	kycH       := handlers.NewKYCHandler(svc)
-	adminH     := handlers.NewAdminHandler(svc)
-	dashboardH      := handlers.NewDashboardHandler(svc)
-	notificationH   := handlers.NewNotificationHandler(svc)
-	withdrawalH     := handlers.NewWithdrawalHandler(svc)
-	webhookH        := handlers.NewWebhookHandler(svc, cfg.HUB2.SecretKey, logger)
+	authH         := handlers.NewAuthHandler(svc, cfg)
+	profileH      := handlers.NewProfileHandler(svc)
+	accountH      := handlers.NewAccountHandler(svc)
+	walletH       := handlers.NewWalletHandler(svc)
+	cryptoH       := handlers.NewCryptoHandler(svc)
+	transferH     := handlers.NewTransferHandler(svc)
+	kycH          := handlers.NewKYCHandler(svc)
+	adminH        := handlers.NewAdminHandler(svc)
+	dashboardH    := handlers.NewDashboardHandler(svc)
+	notificationH := handlers.NewNotificationHandler(svc)
+	withdrawalH   := handlers.NewWithdrawalHandler(svc)
+	securityH     := handlers.NewSecurityHandler(svc)
+	prefsH        := handlers.NewPreferencesHandler(svc)
+	supportH      := handlers.NewSupportHandler(svc)
+	webhookH      := handlers.NewWebhookHandler(svc, cfg.HUB2.SecretKey, logger)
 
 	kycRequired := middleware.KYCRequired(pool)
 
@@ -72,11 +75,15 @@ func newRouter(cfg *config.Config, svc *services.Services, pool *pgxpool.Pool, l
 			r.Post("/otp/verify", authH.VerifyOTP)
 			r.Post("/register", authH.Register)
 			r.Post("/login", authH.Login)
+			r.Post("/2fa/login", authH.CompleteTOTPLogin)
 			r.Post("/google", authH.GoogleSignIn)
 			r.Post("/token/refresh", authH.RefreshToken)
 			r.Post("/forgot-pin", authH.ForgotPIN)
 			r.Post("/reset-pin", authH.ResetPIN)
 		})
+
+		// Support links — public (no auth needed for privacy policy / help center URLs)
+		r.Get("/support/links", supportH.GetAppLinks)
 
 		// ── Protected routes (JWT required) ─────────────────────────────────
 		r.Group(func(r chi.Router) {
@@ -93,6 +100,24 @@ func newRouter(cfg *config.Config, svc *services.Services, pool *pgxpool.Pool, l
 			// Profile
 			r.Get("/profile", profileH.GetProfile)
 			r.Patch("/profile", profileH.UpdateProfile)
+			r.Get("/profile/preferences", prefsH.Get)
+			r.Patch("/profile/preferences", prefsH.Update)
+
+			// Security — 2FA, PIN change, biometrics
+			r.Get("/security", securityH.GetStatus)
+			r.Post("/security/2fa/setup", securityH.Setup2FA)
+			r.Post("/security/2fa/confirm", securityH.Confirm2FA)
+			r.Delete("/security/2fa", securityH.Disable2FA)
+			r.Post("/security/pin/change", securityH.ChangePIN)
+			r.Post("/security/biometrics/enable", securityH.EnableBiometrics)
+			r.Delete("/security/biometrics", securityH.DisableBiometrics)
+
+			// Support — FAQs and tickets
+			r.Get("/support/faqs", supportH.ListFAQs)
+			r.Post("/support/tickets", supportH.CreateTicket)
+			r.Get("/support/tickets", supportH.ListTickets)
+			r.Get("/support/tickets/{id}", supportH.GetTicket)
+			r.Post("/support/tickets/{id}/messages", supportH.ReplyToTicket)
 
 			// KYC (status + doc upload available pre-approval; metamap init too)
 			r.Route("/kyc", func(r chi.Router) {

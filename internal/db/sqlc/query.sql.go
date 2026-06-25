@@ -986,3 +986,140 @@ func (q *Queries) UpdateFiatWithdrawalHub2Ref(ctx context.Context, arg UpdateFia
 func (q *Queries) UpdateFiatWithdrawalNilosRef(ctx context.Context, arg UpdateFiatWithdrawalNilosRefParams) (FiatWithdrawal, error) {
 	return FiatWithdrawal{}, errNotImplemented
 }
+
+// ─── Migration 000008: security (2FA + PIN + biometrics) ─────────────────────
+
+type SetTOTPSecretParams struct {
+	ID         uuid.UUID
+	TOTPSecret *string // nil to clear
+}
+
+type SetTOTPEnabledParams struct {
+	ID          uuid.UUID
+	TOTPEnabled bool
+	TOTPSecret  *string // set when enabling, nil to clear when disabling
+}
+
+// GetUserSecurityByID returns the totp_secret + totp_enabled fields for a user.
+func (q *Queries) GetUserSecurity(ctx context.Context, id uuid.UUID) (struct {
+	TOTPSecret  *string
+	TOTPEnabled bool
+}, error) {
+	return struct {
+		TOTPSecret  *string
+		TOTPEnabled bool
+	}{}, errNotImplemented
+}
+
+func (q *Queries) SetTOTPEnabled(ctx context.Context, arg SetTOTPEnabledParams) error {
+	return errNotImplemented
+}
+
+func (q *Queries) SetBiometricsEnabled(ctx context.Context, userID uuid.UUID, enabled bool) error {
+	return errNotImplemented
+}
+
+// ChangePIN updates the stored PIN hash for a user (requires old hash to have been
+// verified by the caller before invoking this).
+func (q *Queries) ChangePIN(ctx context.Context, id uuid.UUID, newPinHash string) error {
+	return errNotImplemented
+}
+
+// ─── Migration 000008: user preferences ──────────────────────────────────────
+
+type UpsertUserPreferencesParams struct {
+	UserID            uuid.UUID
+	Language          string
+	DarkMode          string
+	BiometricsEnabled bool
+}
+
+func (q *Queries) GetUserPreferences(ctx context.Context, userID uuid.UUID) (UserPreferences, error) {
+	return UserPreferences{}, errNotImplemented
+}
+
+func (q *Queries) UpsertUserPreferences(ctx context.Context, arg UpsertUserPreferencesParams) (UserPreferences, error) {
+	return UserPreferences{}, errNotImplemented
+}
+
+// ─── Migration 000008: support tickets ───────────────────────────────────────
+
+type CreateSupportTicketParams struct {
+	UserID    uuid.UUID
+	Reference string
+	Subject   string
+	Category  string
+}
+
+type CreateSupportMessageParams struct {
+	TicketID   uuid.UUID
+	SenderType string
+	SenderID   *uuid.UUID
+	Body       string
+}
+
+type ListSupportTicketsParams struct {
+	UserID uuid.UUID
+	Limit  int32
+	Offset int32
+}
+
+type GetSupportTicketParams struct {
+	ID     uuid.UUID
+	UserID uuid.UUID
+}
+
+func (q *Queries) CreateSupportTicket(ctx context.Context, arg CreateSupportTicketParams) (SupportTicket, error) {
+	return SupportTicket{}, errNotImplemented
+}
+
+func (q *Queries) GetSupportTicket(ctx context.Context, arg GetSupportTicketParams) (SupportTicket, error) {
+	return SupportTicket{}, errNotImplemented
+}
+
+func (q *Queries) ListSupportTickets(ctx context.Context, arg ListSupportTicketsParams) ([]SupportTicket, error) {
+	return nil, errNotImplemented
+}
+
+func (q *Queries) CountSupportTickets(ctx context.Context, userID uuid.UUID) (int64, error) {
+	return 0, errNotImplemented
+}
+
+func (q *Queries) CreateSupportMessage(ctx context.Context, arg CreateSupportMessageParams) (SupportMessage, error) {
+	return SupportMessage{}, errNotImplemented
+}
+
+func (q *Queries) ListSupportMessages(ctx context.Context, ticketID uuid.UUID) ([]SupportMessage, error) {
+	return nil, errNotImplemented
+}
+
+func (q *Queries) UpdateSupportTicketStatus(ctx context.Context, id uuid.UUID, status string) (SupportTicket, error) {
+	return SupportTicket{}, errNotImplemented
+}
+
+// ─── Migration 000008: FAQs ───────────────────────────────────────────────────
+
+func (q *Queries) ListFAQs(ctx context.Context, category string) ([]FAQ, error) {
+	return nil, errNotImplemented
+}
+
+func (q *Queries) GetFAQ(ctx context.Context, id uuid.UUID) (FAQ, error) {
+	return FAQ{}, errNotImplemented
+}
+
+// Admin FAQ management
+type UpsertFAQParams struct {
+	ID        *uuid.UUID
+	Question  string
+	Answer    string
+	Category  string
+	SortOrder int
+}
+
+func (q *Queries) UpsertFAQ(ctx context.Context, arg UpsertFAQParams) (FAQ, error) {
+	return FAQ{}, errNotImplemented
+}
+
+func (q *Queries) DeleteFAQ(ctx context.Context, id uuid.UUID) error {
+	return errNotImplemented
+}

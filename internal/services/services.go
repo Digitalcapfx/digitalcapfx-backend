@@ -25,6 +25,9 @@ type Services struct {
 	Dashboard     *DashboardService
 	Notifications *NotificationService
 	Withdrawal    *WithdrawalService
+	Security      *SecurityService
+	Preferences   *PreferencesService
+	Support       *SupportService
 }
 
 func New(
@@ -53,5 +56,8 @@ func New(
 		Dashboard:     NewDashboardService(pool, nilosClient, paymentsClient, caasClient, logger),
 		Notifications: notif,
 		Withdrawal:    withdrawalSvc,
+		Security:      NewSecurityService(pool, rdb, logger),
+		Preferences:   NewPreferencesService(pool, logger),
+		Support:       NewSupportService(pool, logger),
 	}
 }

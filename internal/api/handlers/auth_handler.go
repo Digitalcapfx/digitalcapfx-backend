@@ -157,7 +157,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		response.BadRequest(w, "VALIDATION_ERROR", "invalid request body")
 		return
 	}
-	pair, err := h.svc.Auth.Login(r.Context(), services.LoginInput{
+	result, err := h.svc.Auth.Login(r.Context(), services.LoginInput{
 		Phone:    body.Phone,
 		PIN:      body.PIN,
 		DeviceIP: realIP(r),
@@ -170,15 +170,56 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		response.Forbidden(w, "account is inactive")
 	case err != nil:
 		response.InternalError(w)
+	case result.Requires2FA:
+		response.OK(w, map[string]any{
+			"requires_2fa": true,
+			"ref":          result.TOTPRef,
+			"message":      "enter your authenticator code to complete sign-in",
+		})
 	default:
-		notifyFromPair(r, pair.AccessToken, h.cfg.JWT.Secret, h.svc, services.CreateNotificationInput{
+		notifyFromPair(r, result.Pair.AccessToken, h.cfg.JWT.Secret, h.svc, services.CreateNotificationInput{
 			Type:  services.NotifLoginDetected,
 			Title: "New Login Detected",
 			Body:  fmt.Sprintf("A sign-in was detected from %s. Not you? Change your PIN immediately.", realIP(r)),
 			Metadata: map[string]string{"ip": realIP(r), "device": r.UserAgent()},
 		})
-		response.OK(w, pair)
+		response.OK(w, result.Pair)
 	}
+}
+
+// CompleteTOTPLogin godoc
+//
+//	@Summary      Complete 2FA login
+//	@Description  Exchanges a 2FA pending ref (from /auth/login) + a TOTP code for a full JWT pair.
+//	@Tags         auth
+//	@Accept       json
+//	@Produce      json
+//	@Param        body  body      TOTPLoginRequest  true  "ref + TOTP code"
+//	@Success      200   {object}  TokenPairResponse
+//	@Failure      400   {object}  ErrorResponse
+//	@Failure      401   {object}  ErrorResponse
+//	@Router       /auth/2fa/login [post]
+func (h *AuthHandler) CompleteTOTPLogin(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Ref  string `json:"ref"`
+		Code string `json:"code"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.Ref == "" || body.Code == "" {
+		response.BadRequest(w, "VALIDATION_ERROR", "ref and code are required")
+		return
+	}
+	pair, err := h.svc.Auth.CompleteTOTPLogin(r.Context(), body.Ref, body.Code, realIP(r), r.UserAgent())
+	if err != nil {
+		response.Unauthorized(w, "invalid or expired 2FA code")
+		return
+	}
+	notifyFromPair(r, pair.AccessToken, h.cfg.JWT.Secret, h.svc, services.CreateNotificationInput{
+		Type:     services.NotifLoginDetected,
+		Title:    "New Login Detected",
+		Body:     fmt.Sprintf("A sign-in (2FA) was detected from %s.", realIP(r)),
+		Metadata: map[string]string{"ip": realIP(r), "method": "totp"},
+	})
+	response.OK(w, pair)
 }
 
 // ─── Logout ───────────────────────────────────────────────────────────────────

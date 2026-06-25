@@ -274,6 +274,58 @@ type Notification struct {
 	CreatedAt time.Time       `json:"created_at"`
 }
 
+// ─── Migration 000008 models ───────────────────────────────────────────────────
+
+// UserPreferences stores per-user app settings (language, dark mode, biometrics).
+type UserPreferences struct {
+	UserID            uuid.UUID `json:"user_id"`
+	Language          string    `json:"language"`   // ISO 639-1 e.g. "en" | "fr"
+	DarkMode          string    `json:"dark_mode"`  // "always" | "never" | "system"
+	BiometricsEnabled bool      `json:"biometrics_enabled"`
+	CreatedAt         time.Time `json:"created_at"`
+	UpdatedAt         time.Time `json:"updated_at"`
+}
+
+// SupportTicket is a user-initiated help request.
+type SupportTicket struct {
+	ID        uuid.UUID `json:"id"`
+	UserID    uuid.UUID `json:"user_id"`
+	Reference string    `json:"reference"`
+	Subject   string    `json:"subject"`
+	Category  string    `json:"category"` // general|account|payment|kyc|technical|card
+	Status    string    `json:"status"`   // open|in_progress|resolved|closed
+	Priority  string    `json:"priority"` // low|normal|high|urgent
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
+// SupportMessage is one message in a support ticket thread.
+type SupportMessage struct {
+	ID         uuid.UUID  `json:"id"`
+	TicketID   uuid.UUID  `json:"ticket_id"`
+	SenderType string     `json:"sender_type"` // "user" | "agent"
+	SenderID   *uuid.UUID `json:"sender_id"`
+	Body       string     `json:"body"`
+	CreatedAt  time.Time  `json:"created_at"`
+}
+
+// FAQ is an admin-managed frequently-asked-question entry.
+type FAQ struct {
+	ID        uuid.UUID `json:"id"`
+	Question  string    `json:"question"`
+	Answer    string    `json:"answer"`
+	Category  string    `json:"category"`
+	SortOrder int       `json:"sort_order"`
+	IsActive  bool      `json:"is_active"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
+// SupportTicketWithMessages is the full view returned when fetching a single ticket.
+type SupportTicketWithMessages struct {
+	SupportTicket
+	Messages []SupportMessage `json:"messages"`
+}
+
 // ─── Migration 000007 models ───────────────────────────────────────────────────
 
 // BusinessFxRate is an admin-controlled conversion rate used for fiat withdrawals.
