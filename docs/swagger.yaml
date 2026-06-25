@@ -1,0 +1,1497 @@
+basePath: /api/v1
+definitions:
+  internal_api_handlers.AccountData:
+    properties:
+      account_number:
+        example: DFX0000001
+        type: string
+      available_balance:
+        example: "5000.000000"
+        type: string
+      balance:
+        example: "5000.000000"
+        type: string
+      created_at:
+        type: string
+      currency:
+        example: XAF
+        type: string
+      id:
+        example: 550e8400-e29b-41d4-a716-446655440000
+        type: string
+      status:
+        example: active
+        type: string
+      user_id:
+        example: 550e8400-e29b-41d4-a716-446655440001
+        type: string
+    type: object
+  internal_api_handlers.AccountListResponse:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/internal_api_handlers.AccountData'
+        type: array
+      success:
+        example: true
+        type: boolean
+    type: object
+  internal_api_handlers.AccountResponse:
+    properties:
+      data:
+        $ref: '#/definitions/internal_api_handlers.AccountData'
+      success:
+        example: true
+        type: boolean
+    type: object
+  internal_api_handlers.BalanceData:
+    properties:
+      balance_usdc:
+        example: "100.000000"
+        type: string
+      wallet_address:
+        example: 0xSCW123...
+        type: string
+    type: object
+  internal_api_handlers.CaasWalletData:
+    properties:
+      abstraction_address:
+        example: 0xSCW123...
+        type: string
+      caas_wallet_id:
+        example: 0xblindindex...
+        type: string
+      created_at:
+        type: string
+      id:
+        type: string
+      is_active:
+        example: true
+        type: boolean
+      user_id:
+        type: string
+    type: object
+  internal_api_handlers.CaasWalletResponse:
+    properties:
+      data:
+        $ref: '#/definitions/internal_api_handlers.CaasWalletData'
+      success:
+        example: true
+        type: boolean
+    type: object
+  internal_api_handlers.CreateWalletRequest:
+    properties:
+      network:
+        description: 'Network is the blockchain network. Supported: BTC BCH LTC BSC
+          ETH POL TRX SOL XRP'
+        enum:
+        - BTC
+        - BCH
+        - LTC
+        - BSC
+        - ETH
+        - POL
+        - TRX
+        - SOL
+        - XRP
+        example: ETH
+        type: string
+    type: object
+  internal_api_handlers.CryptoBalanceResponse:
+    properties:
+      data:
+        $ref: '#/definitions/internal_api_handlers.BalanceData'
+      success:
+        example: true
+        type: boolean
+    type: object
+  internal_api_handlers.CryptoTxData:
+    properties:
+      amount:
+        example: "50.00"
+        type: string
+      created_at:
+        type: string
+      id:
+        type: string
+      receiver_phone:
+        example: "+237698765432"
+        type: string
+      reference:
+        example: CRYPTO-REF-001
+        type: string
+      sender_user_id:
+        type: string
+      status:
+        example: pending
+        type: string
+      token:
+        example: USDC
+        type: string
+      tx_hash:
+        type: string
+    type: object
+  internal_api_handlers.CryptoTxListResponse:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/internal_api_handlers.CryptoTxData'
+        type: array
+      success:
+        example: true
+        type: boolean
+    type: object
+  internal_api_handlers.CryptoTxResponse:
+    properties:
+      data:
+        $ref: '#/definitions/internal_api_handlers.CryptoTxData'
+      success:
+        example: true
+        type: boolean
+    type: object
+  internal_api_handlers.DepositRequest:
+    properties:
+      amount:
+        example: 5000
+        type: number
+      currency:
+        example: XAF
+        type: string
+      operator:
+        example: MTN
+        type: string
+      phone:
+        example: "+237612345678"
+        type: string
+    type: object
+  internal_api_handlers.ErrorResponse:
+    properties:
+      error:
+        properties:
+          code:
+            example: VALIDATION_ERROR
+            type: string
+          message:
+            example: phone is required
+            type: string
+        type: object
+      success:
+        example: false
+        type: boolean
+    type: object
+  internal_api_handlers.FundAccountRequest:
+    properties:
+      amount:
+        description: Amount in local fiat (minimum 100)
+        example: 20000
+        minimum: 100
+        type: number
+      currency:
+        description: 'Currency of the Mobile Money deposit: XOF or XAF'
+        enum:
+        - XOF
+        - XAF
+        example: XOF
+        type: string
+      operator:
+        description: Operator is the Mobile Money provider
+        enum:
+        - Orange
+        - MTN
+        - Wave
+        - Moov
+        - Airtel
+        example: MTN
+        type: string
+      phone:
+        description: Phone is the Mobile Money number to pull from (E.164)
+        example: "+22507000000"
+        type: string
+      token:
+        description: Token is the target stablecoin — defaults to USDC
+        enum:
+        - USDC
+        - USDT
+        example: USDC
+        type: string
+    type: object
+  internal_api_handlers.HUB2WebhookRequest:
+    properties:
+      amount:
+        example: 20000
+        type: number
+      currency:
+        example: XOF
+        type: string
+      phone:
+        example: "+22507000000"
+        type: string
+      reference:
+        example: HUB2-REF-001
+        type: string
+      status:
+        enum:
+        - SUCCESSFUL
+        - FAILED
+        - CANCELLED
+        - PENDING
+        example: SUCCESSFUL
+        type: string
+      type:
+        enum:
+        - COLLECTION
+        - DISBURSEMENT
+        example: COLLECTION
+        type: string
+    type: object
+  internal_api_handlers.Hub2PaymentRequest:
+    properties:
+      amount:
+        example: 5000
+        type: number
+      currency:
+        example: XAF
+        type: string
+      direction:
+        description: 'Direction: collection (deposit) or disbursement (withdrawal)'
+        enum:
+        - collection
+        - disbursement
+        example: collection
+        type: string
+      operator:
+        example: MTN
+        type: string
+      payment_method:
+        description: PaymentMethod e.g. mobile_money
+        example: mobile_money
+        type: string
+      phone:
+        example: "+237612345678"
+        type: string
+    type: object
+  internal_api_handlers.Hub2RefData:
+    properties:
+      hub2_reference:
+        example: HUB2-REF-001
+        type: string
+    type: object
+  internal_api_handlers.Hub2RefResponse:
+    properties:
+      data:
+        $ref: '#/definitions/internal_api_handlers.Hub2RefData'
+      success:
+        example: true
+        type: boolean
+    type: object
+  internal_api_handlers.InternalTransferRequest:
+    properties:
+      amount:
+        example: 5000
+        type: number
+      currency:
+        example: XAF
+        type: string
+      description:
+        example: Monthly payment
+        type: string
+      receiver_phone:
+        example: "+237698765432"
+        type: string
+    type: object
+  internal_api_handlers.KYCDocumentData:
+    properties:
+      created_at:
+        type: string
+      doc_type:
+        example: national_id
+        type: string
+      doc_url:
+        type: string
+      id:
+        type: string
+      rejection_reason:
+        type: string
+      status:
+        example: pending
+        type: string
+      user_id:
+        type: string
+    type: object
+  internal_api_handlers.KYCDocumentListResponse:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/internal_api_handlers.KYCDocumentData'
+        type: array
+      success:
+        example: true
+        type: boolean
+    type: object
+  internal_api_handlers.KYCDocumentRequest:
+    properties:
+      doc_type:
+        description: 'DocType one of: national_id | passport | selfie | proof_of_address'
+        enum:
+        - national_id
+        - passport
+        - selfie
+        - proof_of_address
+        example: national_id
+        type: string
+      doc_url:
+        description: DocURL is the GCS object path or signed URL returned by the upload
+          endpoint
+        example: https://storage.googleapis.com/digitalfx-kyc-dev/doc.jpg
+        type: string
+    type: object
+  internal_api_handlers.KYCDocumentResponse:
+    properties:
+      data:
+        $ref: '#/definitions/internal_api_handlers.KYCDocumentData'
+      success:
+        example: true
+        type: boolean
+    type: object
+  internal_api_handlers.KYCStatusData:
+    properties:
+      kyc_status:
+        enum:
+        - pending
+        - approved
+        - rejected
+        example: pending
+        type: string
+    type: object
+  internal_api_handlers.KYCStatusResponse:
+    properties:
+      data:
+        $ref: '#/definitions/internal_api_handlers.KYCStatusData'
+      success:
+        example: true
+        type: boolean
+    type: object
+  internal_api_handlers.LoginRequest:
+    properties:
+      phone:
+        example: "+237612345678"
+        type: string
+      pin:
+        example: "123456"
+        type: string
+    type: object
+  internal_api_handlers.MessageResponse:
+    properties:
+      message:
+        example: OTP sent
+        type: string
+      success:
+        example: true
+        type: boolean
+    type: object
+  internal_api_handlers.PaginationMeta:
+    properties:
+      page:
+        example: 1
+        type: integer
+      per_page:
+        example: 20
+        type: integer
+      total:
+        example: 100
+        type: integer
+      total_pages:
+        example: 5
+        type: integer
+    type: object
+  internal_api_handlers.RefreshTokenRequest:
+    properties:
+      refresh_token:
+        example: eyJhbGci...
+        type: string
+    type: object
+  internal_api_handlers.RegisterRequest:
+    properties:
+      email:
+        example: alice@example.com
+        type: string
+      first_name:
+        example: Alice
+        type: string
+      last_name:
+        example: Dupont
+        type: string
+      phone:
+        example: "+237612345678"
+        type: string
+      pin:
+        example: "123456"
+        type: string
+    type: object
+  internal_api_handlers.SendCryptoRequest:
+    properties:
+      amount:
+        example: "50.00"
+        type: string
+      receiver_phone:
+        example: "+237698765432"
+        type: string
+      token:
+        description: Token must be USDT or USDC
+        enum:
+        - USDT
+        - USDC
+        example: USDC
+        type: string
+    type: object
+  internal_api_handlers.SendOTPRequest:
+    properties:
+      phone:
+        example: "+237612345678"
+        type: string
+    type: object
+  internal_api_handlers.TokenPairData:
+    properties:
+      access_token:
+        example: eyJhbGci...
+        type: string
+      expires_in:
+        example: 1800
+        type: integer
+      refresh_token:
+        example: eyJhbGci...
+        type: string
+    type: object
+  internal_api_handlers.TokenPairResponse:
+    properties:
+      data:
+        $ref: '#/definitions/internal_api_handlers.TokenPairData'
+      success:
+        example: true
+        type: boolean
+    type: object
+  internal_api_handlers.TransactionData:
+    properties:
+      account_id:
+        type: string
+      amount:
+        example: "5000.000000"
+        type: string
+      created_at:
+        type: string
+      currency:
+        example: XAF
+        type: string
+      description:
+        example: Deposit via MTN Mobile Money
+        type: string
+      fee:
+        example: "0.000000"
+        type: string
+      id:
+        example: 550e8400-e29b-41d4-a716-446655440000
+        type: string
+      reference:
+        example: TXN-20240101-001
+        type: string
+      status:
+        example: completed
+        type: string
+      type:
+        example: credit
+        type: string
+    type: object
+  internal_api_handlers.TransactionListResponse:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/internal_api_handlers.TransactionData'
+        type: array
+      meta:
+        $ref: '#/definitions/internal_api_handlers.PaginationMeta'
+      success:
+        example: true
+        type: boolean
+    type: object
+  internal_api_handlers.TransactionResponse:
+    properties:
+      data:
+        $ref: '#/definitions/internal_api_handlers.TransactionData'
+      success:
+        example: true
+        type: boolean
+    type: object
+  internal_api_handlers.VerifyOTPRequest:
+    properties:
+      code:
+        example: "123456"
+        type: string
+      phone:
+        example: "+237612345678"
+        type: string
+    type: object
+  internal_api_handlers.WalletData:
+    properties:
+      address:
+        example: 0xabc123...
+        type: string
+      created_at:
+        type: string
+      id:
+        type: string
+      is_default:
+        example: true
+        type: boolean
+      network:
+        example: ETH
+        type: string
+      user_id:
+        type: string
+      waas_wallet_id:
+        example: cust_abc123
+        type: string
+    type: object
+  internal_api_handlers.WalletListResponse:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/internal_api_handlers.WalletData'
+        type: array
+      success:
+        example: true
+        type: boolean
+    type: object
+  internal_api_handlers.WalletResponse:
+    properties:
+      data:
+        $ref: '#/definitions/internal_api_handlers.WalletData'
+      success:
+        example: true
+        type: boolean
+    type: object
+  internal_api_handlers.WithdrawalRequest:
+    properties:
+      amount:
+        example: 5000
+        type: number
+      currency:
+        example: XAF
+        type: string
+      operator:
+        example: ORANGE
+        type: string
+      phone:
+        example: "+237612345678"
+        type: string
+    type: object
+host: localhost:8080
+info:
+  contact:
+    email: engineering@rach.finance
+    name: Rach Finance Engineering
+  description: |-
+    DigitalFX is a multi-currency fintech platform for Central/West Africa.
+    It combines fiat accounts (XAF, XOF, USD, GBP, EUR), HD crypto wallets (BIP-44 via Rach WaaS),
+    and stablecoin P2P transfers (USDC/USDT via Rach CaaS ERC-4337 SCWs).
+    Mobile Money deposits and withdrawals are handled via HUB2 (MTN, Orange).
+  title: DigitalFX API
+  version: "1.0"
+paths:
+  /accounts:
+    get:
+      description: Returns all fiat accounts (XAF, XOF, USD, GBP, EUR) for the authenticated
+        user.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_api_handlers.AccountListResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/internal_api_handlers.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/internal_api_handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List accounts
+      tags:
+      - accounts
+  /accounts/{currency}:
+    get:
+      description: Returns a single fiat account for the given currency code.
+      parameters:
+      - description: Currency code
+        enum:
+        - XAF
+        - XOF
+        - USD
+        - GBP
+        - EUR
+        in: path
+        name: currency
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_api_handlers.AccountResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/internal_api_handlers.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/internal_api_handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get account by currency
+      tags:
+      - accounts
+  /accounts/{currency}/transactions:
+    get:
+      description: Returns a paginated list of transactions for the given currency
+        account.
+      parameters:
+      - description: Currency code
+        enum:
+        - XAF
+        - XOF
+        - USD
+        - GBP
+        - EUR
+        in: path
+        name: currency
+        required: true
+        type: string
+      - description: Page number (default 1)
+        in: query
+        name: page
+        type: integer
+      - description: Results per page, max 100 (default 20)
+        in: query
+        name: per_page
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_api_handlers.TransactionListResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/internal_api_handlers.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/internal_api_handlers.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/internal_api_handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List transactions for an account
+      tags:
+      - accounts
+  /accounts/{currency}/transactions/{id}:
+    get:
+      description: Returns a specific transaction by its UUID.
+      parameters:
+      - description: Currency code
+        enum:
+        - XAF
+        - XOF
+        - USD
+        - GBP
+        - EUR
+        in: path
+        name: currency
+        required: true
+        type: string
+      - description: Transaction UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_api_handlers.TransactionResponse'
+        "400":
+          description: Invalid UUID
+          schema:
+            $ref: '#/definitions/internal_api_handlers.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/internal_api_handlers.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/internal_api_handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get a single transaction
+      tags:
+      - accounts
+  /auth/login:
+    post:
+      consumes:
+      - application/json
+      description: Authenticates a user with phone + PIN and returns a JWT token pair.
+      parameters:
+      - description: Credentials
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/internal_api_handlers.LoginRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_api_handlers.TokenPairResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/internal_api_handlers.ErrorResponse'
+        "403":
+          description: Account inactive
+          schema:
+            $ref: '#/definitions/internal_api_handlers.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/internal_api_handlers.ErrorResponse'
+      summary: Login
+      tags:
+      - auth
+  /auth/otp/send:
+    post:
+      consumes:
+      - application/json
+      description: Sends a 6-digit OTP to the provided phone number. Must be called
+        before register or login.
+      parameters:
+      - description: Phone number in E.164 format
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/internal_api_handlers.SendOTPRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_api_handlers.MessageResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/internal_api_handlers.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/internal_api_handlers.ErrorResponse'
+      summary: Send OTP
+      tags:
+      - auth
+  /auth/otp/verify:
+    post:
+      consumes:
+      - application/json
+      description: Confirms that the OTP sent to the phone is correct. Call before
+        register for new users.
+      parameters:
+      - description: Phone + OTP code
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/internal_api_handlers.VerifyOTPRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_api_handlers.MessageResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/internal_api_handlers.ErrorResponse'
+      summary: Verify OTP
+      tags:
+      - auth
+  /auth/register:
+    post:
+      consumes:
+      - application/json
+      description: Creates a new user account and returns a JWT token pair. OTP must
+        have been verified first.
+      parameters:
+      - description: New user details
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/internal_api_handlers.RegisterRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/internal_api_handlers.TokenPairResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/internal_api_handlers.ErrorResponse'
+        "409":
+          description: Phone number already registered
+          schema:
+            $ref: '#/definitions/internal_api_handlers.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/internal_api_handlers.ErrorResponse'
+      summary: Register
+      tags:
+      - auth
+  /auth/token/refresh:
+    post:
+      consumes:
+      - application/json
+      description: Issues a new access + refresh token pair using a valid refresh
+        token.
+      parameters:
+      - description: Refresh token
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/internal_api_handlers.RefreshTokenRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_api_handlers.TokenPairResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/internal_api_handlers.ErrorResponse'
+        "401":
+          description: Invalid or expired refresh token
+          schema:
+            $ref: '#/definitions/internal_api_handlers.ErrorResponse'
+      summary: Refresh token
+      tags:
+      - auth
+  /crypto/balances:
+    get:
+      description: Returns the USDC balance of the caller's ERC-4337 Smart Contract
+        Wallet from the CaaS service.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_api_handlers.CryptoBalanceResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/internal_api_handlers.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/internal_api_handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get stablecoin balances
+      tags:
+      - crypto
+  /crypto/fund:
+    post:
+      consumes:
+      - application/json
+      description: 'Step 4–5 of the Instant USD Account flow. Initiates a HUB2 Mobile
+        Money collection: the customer receives a push-to-pay prompt on their phone.
+        After they approve, HUB2 fires a webhook which triggers DigitalFX to instruct
+        Rach CaaS to convert the XOF/XAF to USDC/USDT and credit the customer''s ERC-4337
+        Smart Contract Wallet. The customer sees their updated balance via GET /crypto/balances
+        once Rach CaaS confirms the fiat and completes the OTC conversion.'
+      parameters:
+      - description: Funding request
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/internal_api_handlers.FundAccountRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: HUB2 collection reference — poll status or wait for balance
+            update
+          schema:
+            $ref: '#/definitions/internal_api_handlers.Hub2RefResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/internal_api_handlers.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/internal_api_handlers.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/internal_api_handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Fund Instant USD Account via Mobile Money
+      tags:
+      - crypto
+  /crypto/send:
+    post:
+      consumes:
+      - application/json
+      description: Transfers stablecoins (USDT or USDC) from the caller to another
+        DigitalFX user identified by phone number. An FX quote is obtained first,
+        then the CaaS P2P transfer is executed. Amount is in USD-equivalent decimal
+        (e.g. "50.00").
+      parameters:
+      - description: Transfer details
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/internal_api_handlers.SendCryptoRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/internal_api_handlers.CryptoTxResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/internal_api_handlers.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/internal_api_handlers.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/internal_api_handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Send USDT or USDC to another user
+      tags:
+      - crypto
+  /crypto/transactions:
+    get:
+      description: Returns a paginated list of crypto (USDT/USDC) transactions for
+        the authenticated user.
+      parameters:
+      - description: Page number (default 1)
+        in: query
+        name: page
+        type: integer
+      - description: Results per page, max 100 (default 20)
+        in: query
+        name: per_page
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_api_handlers.CryptoTxListResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/internal_api_handlers.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/internal_api_handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List crypto transactions
+      tags:
+      - crypto
+  /crypto/transactions/{id}:
+    get:
+      description: Returns a single crypto transaction by its UUID.
+      parameters:
+      - description: Transaction UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_api_handlers.CryptoTxResponse'
+        "400":
+          description: Invalid UUID
+          schema:
+            $ref: '#/definitions/internal_api_handlers.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/internal_api_handlers.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/internal_api_handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get a crypto transaction
+      tags:
+      - crypto
+  /crypto/wallet:
+    get:
+      description: Returns the caller's ERC-4337 Smart Contract Wallet (SCW), provisioning
+        it on the CaaS service if this is the first call. The wallet is identified
+        by the user's phone number.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_api_handlers.CaasWalletResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/internal_api_handlers.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/internal_api_handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get or create ERC-4337 abstraction wallet
+      tags:
+      - crypto
+  /kyc/documents:
+    get:
+      description: Returns all identity documents submitted by the authenticated user.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_api_handlers.KYCDocumentListResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/internal_api_handlers.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/internal_api_handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List KYC documents
+      tags:
+      - kyc
+    post:
+      consumes:
+      - application/json
+      description: Records a KYC document for manual review. The doc_url should be
+        a GCS signed URL or object path obtained from the client-side upload flow.
+      parameters:
+      - description: Document metadata
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/internal_api_handlers.KYCDocumentRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/internal_api_handlers.KYCDocumentResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/internal_api_handlers.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/internal_api_handlers.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/internal_api_handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Submit a KYC document
+      tags:
+      - kyc
+  /kyc/status:
+    get:
+      description: 'Returns the current KYC verification status for the authenticated
+        user. Possible values: pending, approved, rejected.'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_api_handlers.KYCStatusResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/internal_api_handlers.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/internal_api_handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get KYC status
+      tags:
+      - kyc
+  /transfers/exchange:
+    post:
+      consumes:
+      - application/json
+      description: Converts between supported fiat currencies at the current FX rate.
+        Rate provider integration is pending.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_api_handlers.MessageResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/internal_api_handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Exchange currency
+      tags:
+      - transfers
+  /transfers/hub2:
+    post:
+      consumes:
+      - application/json
+      description: Initiates either a collection (deposit) or disbursement (withdrawal)
+        via the HUB2 Mobile Money gateway for XAF/XOF operators (MTN, Orange).
+      parameters:
+      - description: Payment details
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/internal_api_handlers.Hub2PaymentRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/internal_api_handlers.Hub2RefResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/internal_api_handlers.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/internal_api_handlers.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/internal_api_handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Mobile Money payment via HUB2
+      tags:
+      - transfers
+  /transfers/internal:
+    post:
+      consumes:
+      - application/json
+      description: Transfers fiat funds between two DigitalFX users using their phone
+        numbers. Both sender and receiver must have an account in the requested currency.
+      parameters:
+      - description: Transfer details
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/internal_api_handlers.InternalTransferRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_api_handlers.MessageResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/internal_api_handlers.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/internal_api_handlers.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/internal_api_handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Internal fiat transfer
+      tags:
+      - transfers
+  /wallets:
+    get:
+      description: Returns all on-chain HD wallets (BIP-44) provisioned for the authenticated
+        user via the Rach WaaS service.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_api_handlers.WalletListResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/internal_api_handlers.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/internal_api_handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List HD wallets
+      tags:
+      - wallets
+    post:
+      consumes:
+      - application/json
+      description: Provisions an HD wallet seed (if not already created) and derives
+        a deposit address for the given blockchain network. Idempotent — safe to call
+        again for the same network.
+      parameters:
+      - description: Network selection
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/internal_api_handlers.CreateWalletRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/internal_api_handlers.WalletResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/internal_api_handlers.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/internal_api_handlers.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/internal_api_handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Create HD wallet for a network
+      tags:
+      - wallets
+  /wallets/{walletId}/address:
+    get:
+      description: Returns the deposit address for the specified wallet ID.
+      parameters:
+      - description: Wallet UUID
+        in: path
+        name: walletId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_api_handlers.WalletResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/internal_api_handlers.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/internal_api_handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get deposit address
+      tags:
+      - wallets
+  /wallets/deposit:
+    post:
+      consumes:
+      - application/json
+      description: Initiates a Mobile Money collection (deposit) via HUB2, crediting
+        the user's fiat account when confirmed. Returns the HUB2 reference for webhook
+        correlation.
+      parameters:
+      - description: Deposit details
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/internal_api_handlers.DepositRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/internal_api_handlers.Hub2RefResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/internal_api_handlers.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/internal_api_handlers.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/internal_api_handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Initiate Mobile Money deposit
+      tags:
+      - wallets
+  /wallets/withdraw:
+    post:
+      consumes:
+      - application/json
+      description: Initiates a Mobile Money disbursement (withdrawal) via HUB2, debiting
+        the user's fiat account. Returns the HUB2 reference for tracking.
+      parameters:
+      - description: Withdrawal details
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/internal_api_handlers.WithdrawalRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/internal_api_handlers.Hub2RefResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/internal_api_handlers.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/internal_api_handlers.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/internal_api_handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Initiate Mobile Money withdrawal
+      tags:
+      - wallets
+  /webhooks/hub2:
+    post:
+      consumes:
+      - application/json
+      description: Receives Mobile Money payment status updates from HUB2. On a COLLECTION
+        SUCCESSFUL event, DigitalFX automatically credits the user's CaaS USDC wallet.
+        The request must carry a valid HMAC-SHA256 signature in the X-Hub2-Signature
+        header.
+      parameters:
+      - description: 'HMAC-SHA256 signature: sha256=<hex>'
+        in: header
+        name: X-Hub2-Signature
+        required: true
+        type: string
+      - description: HUB2 webhook payload
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/internal_api_handlers.HUB2WebhookRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_api_handlers.MessageResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/internal_api_handlers.ErrorResponse'
+        "403":
+          description: Invalid signature
+          schema:
+            $ref: '#/definitions/internal_api_handlers.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/internal_api_handlers.ErrorResponse'
+      summary: HUB2 payment webhook
+      tags:
+      - webhooks
+securityDefinitions:
+  BearerAuth:
+    description: 'JWT access token — prefix with "Bearer ": Bearer eyJhbGci...'
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"
