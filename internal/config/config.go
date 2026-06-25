@@ -102,9 +102,11 @@ type GoogleConfig struct {
 }
 
 // NilosConfig holds credentials for the Nilos fiat banking API.
+// Auth uses HMAC-SHA256: X-Api-Key = APIKey (ID), X-Api-Signature = HMAC-SHA256(path+body, APISecret).
 type NilosConfig struct {
-	BaseURL string
-	APIKey  string
+	BaseURL   string
+	APIKey    string // key ID sent as X-Api-Key
+	APISecret string // signing secret for HMAC-SHA256
 }
 
 func Load() (*Config, error) {
@@ -166,8 +168,9 @@ func Load() (*Config, error) {
 
 	cfg.Google.ClientID = getEnv("GOOGLE_CLIENT_ID", "")
 
-	cfg.Nilos.BaseURL = getEnv("NILOS_BASE_URL", "https://api.nilos.io/v1")
+	cfg.Nilos.BaseURL = getEnv("NILOS_BASE_URL", "https://app-demo.nilos.io")
 	cfg.Nilos.APIKey = getEnv("NILOS_API_KEY", "")
+	cfg.Nilos.APISecret = getEnv("NILOS_API_SECRET", "")
 
 	if len(errs) > 0 {
 		return nil, fmt.Errorf("config errors:\n  %s", joinErrors(errs))

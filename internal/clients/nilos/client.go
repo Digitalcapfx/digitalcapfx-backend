@@ -3,19 +3,26 @@ package nilos
 import (
 	"bytes"
 	"context"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"time"
 )
 
-const defaultBaseURL = "https://api.nilos.io/v1"
+// Sandbox: https://app-demo.nilos.io  |  Production: https://app.nilos.io
+const defaultBaseURL = "https://app-demo.nilos.io"
 
 // Client is the Nilos fiat banking API client.
-// Nilos provides virtual IBAN/accounts, multi-currency balances, and SWIFT/SEPA/CEMAC transfers.
+// Auth: HMAC-SHA256 — every request carries X-Api-Key (key ID) and
+// X-Api-Signature = hex(HMAC-SHA256(urlPath + requestBody, apiSecret)).
 type Client struct {
 	baseURL    string
-	apiKey     string
+	apiKey     string // key ID → X-Api-Key header
+	apiSecret  string // signing secret → HMAC-SHA256
 	httpClient *http.Client
 }
 
@@ -25,18 +32,25 @@ func WithBaseURL(url string) Option {
 	return func(c *Client) { c.baseURL = url }
 }
 
-func New(apiKey string, opts ...Option) *Client {
+// New creates a Nilos client. apiKey is the key ID; apiSecret is the HMAC signing secret.
+func New(apiKey, apiSecret string, opts ...Option) *Client {
 	c := &Client{
-		baseURL: defaultBaseURL,
-		apiKey:  apiKey,
-		httpClient: &http.Client{
-			Timeout: 30 * time.Second,
-		},
+		baseURL:   defaultBaseURL,
+		apiKey:    apiKey,
+		apiSecret: apiSecret,
+		httpClient: &http.Client{Timeout: 30 * time.Second},
 	}
 	for _, o := range opts {
 		o(c)
 	}
 	return c
+}
+
+// sign returns hex(HMAC-SHA256(path+body, apiSecret)).
+func (c *Client) sign(path, body string) string {
+	mac := hmac.New(sha256.New, []byte(c.apiSecret))
+	mac.Write([]byte(path + body))
+	return hex.EncodeToString(mac.Sum(nil))
 }
 
 // ─── Customer ─────────────────────────────────────────────────────────────────
@@ -181,18 +195,10 @@ func (c *Client) doPost(ctx context.Context, path string, body, out interface{})
 		return err
 	}
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+c.apiKey)
+	req.Header.Set("X-Api-Key", c.apiKey)
+	req.Header.Set("X-Api-Signature", c.sign(path, string(b)))
 
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return fmt.Errorf("nilos POST %s: %w", path, err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode >= 400 {
-		return fmt.Errorf("nilos POST %s: status %d", path, resp.StatusCode)
-	}
-	return json.NewDecoder(resp.Body).Decode(out)
+	return c.do(req, path, out)
 }
 
 func (c *Client) doGet(ctx context.Context, path string, out interface{}) error {
@@ -200,16 +206,22 @@ func (c *Client) doGet(ctx context.Context, path string, out interface{}) error 
 	if err != nil {
 		return err
 	}
-	req.Header.Set("Authorization", "Bearer "+c.apiKey)
+	req.Header.Set("X-Api-Key", c.apiKey)
+	req.Header.Set("X-Api-Signature", c.sign(path, ""))
 
+	return c.do(req, path, out)
+}
+
+func (c *Client) do(req *http.Request, path string, out interface{}) error {
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return fmt.Errorf("nilos GET %s: %w", path, err)
+		return fmt.Errorf("nilos %s %s: %w", req.Method, path, err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode >= 400 {
-		return fmt.Errorf("nilos GET %s: status %d", path, resp.StatusCode)
+		errBody, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("nilos %s %s: status %d: %s", req.Method, path, resp.StatusCode, string(errBody))
 	}
 	return json.NewDecoder(resp.Body).Decode(out)
 }

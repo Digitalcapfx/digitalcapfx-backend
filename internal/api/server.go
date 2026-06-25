@@ -62,7 +62,7 @@ func NewServer(cfg *config.Config) (*Server, error) {
 		cfg.MetaMap.ClientSecret,
 		cfg.MetaMap.FlowID,
 	)
-	nilosClient := nilos.New(cfg.Nilos.APIKey, nilos.WithBaseURL(cfg.Nilos.BaseURL))
+	nilosClient := nilos.New(cfg.Nilos.APIKey, cfg.Nilos.APISecret, nilos.WithBaseURL(cfg.Nilos.BaseURL))
 
 	// Service layer
 	svc := services.New(pool, rdb, paymentsClient, caasClient, hub2Client, emailClient, metamapClient, nilosClient, cfg, logger)
