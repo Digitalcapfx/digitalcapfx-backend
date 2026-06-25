@@ -43,6 +43,7 @@ func newRouter(cfg *config.Config, svc *services.Services, pool *pgxpool.Pool, l
 	adminH     := handlers.NewAdminHandler(svc)
 	dashboardH      := handlers.NewDashboardHandler(svc)
 	notificationH   := handlers.NewNotificationHandler(svc)
+	withdrawalH     := handlers.NewWithdrawalHandler(svc)
 	webhookH        := handlers.NewWebhookHandler(svc, cfg.HUB2.SecretKey, logger)
 
 	kycRequired := middleware.KYCRequired(pool)
@@ -143,6 +144,15 @@ func newRouter(cfg *config.Config, svc *services.Services, pool *pgxpool.Pool, l
 				r.Get("/dashboard", dashboardH.GetDashboard)
 				r.Get("/activity", dashboardH.GetActivityFeed)
 				r.Get("/crypto/contacts", dashboardH.GetRecentContacts)
+
+				// Fiat withdrawals (Nilos-backed accounts → bank or mobile money)
+				r.Post("/withdrawals/quote", withdrawalH.Quote)
+				r.Post("/withdrawals", withdrawalH.Initiate)
+				r.Get("/withdrawals", withdrawalH.List)
+				r.Get("/withdrawals/{id}", withdrawalH.Get)
+				r.Get("/withdrawals/beneficiaries", withdrawalH.ListBeneficiaries)
+				r.Post("/withdrawals/beneficiaries", withdrawalH.SaveBeneficiary)
+				r.Delete("/withdrawals/beneficiaries/{id}", withdrawalH.DeleteBeneficiary)
 			})
 
 			// Notifications (no KYC gate — available from day 1)
@@ -158,6 +168,8 @@ func newRouter(cfg *config.Config, svc *services.Services, pool *pgxpool.Pool, l
 				r.Get("/admin/kyc/pending", adminH.ListPendingKYC)
 				r.Post("/admin/kyc/{id}/approve", adminH.ApproveKYC)
 				r.Post("/admin/kyc/{id}/reject", adminH.RejectKYC)
+				r.Post("/admin/withdrawal-rates", adminH.SetWithdrawalRate)
+				r.Get("/admin/withdrawal-rates", adminH.ListWithdrawalRates)
 			})
 		})
 	})

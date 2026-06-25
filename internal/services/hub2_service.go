@@ -34,10 +34,11 @@ import (
 )
 
 type HUB2Service struct {
-	pool       *pgxpool.Pool
-	hub2Client *hub2.Client
-	caasClient *caas.Client
-	logger     *zap.Logger
+	pool        *pgxpool.Pool
+	hub2Client  *hub2.Client
+	caasClient  *caas.Client
+	withdrawal  *WithdrawalService // nil until set via SetWithdrawalService
+	logger      *zap.Logger
 }
 
 func NewHUB2Service(pool *pgxpool.Pool, hub2Client *hub2.Client, caasClient *caas.Client, logger *zap.Logger) *HUB2Service {
@@ -47,6 +48,12 @@ func NewHUB2Service(pool *pgxpool.Pool, hub2Client *hub2.Client, caasClient *caa
 		caasClient: caasClient,
 		logger:     logger,
 	}
+}
+
+// SetWithdrawalService wires in the withdrawal service after both are constructed
+// (avoids circular dependency during New).
+func (s *HUB2Service) SetWithdrawalService(ws *WithdrawalService) {
+	s.withdrawal = ws
 }
 
 // HandleWebhook processes a payment status update pushed by HUB2 (step 5 → step 6).
@@ -95,6 +102,11 @@ func (s *HUB2Service) HandleWebhook(ctx context.Context, payload hub2.WebhookPay
 			zap.String("status", payload.Status),
 			zap.String("type", payload.Type),
 		)
+		// For disbursements, notify the withdrawal service so it can
+		// finalise the fiat_withdrawal record and user balance.
+		if payload.Type == "DISBURSEMENT" && s.withdrawal != nil {
+			s.withdrawal.HandleDisbursementResult(ctx, payload.Reference, payload.Status)
+		}
 		return err
 	}
 

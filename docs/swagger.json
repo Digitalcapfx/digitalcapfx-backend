@@ -437,6 +437,89 @@
                 }
             }
         },
+        "/admin/withdrawal-rates": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns all configured withdrawal FX rates (active and inactive).",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin"
+                ],
+                "summary": "List all business FX rates",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "type": "object"
+                            }
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Creates or replaces the admin-controlled conversion rate for a",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin"
+                ],
+                "summary": "Set or update a business FX rate for fiat withdrawals",
+                "parameters": [
+                    {
+                        "description": "Rate configuration",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.AdminSetRateRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/auth/devices": {
             "get": {
                 "security": [
@@ -2287,6 +2370,300 @@
                     }
                 }
             }
+        },
+        "/withdrawals": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns a paginated list of the caller's fiat withdrawal requests.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "withdrawals"
+                ],
+                "summary": "List fiat withdrawals",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Page number (default 1)",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Results per page, max 50 (default 20)",
+                        "name": "per_page",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.WithdrawalListResponse"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Initiates a withdrawal from the user's Nilos-backed fiat account",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "withdrawals"
+                ],
+                "summary": "Initiate fiat withdrawal",
+                "parameters": [
+                    {
+                        "description": "Withdrawal request",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.InitiateWithdrawalRequestBody"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.FiatWithdrawalResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "422": {
+                        "description": "Insufficient balance",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/withdrawals/beneficiaries": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns all saved withdrawal destinations (banks and mobile money",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "withdrawals"
+                ],
+                "summary": "List saved beneficiaries",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/handlers.BeneficiaryResponse"
+                            }
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Saves a bank account or mobile money number for quick repeat",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "withdrawals"
+                ],
+                "summary": "Save a new beneficiary",
+                "parameters": [
+                    {
+                        "description": "Beneficiary",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.SaveBeneficiaryRequestBody"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.BeneficiaryResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/withdrawals/beneficiaries/{id}": {
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "withdrawals"
+                ],
+                "summary": "Delete a saved beneficiary",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Beneficiary UUID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.MessageResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/withdrawals/quote": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns the exact fee and destination amount for a withdrawal",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "withdrawals"
+                ],
+                "summary": "Preview fiat withdrawal",
+                "parameters": [
+                    {
+                        "description": "Quote request",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.WithdrawalQuoteRequestBody"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.WithdrawalQuoteData"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/withdrawals/{id}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "withdrawals"
+                ],
+                "summary": "Get a fiat withdrawal by ID",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Withdrawal UUID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.FiatWithdrawalResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    }
+                }
+            }
         }
     },
     "definitions": {
@@ -2362,6 +2739,31 @@
                 }
             }
         },
+        "handlers.AdminSetRateRequest": {
+            "type": "object",
+            "properties": {
+                "fee_percent": {
+                    "description": "e.g. 0.01 = 1% fee on source amount",
+                    "type": "number"
+                },
+                "flat_fee": {
+                    "description": "e.g. 0.50 flat fee in source currency",
+                    "type": "number"
+                },
+                "rate": {
+                    "description": "e.g. 595.0 → 1 USD = 595 XAF",
+                    "type": "number"
+                },
+                "source_currency": {
+                    "description": "e.g. \"USD\"",
+                    "type": "string"
+                },
+                "target_currency": {
+                    "description": "e.g. \"XAF\"",
+                    "type": "string"
+                }
+            }
+        },
         "handlers.BalanceData": {
             "type": "object",
             "properties": {
@@ -2374,6 +2776,9 @@
                     "example": "0xSCW123..."
                 }
             }
+        },
+        "handlers.BeneficiaryResponse": {
+            "type": "object"
         },
         "handlers.CaasWalletData": {
             "type": "object",
@@ -2595,6 +3000,9 @@
                 }
             }
         },
+        "handlers.FiatWithdrawalResponse": {
+            "type": "object"
+        },
         "handlers.ForgotPINRequest": {
             "type": "object",
             "properties": {
@@ -2767,6 +3175,59 @@
                 "success": {
                     "type": "boolean",
                     "example": true
+                }
+            }
+        },
+        "handlers.InitiateWithdrawalRequestBody": {
+            "type": "object",
+            "properties": {
+                "account_number": {
+                    "type": "string"
+                },
+                "bank_name": {
+                    "description": "Bank",
+                    "type": "string"
+                },
+                "beneficiary_id": {
+                    "description": "Saved beneficiary (pre-fills destination fields)",
+                    "type": "string"
+                },
+                "destination_country": {
+                    "type": "string"
+                },
+                "destination_currency": {
+                    "type": "string"
+                },
+                "destination_type": {
+                    "type": "string"
+                },
+                "iban": {
+                    "type": "string"
+                },
+                "operator": {
+                    "type": "string"
+                },
+                "phone_number": {
+                    "description": "Mobile money",
+                    "type": "string"
+                },
+                "recipient_name": {
+                    "type": "string"
+                },
+                "routing_number": {
+                    "type": "string"
+                },
+                "sort_code": {
+                    "type": "string"
+                },
+                "source_amount": {
+                    "type": "number"
+                },
+                "source_currency": {
+                    "type": "string"
+                },
+                "swift_code": {
+                    "type": "string"
                 }
             }
         },
@@ -3083,6 +3544,47 @@
                 }
             }
         },
+        "handlers.SaveBeneficiaryRequestBody": {
+            "type": "object",
+            "properties": {
+                "account_number": {
+                    "type": "string"
+                },
+                "bank_name": {
+                    "type": "string"
+                },
+                "country": {
+                    "type": "string"
+                },
+                "destination_currency": {
+                    "type": "string"
+                },
+                "iban": {
+                    "type": "string"
+                },
+                "label": {
+                    "type": "string"
+                },
+                "operator": {
+                    "type": "string"
+                },
+                "phone_number": {
+                    "type": "string"
+                },
+                "routing_number": {
+                    "type": "string"
+                },
+                "sort_code": {
+                    "type": "string"
+                },
+                "swift_code": {
+                    "type": "string"
+                },
+                "type": {
+                    "type": "string"
+                }
+            }
+        },
         "handlers.SendCryptoRequest": {
             "type": "object",
             "properties": {
@@ -3324,6 +3826,29 @@
                 "success": {
                     "type": "boolean",
                     "example": true
+                }
+            }
+        },
+        "handlers.WithdrawalListResponse": {
+            "type": "object"
+        },
+        "handlers.WithdrawalQuoteData": {
+            "type": "object"
+        },
+        "handlers.WithdrawalQuoteRequestBody": {
+            "type": "object",
+            "properties": {
+                "destination_currency": {
+                    "type": "string"
+                },
+                "destination_type": {
+                    "type": "string"
+                },
+                "source_amount": {
+                    "type": "number"
+                },
+                "source_currency": {
+                    "type": "string"
                 }
             }
         },

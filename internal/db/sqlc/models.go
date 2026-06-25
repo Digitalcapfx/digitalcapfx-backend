@@ -273,3 +273,74 @@ type Notification struct {
 	Metadata  json.RawMessage `json:"metadata,omitempty"`
 	CreatedAt time.Time       `json:"created_at"`
 }
+
+// ─── Migration 000007 models ───────────────────────────────────────────────────
+
+// BusinessFxRate is an admin-controlled conversion rate used for fiat withdrawals.
+// The business earns the spread between this rate and the interbank rate.
+type BusinessFxRate struct {
+	ID             uuid.UUID      `json:"id"`
+	SourceCurrency string         `json:"source_currency"`
+	TargetCurrency string         `json:"target_currency"`
+	Rate           pgtype.Numeric `json:"rate"`        // units of target per 1 source
+	FeePercent     pgtype.Numeric `json:"fee_percent"` // e.g. 0.0100 = 1%
+	FlatFee        pgtype.Numeric `json:"flat_fee"`    // flat fee in source currency
+	IsActive       bool           `json:"is_active"`
+	SetBy          *uuid.UUID     `json:"set_by"`
+	CreatedAt      time.Time      `json:"created_at"`
+	UpdatedAt      time.Time      `json:"updated_at"`
+}
+
+// Beneficiary is a saved withdrawal destination (bank account or mobile money number).
+type Beneficiary struct {
+	ID                  uuid.UUID `json:"id"`
+	UserID              uuid.UUID `json:"user_id"`
+	Label               string    `json:"label"`
+	Type                string    `json:"type"`                // "mobile_money" | "bank"
+	DestinationCurrency string    `json:"destination_currency"`
+	Country             string    `json:"country"`
+	PhoneNumber         *string   `json:"phone_number"`
+	Operator            *string   `json:"operator"`
+	BankName            *string   `json:"bank_name"`
+	AccountNumber       *string   `json:"account_number"`
+	IBAN                *string   `json:"iban"`
+	SwiftCode           *string   `json:"swift_code"`
+	SortCode            *string   `json:"sort_code"`
+	RoutingNumber       *string   `json:"routing_number"`
+	NilosRecipientID    *string   `json:"nilos_recipient_id"`
+	CreatedAt           time.Time `json:"created_at"`
+}
+
+// FiatWithdrawal tracks a user's request to move funds from their Nilos fiat
+// account to an external destination (bank or mobile money).
+type FiatWithdrawal struct {
+	ID                  uuid.UUID      `json:"id"`
+	UserID              uuid.UUID      `json:"user_id"`
+	SourceCurrency      string         `json:"source_currency"`
+	SourceAmount        pgtype.Numeric `json:"source_amount"`
+	Fee                 pgtype.Numeric `json:"fee"`
+	FeeCurrency         string         `json:"fee_currency"`
+	FxRate              pgtype.Numeric `json:"fx_rate"` // NULL when same currency
+	DestinationType     string         `json:"destination_type"`
+	DestinationCurrency string         `json:"destination_currency"`
+	DestinationAmount   pgtype.Numeric `json:"destination_amount"`
+	DestinationCountry  string         `json:"destination_country"`
+	RecipientName       string         `json:"recipient_name"`
+	PhoneNumber         *string        `json:"phone_number"`
+	Operator            *string        `json:"operator"`
+	BankName            *string        `json:"bank_name"`
+	AccountNumber       *string        `json:"account_number"`
+	IBAN                *string        `json:"iban"`
+	SwiftCode           *string        `json:"swift_code"`
+	SortCode            *string        `json:"sort_code"`
+	RoutingNumber       *string        `json:"routing_number"`
+	Status              string         `json:"status"`
+	NilosPayoutID       *string        `json:"nilos_payout_id"`
+	NilosRecipientID    *string        `json:"nilos_recipient_id"`
+	Hub2Reference       *string        `json:"hub2_reference"`
+	FailureReason       *string        `json:"failure_reason"`
+	Reference           string         `json:"reference"`
+	BeneficiaryID       *uuid.UUID     `json:"beneficiary_id"`
+	CreatedAt           time.Time      `json:"created_at"`
+	UpdatedAt           time.Time      `json:"updated_at"`
+}

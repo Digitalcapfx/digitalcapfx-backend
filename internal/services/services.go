@@ -24,6 +24,7 @@ type Services struct {
 	HUB2          *HUB2Service
 	Dashboard     *DashboardService
 	Notifications *NotificationService
+	Withdrawal    *WithdrawalService
 }
 
 func New(
@@ -39,14 +40,18 @@ func New(
 	logger *zap.Logger,
 ) *Services {
 	notif := NewNotificationService(pool, logger)
+	hub2Svc := NewHUB2Service(pool, hub2Client, caasClient, logger)
+	withdrawalSvc := NewWithdrawalService(pool, hub2Client, nilosClient, notif, logger)
+	hub2Svc.SetWithdrawalService(withdrawalSvc)
 	return &Services{
 		Auth:          NewAuthService(pool, rdb, cfg, logger, emailClient),
 		Account:       NewAccountService(pool, logger),
 		Wallet:        NewWalletService(pool, paymentsClient, hub2Client, logger),
 		Crypto:        NewCryptoService(pool, caasClient, hub2Client, logger),
 		KYC:           NewKYCService(pool, cfg, logger, metamapClient, emailClient, notif),
-		HUB2:          NewHUB2Service(pool, hub2Client, caasClient, logger),
+		HUB2:          hub2Svc,
 		Dashboard:     NewDashboardService(pool, nilosClient, paymentsClient, caasClient, logger),
 		Notifications: notif,
+		Withdrawal:    withdrawalSvc,
 	}
 }

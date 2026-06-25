@@ -123,6 +123,84 @@ func (h *AdminHandler) RejectKYC(w http.ResponseWriter, r *http.Request) {
 	response.OKWithMessage(w, "KYC rejected — user has been notified", nil)
 }
 
+// ─── FX Rate management ───────────────────────────────────────────────────────
+
+// SetWithdrawalRate godoc
+//
+//	@Summary      Set or update a business FX rate for fiat withdrawals
+//	@Description  Creates or replaces the admin-controlled conversion rate for a
+//	              currency pair. The business rate is applied when users withdraw
+//	              (e.g. USD→XAF). The spread between this rate and the interbank
+//	              rate is the business margin. Also configures the fee percentage
+//	              and optional flat fee charged on each withdrawal.
+//	@Tags         admin
+//	@Accept       json
+//	@Produce      json
+//	@Security     BearerAuth
+//	@Param        body  body      AdminSetRateRequest  true  "Rate configuration"
+//	@Success      200   {object}  object
+//	@Failure      400   {object}  ErrorResponse
+//	@Failure      401   {object}  ErrorResponse
+//	@Failure      403   {object}  ErrorResponse
+//	@Router       /admin/withdrawal-rates [post]
+func (h *AdminHandler) SetWithdrawalRate(w http.ResponseWriter, r *http.Request) {
+	adminID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		response.Unauthorized(w, "unauthorized")
+		return
+	}
+
+	var body AdminSetRateRequest
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		response.BadRequest(w, "VALIDATION_ERROR", "invalid request body")
+		return
+	}
+	if body.SourceCurrency == "" || body.TargetCurrency == "" || body.Rate <= 0 {
+		response.BadRequest(w, "VALIDATION_ERROR", "source_currency, target_currency and rate are required")
+		return
+	}
+
+	rate, err := h.svc.Withdrawal.SetRate(r.Context(), adminID, services.SetRateRequest{
+		SourceCurrency: body.SourceCurrency,
+		TargetCurrency: body.TargetCurrency,
+		Rate:           body.Rate,
+		FeePercent:     body.FeePercent,
+		FlatFee:        body.FlatFee,
+	})
+	if err != nil {
+		response.InternalError(w)
+		return
+	}
+	response.OK(w, rate)
+}
+
+// ListWithdrawalRates godoc
+//
+//	@Summary      List all business FX rates
+//	@Description  Returns all configured withdrawal FX rates (active and inactive).
+//	@Tags         admin
+//	@Produce      json
+//	@Security     BearerAuth
+//	@Success      200  {array}  object
+//	@Router       /admin/withdrawal-rates [get]
+func (h *AdminHandler) ListWithdrawalRates(w http.ResponseWriter, r *http.Request) {
+	rates, err := h.svc.Withdrawal.ListRates(r.Context())
+	if err != nil {
+		response.InternalError(w)
+		return
+	}
+	response.OK(w, rates)
+}
+
+// AdminSetRateRequest is the body for SetWithdrawalRate.
+type AdminSetRateRequest struct {
+	SourceCurrency string  `json:"source_currency"` // e.g. "USD"
+	TargetCurrency string  `json:"target_currency"` // e.g. "XAF"
+	Rate           float64 `json:"rate"`            // e.g. 595.0 → 1 USD = 595 XAF
+	FeePercent     float64 `json:"fee_percent"`     // e.g. 0.01 = 1% fee on source amount
+	FlatFee        float64 `json:"flat_fee"`        // e.g. 0.50 flat fee in source currency
+}
+
 func parseAdminKYCParams(w http.ResponseWriter, r *http.Request) (userID, adminID uuid.UUID, ok bool) {
 	adminID, valid := middleware.UserIDFromContext(r.Context())
 	if !valid {

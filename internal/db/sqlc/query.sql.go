@@ -787,3 +787,202 @@ func (q *Queries) MarkAllNotificationsRead(ctx context.Context, userID uuid.UUID
 func (q *Queries) GetNotificationByID(ctx context.Context, id uuid.UUID) (Notification, error) {
 	return Notification{}, errNotImplemented
 }
+
+// ─── Migration 000007: account balance management ─────────────────────────────
+
+type DeductAvailableBalanceParams struct {
+	ID     uuid.UUID
+	Amount string // decimal string e.g. "100.00"
+}
+
+type RestoreAvailableBalanceParams struct {
+	ID     uuid.UUID
+	Amount string
+}
+
+type DeductBalanceParams struct {
+	ID     uuid.UUID
+	Amount string
+}
+
+// DeductAvailableBalance holds funds for a pending withdrawal (reduces available, not settled).
+func (q *Queries) DeductAvailableBalance(ctx context.Context, arg DeductAvailableBalanceParams) error {
+	return errNotImplemented
+}
+
+// RestoreAvailableBalance releases funds held for a failed or cancelled withdrawal.
+func (q *Queries) RestoreAvailableBalance(ctx context.Context, arg RestoreAvailableBalanceParams) error {
+	return errNotImplemented
+}
+
+// DeductBalance settles a completed withdrawal (reduces both available and settled balance).
+func (q *Queries) DeductBalance(ctx context.Context, arg DeductBalanceParams) error {
+	return errNotImplemented
+}
+
+// GetAccountWithNilosByUserAndCurrency returns the full account row including Nilos fields.
+func (q *Queries) GetAccountWithNilosByUserAndCurrency(ctx context.Context, userID uuid.UUID, currency string) (AccountWithNilos, error) {
+	return AccountWithNilos{}, errNotImplemented
+}
+
+// ─── Migration 000007: business FX rates ─────────────────────────────────────
+
+type UpsertBusinessFxRateParams struct {
+	SourceCurrency string
+	TargetCurrency string
+	Rate           string // decimal e.g. "595.00"
+	FeePercent     string // decimal e.g. "0.0100"
+	FlatFee        string // decimal e.g. "0.00"
+	SetBy          *uuid.UUID
+}
+
+type GetBusinessFxRateParams struct {
+	SourceCurrency string
+	TargetCurrency string
+}
+
+// UpsertBusinessFxRate creates or updates the conversion rate for a currency pair.
+func (q *Queries) UpsertBusinessFxRate(ctx context.Context, arg UpsertBusinessFxRateParams) (BusinessFxRate, error) {
+	return BusinessFxRate{}, errNotImplemented
+}
+
+// GetBusinessFxRate returns the active rate for a currency pair, or an error if not found.
+func (q *Queries) GetBusinessFxRate(ctx context.Context, arg GetBusinessFxRateParams) (BusinessFxRate, error) {
+	return BusinessFxRate{}, errNotImplemented
+}
+
+// ListBusinessFxRates returns all configured rates.
+func (q *Queries) ListBusinessFxRates(ctx context.Context) ([]BusinessFxRate, error) {
+	return nil, errNotImplemented
+}
+
+// ─── Migration 000007: beneficiaries ─────────────────────────────────────────
+
+type CreateBeneficiaryParams struct {
+	UserID              uuid.UUID
+	Label               string
+	Type                string // "mobile_money" | "bank"
+	DestinationCurrency string
+	Country             string
+	PhoneNumber         *string
+	Operator            *string
+	BankName            *string
+	AccountNumber       *string
+	IBAN                *string
+	SwiftCode           *string
+	SortCode            *string
+	RoutingNumber       *string
+}
+
+type GetBeneficiaryByIDParams struct {
+	ID     uuid.UUID
+	UserID uuid.UUID
+}
+
+func (q *Queries) CreateBeneficiary(ctx context.Context, arg CreateBeneficiaryParams) (Beneficiary, error) {
+	return Beneficiary{}, errNotImplemented
+}
+
+func (q *Queries) ListBeneficiaries(ctx context.Context, userID uuid.UUID) ([]Beneficiary, error) {
+	return nil, errNotImplemented
+}
+
+func (q *Queries) GetBeneficiaryByID(ctx context.Context, arg GetBeneficiaryByIDParams) (Beneficiary, error) {
+	return Beneficiary{}, errNotImplemented
+}
+
+func (q *Queries) UpdateBeneficiaryNilosRecipient(ctx context.Context, id uuid.UUID, nilosRecipientID string) error {
+	return errNotImplemented
+}
+
+func (q *Queries) DeleteBeneficiary(ctx context.Context, id, userID uuid.UUID) error {
+	return errNotImplemented
+}
+
+// ─── Migration 000007: fiat withdrawals ──────────────────────────────────────
+
+type CreateFiatWithdrawalParams struct {
+	UserID              uuid.UUID
+	SourceCurrency      string
+	SourceAmount        string
+	Fee                 string
+	FeeCurrency         string
+	FxRate              *string    // nil if same currency
+	DestinationType     string
+	DestinationCurrency string
+	DestinationAmount   string
+	DestinationCountry  string
+	RecipientName       string
+	PhoneNumber         *string
+	Operator            *string
+	BankName            *string
+	AccountNumber       *string
+	IBAN                *string
+	SwiftCode           *string
+	SortCode            *string
+	RoutingNumber       *string
+	Reference           string
+	BeneficiaryID       *uuid.UUID
+}
+
+type GetFiatWithdrawalByIDParams struct {
+	ID     uuid.UUID
+	UserID uuid.UUID
+}
+
+type ListFiatWithdrawalsParams struct {
+	UserID uuid.UUID
+	Limit  int32
+	Offset int32
+}
+
+type UpdateFiatWithdrawalStatusParams struct {
+	ID            uuid.UUID
+	Status        string
+	FailureReason *string
+}
+
+type UpdateFiatWithdrawalHub2RefParams struct {
+	ID            uuid.UUID
+	Hub2Reference string
+	Status        string
+}
+
+type UpdateFiatWithdrawalNilosRefParams struct {
+	ID               uuid.UUID
+	NilosPayoutID    string
+	NilosRecipientID string
+	Status           string
+}
+
+func (q *Queries) CreateFiatWithdrawal(ctx context.Context, arg CreateFiatWithdrawalParams) (FiatWithdrawal, error) {
+	return FiatWithdrawal{}, errNotImplemented
+}
+
+func (q *Queries) GetFiatWithdrawalByID(ctx context.Context, arg GetFiatWithdrawalByIDParams) (FiatWithdrawal, error) {
+	return FiatWithdrawal{}, errNotImplemented
+}
+
+func (q *Queries) GetFiatWithdrawalByHub2Ref(ctx context.Context, hub2Ref string) (FiatWithdrawal, error) {
+	return FiatWithdrawal{}, errNotImplemented
+}
+
+func (q *Queries) ListFiatWithdrawals(ctx context.Context, arg ListFiatWithdrawalsParams) ([]FiatWithdrawal, error) {
+	return nil, errNotImplemented
+}
+
+func (q *Queries) CountFiatWithdrawals(ctx context.Context, userID uuid.UUID) (int64, error) {
+	return 0, errNotImplemented
+}
+
+func (q *Queries) UpdateFiatWithdrawalStatus(ctx context.Context, arg UpdateFiatWithdrawalStatusParams) (FiatWithdrawal, error) {
+	return FiatWithdrawal{}, errNotImplemented
+}
+
+func (q *Queries) UpdateFiatWithdrawalHub2Ref(ctx context.Context, arg UpdateFiatWithdrawalHub2RefParams) (FiatWithdrawal, error) {
+	return FiatWithdrawal{}, errNotImplemented
+}
+
+func (q *Queries) UpdateFiatWithdrawalNilosRef(ctx context.Context, arg UpdateFiatWithdrawalNilosRefParams) (FiatWithdrawal, error) {
+	return FiatWithdrawal{}, errNotImplemented
+}
