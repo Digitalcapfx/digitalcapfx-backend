@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -286,7 +287,10 @@ func defaultFXRates() map[string]float64 {
 		"USD": 1.0, "USDC": 1.0, "USDT": 1.0,
 		"EUR": 0.91, "GBP": 0.79,
 		"XAF": 609.0, "XOF": 609.0,
+		// Crypto — approximate USD/unit rates as fallback (DB rates override these)
 		"BTC": 0.000015, "ETH": 0.00033,
+		"SOL": 0.0065, "LTC": 0.012, "TRX": 8.0,
+		"POL": 0.58, "BCH": 0.0034, "XRP": 1.82,
 	}
 }
 
@@ -339,11 +343,15 @@ func currencyFlag(c string) string {
 }
 
 func initials(name string) string {
+	name = strings.TrimSpace(name)
 	if name == "" {
-		return "?"
+		return ""
 	}
-	for _, r := range name {
-		return string(r)
+	words := strings.Fields(name)
+	if len(words) == 1 {
+		return strings.ToUpper(string([]rune(words[0])[0]))
 	}
-	return "?"
+	first := []rune(words[0])
+	last := []rune(words[len(words)-1])
+	return strings.ToUpper(string(first[0])) + strings.ToUpper(string(last[0]))
 }

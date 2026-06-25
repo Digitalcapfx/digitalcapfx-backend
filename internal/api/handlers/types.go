@@ -262,6 +262,12 @@ type AdminKYCRejectRequest struct {
 
 // ─── Auth Extended ────────────────────────────────────────────────────────────
 
+// TOTPLoginRequest is the body for POST /auth/2fa/login (step 2 of 2FA login).
+type TOTPLoginRequest struct {
+	Ref  string `json:"ref" example:"a1b2c3d4-totp-pending-ref"`
+	Code string `json:"code" example:"123456"`
+}
+
 type GoogleSignInRequest struct {
 	IDToken string `json:"id_token" example:"eyJhbGci..."`
 }
@@ -328,6 +334,33 @@ type UpdateProfileRequest struct {
 	AvatarURL   *string `json:"avatar_url,omitempty"`
 	DateOfBirth *string `json:"date_of_birth,omitempty" example:"1995-06-15"`
 	Nationality *string `json:"nationality,omitempty" example:"Cameroonian"`
+}
+
+// ─── Support ──────────────────────────────────────────────────────────────────
+
+// CreateTicketRequest is the body for POST /support/tickets.
+type CreateTicketRequest struct {
+	Subject  string `json:"subject" example:"My transfer is stuck"`
+	// Category one of: general account payment kyc technical card
+	Category string `json:"category" example:"payment" enums:"general,account,payment,kyc,technical,card"`
+	Body     string `json:"body" example:"I sent $50 two days ago and it hasn't arrived."`
+}
+
+// ReplyToTicketRequest is the body for POST /support/tickets/{id}/messages.
+type ReplyToTicketRequest struct {
+	Body string `json:"body" example:"Any update on my issue?"`
+}
+
+// ─── Preferences ──────────────────────────────────────────────────────────────
+
+// UpdatePreferencesRequest is the body for PATCH /profile/preferences.
+type UpdatePreferencesRequest struct {
+	// Language one of: en fr es ar pt
+	Language string `json:"language,omitempty" example:"en" enums:"en,fr,es,ar,pt"`
+	// DarkMode one of: always never system
+	DarkMode string `json:"dark_mode,omitempty" example:"always" enums:"always,never,system"`
+	// BiometricsEnabled toggles fingerprint / Face ID unlock
+	BiometricsEnabled *bool `json:"biometrics_enabled,omitempty" example:"true"`
 }
 
 // ─── MetaMap KYC ──────────────────────────────────────────────────────────────

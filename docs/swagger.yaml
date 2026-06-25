@@ -105,6 +105,26 @@ definitions:
         example: true
         type: boolean
     type: object
+  handlers.CreateTicketRequest:
+    properties:
+      body:
+        example: I sent $50 two days ago and it hasn't arrived.
+        type: string
+      category:
+        description: 'Category one of: general account payment kyc technical card'
+        enum:
+        - general
+        - account
+        - payment
+        - kyc
+        - technical
+        - card
+        example: payment
+        type: string
+      subject:
+        example: My transfer is stuck
+        type: string
+    type: object
   handlers.CreateWalletRequest:
     properties:
       network:
@@ -670,6 +690,15 @@ definitions:
         example: "+237612345678"
         type: string
     type: object
+  handlers.TOTPLoginRequest:
+    properties:
+      code:
+        example: "123456"
+        type: string
+      ref:
+        example: a1b2c3d4-totp-pending-ref
+        type: string
+    type: object
   handlers.TokenPairData:
     properties:
       access_token:
@@ -743,6 +772,31 @@ definitions:
       success:
         example: true
         type: boolean
+    type: object
+  handlers.UpdatePreferencesRequest:
+    properties:
+      biometrics_enabled:
+        description: BiometricsEnabled toggles fingerprint / Face ID unlock
+        example: true
+        type: boolean
+      dark_mode:
+        description: 'DarkMode one of: always never system'
+        enum:
+        - always
+        - never
+        - system
+        example: always
+        type: string
+      language:
+        description: 'Language one of: en fr es ar pt'
+        enum:
+        - en
+        - fr
+        - es
+        - ar
+        - pt
+        example: en
+        type: string
     type: object
   handlers.UpdateProfileRequest:
     properties:
@@ -1194,6 +1248,37 @@ paths:
       summary: Set or update a business FX rate for fiat withdrawals
       tags:
       - admin
+  /auth/2fa/login:
+    post:
+      consumes:
+      - application/json
+      description: Exchanges a 2FA pending ref (from /auth/login) + a TOTP code for
+        a full JWT pair.
+      parameters:
+      - description: ref + TOTP code
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.TOTPLoginRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.TokenPairResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      summary: Complete 2FA login
+      tags:
+      - auth
   /auth/devices:
     delete:
       description: Revokes all active sessions except the current one.
@@ -2099,6 +2184,429 @@ paths:
       summary: Update profile
       tags:
       - profile
+  /profile/preferences:
+    get:
+      description: Returns the authenticated user's app preferences (language, dark
+        mode, biometrics).
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get preferences
+      tags:
+      - preferences
+    patch:
+      consumes:
+      - application/json
+      description: 'Updates one or more app preferences. Omitted fields are left unchanged.
+        Supported languages: en, fr, es, ar, pt. Dark mode values: always | never
+        | system.'
+      parameters:
+      - description: Preference fields to update
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.UpdatePreferencesRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Update preferences
+      tags:
+      - preferences
+  /security:
+    get:
+      description: Returns whether 2FA and biometrics are enabled for the authenticated
+        user.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Security status
+      tags:
+      - security
+  /security/2fa:
+    delete:
+      consumes:
+      - application/json
+      description: Verifies a live TOTP code and deactivates two-factor authentication.
+      parameters:
+      - description: '{ code }'
+        in: body
+        name: body
+        required: true
+        schema:
+          additionalProperties:
+            type: string
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.MessageResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Disable 2FA
+      tags:
+      - security
+  /security/2fa/confirm:
+    post:
+      consumes:
+      - application/json
+      description: Verifies the first TOTP code from the authenticator app and activates
+        2FA on the account.
+      parameters:
+      - description: '{ code }'
+        in: body
+        name: body
+        required: true
+        schema:
+          additionalProperties:
+            type: string
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.MessageResponse'
+        "400":
+          description: Invalid code or setup expired
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Confirm and activate 2FA
+      tags:
+      - security
+  /security/2fa/setup:
+    post:
+      description: Generates a TOTP secret and OTP URI. Encode the URI as a QR code
+        and scan it in an authenticator app, then call /security/2fa/confirm to activate.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: 2FA already enabled
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Set up 2FA
+      tags:
+      - security
+  /security/biometrics:
+    delete:
+      description: Removes the biometrics enabled flag from user preferences.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.MessageResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Disable biometrics
+      tags:
+      - security
+  /security/biometrics/enable:
+    post:
+      description: Marks biometric authentication as enabled in user preferences.
+        Actual biometric credential management is handled on the device.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.MessageResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Enable biometrics
+      tags:
+      - security
+  /security/pin/change:
+    post:
+      consumes:
+      - application/json
+      description: Verifies the current PIN and sets a new one. Does not revoke existing
+        sessions.
+      parameters:
+      - description: '{ current_pin, new_pin }'
+        in: body
+        name: body
+        required: true
+        schema:
+          additionalProperties:
+            type: string
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.MessageResponse'
+        "400":
+          description: Wrong current PIN
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Change PIN
+      tags:
+      - security
+  /support/faqs:
+    get:
+      description: Returns active FAQ entries. Pass ?category= to filter (general
+        | account | payment | kyc | technical | card).
+      parameters:
+      - description: FAQ category
+        in: query
+        name: category
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              additionalProperties: true
+              type: object
+            type: array
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List FAQs
+      tags:
+      - support
+  /support/links:
+    get:
+      description: Returns URLs for Privacy Policy, Help Center, and Terms of Use.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Get app links
+      tags:
+      - support
+  /support/tickets:
+    get:
+      description: Returns the authenticated user's support tickets, newest first.
+      parameters:
+      - description: Page number (default 1)
+        in: query
+        name: page
+        type: integer
+      - description: Results per page (default 20)
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List support tickets
+      tags:
+      - support
+    post:
+      consumes:
+      - application/json
+      description: 'Creates a new support ticket with an opening message. Category:
+        general | account | payment | kyc | technical | card.'
+      parameters:
+      - description: Ticket details
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.CreateTicketRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Open a support ticket
+      tags:
+      - support
+  /support/tickets/{id}:
+    get:
+      description: Returns a specific support ticket and its full message thread.
+      parameters:
+      - description: Ticket ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get ticket with messages
+      tags:
+      - support
+  /support/tickets/{id}/messages:
+    post:
+      consumes:
+      - application/json
+      description: Adds a message to an open support ticket.
+      parameters:
+      - description: Ticket ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: '{ body }'
+        in: body
+        name: body
+        required: true
+        schema:
+          additionalProperties:
+            type: string
+          type: object
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Ticket resolved/closed
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Reply to a ticket
+      tags:
+      - support
   /transfers/exchange:
     post:
       consumes:
@@ -2285,6 +2793,72 @@ paths:
       summary: Get deposit address
       tags:
       - wallets
+  /wallets/crypto/{network}:
+    get:
+      description: Returns the wallet header (live balance, receive address, actions)
+        for a WaaS crypto wallet. Balance is fetched live from the Payments API.
+      parameters:
+      - description: Network (BTC, ETH, SOL, LTC, TRX, POL, BCH, XRP)
+        in: path
+        name: network
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Crypto wallet detail
+      tags:
+      - wallets
+  /wallets/crypto/{network}/transactions:
+    get:
+      description: Returns on-chain transaction history from the Payments API (WaaS)
+        for a specific network.
+      parameters:
+      - description: Network
+        in: path
+        name: network
+        required: true
+        type: string
+      - description: Page (default 1)
+        in: query
+        name: page
+        type: integer
+      - description: Results per page (default 20)
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Crypto wallet transaction history
+      tags:
+      - wallets
   /wallets/deposit:
     post:
       consumes:
@@ -2321,6 +2895,211 @@ paths:
       security:
       - BearerAuth: []
       summary: Initiate Mobile Money deposit
+      tags:
+      - wallets
+  /wallets/fiat/{currency}:
+    get:
+      description: Returns the wallet header (balance, account number, actions) for
+        a specific fiat currency.
+      parameters:
+      - description: Currency code (USD, EUR, GBP, XAF, XOF)
+        in: path
+        name: currency
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Fiat wallet detail
+      tags:
+      - wallets
+  /wallets/fiat/{currency}/transactions:
+    get:
+      description: Returns the transaction history for a fiat wallet with time-period
+        grouping (THIS WEEK / LAST WEEK / EARLIER) and aggregate stats (In / Out /
+        Total). Filterable by type and full-text search.
+      parameters:
+      - description: Currency code
+        in: path
+        name: currency
+        required: true
+        type: string
+      - description: Transaction type
+        enum:
+        - sent
+        - received
+        - exchanged
+        - deposited
+        - withdrawn
+        in: query
+        name: type
+        type: string
+      - description: Search description or reference
+        in: query
+        name: search
+        type: string
+      - description: Page (default 1)
+        in: query
+        name: page
+        type: integer
+      - description: Results per page (default 20)
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Fiat wallet transaction history
+      tags:
+      - wallets
+  /wallets/overview:
+    get:
+      description: Returns the Phone Send card (USDC balance + recent contacts) plus
+        the unified wallet list (fiat + stablecoins + crypto). Filter with ?type=fiat|stablecoin|crypto.
+      parameters:
+      - description: Wallet type filter
+        enum:
+        - fiat
+        - stablecoin
+        - crypto
+        in: query
+        name: type
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Wallets overview
+      tags:
+      - wallets
+  /wallets/stablecoin/{symbol}:
+    get:
+      description: Returns the wallet header for a stablecoin (USDC). Balance is fetched
+        live from Rach CaaS.
+      parameters:
+      - description: Token symbol (USDC)
+        in: path
+        name: symbol
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Stablecoin wallet detail
+      tags:
+      - wallets
+  /wallets/stablecoin/{symbol}/transactions:
+    get:
+      description: Returns CaaS P2P send/receive history for the USDC stablecoin wallet.
+        Maps to the same data as GET /crypto/transactions.
+      parameters:
+      - description: Token symbol (USDC)
+        in: path
+        name: symbol
+        required: true
+        type: string
+      - description: Page
+        in: query
+        name: page
+        type: integer
+      - description: Limit
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Stablecoin transaction history
+      tags:
+      - wallets
+  /wallets/supported-assets:
+    get:
+      description: Returns all addable assets (crypto networks + stablecoins) with
+        has_wallet=true if the user has already provisioned that wallet. Used for
+        the + Add flow.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              additionalProperties: true
+              type: object
+            type: array
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Supported assets
       tags:
       - wallets
   /wallets/withdraw:
