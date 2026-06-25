@@ -14,13 +14,15 @@ import (
 type contextKey string
 
 const (
-	ContextKeyUserID      contextKey = "user_id"
-	ContextKeyUserPhone   contextKey = "user_phone"
+	ContextKeyUserID    contextKey = "user_id"
+	ContextKeyUserPhone contextKey = "user_phone"
+	ContextKeySessionID contextKey = "session_id"
 )
 
 type Claims struct {
-	UserID string `json:"user_id"`
-	Phone  string `json:"phone"`
+	UserID    string `json:"user_id"`
+	Phone     string `json:"phone"`
+	SessionID string `json:"session_id,omitempty"`
 	jwt.RegisteredClaims
 }
 
@@ -55,6 +57,7 @@ func Auth(secret string) func(http.Handler) http.Handler {
 
 			ctx := context.WithValue(r.Context(), ContextKeyUserID, userID)
 			ctx = context.WithValue(ctx, ContextKeyUserPhone, claims.Phone)
+			ctx = context.WithValue(ctx, ContextKeySessionID, claims.SessionID)
 
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
@@ -69,4 +72,9 @@ func UserIDFromContext(ctx context.Context) (uuid.UUID, bool) {
 func UserPhoneFromContext(ctx context.Context) (string, bool) {
 	phone, ok := ctx.Value(ContextKeyUserPhone).(string)
 	return phone, ok
+}
+
+func SessionIDFromContext(ctx context.Context) (string, bool) {
+	sid, ok := ctx.Value(ContextKeySessionID).(string)
+	return sid, ok && sid != ""
 }

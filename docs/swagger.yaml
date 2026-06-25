@@ -1,6 +1,6 @@
 basePath: /api/v1
 definitions:
-  internal_api_handlers.AccountData:
+  handlers.AccountData:
     properties:
       account_number:
         example: DFX0000001
@@ -26,25 +26,25 @@ definitions:
         example: 550e8400-e29b-41d4-a716-446655440001
         type: string
     type: object
-  internal_api_handlers.AccountListResponse:
+  handlers.AccountListResponse:
     properties:
       data:
         items:
-          $ref: '#/definitions/internal_api_handlers.AccountData'
+          $ref: '#/definitions/handlers.AccountData'
         type: array
       success:
         example: true
         type: boolean
     type: object
-  internal_api_handlers.AccountResponse:
+  handlers.AccountResponse:
     properties:
       data:
-        $ref: '#/definitions/internal_api_handlers.AccountData'
+        $ref: '#/definitions/handlers.AccountData'
       success:
         example: true
         type: boolean
     type: object
-  internal_api_handlers.BalanceData:
+  handlers.BalanceData:
     properties:
       balance_usdc:
         example: "100.000000"
@@ -53,7 +53,7 @@ definitions:
         example: 0xSCW123...
         type: string
     type: object
-  internal_api_handlers.CaasWalletData:
+  handlers.CaasWalletData:
     properties:
       abstraction_address:
         example: 0xSCW123...
@@ -71,15 +71,15 @@ definitions:
       user_id:
         type: string
     type: object
-  internal_api_handlers.CaasWalletResponse:
+  handlers.CaasWalletResponse:
     properties:
       data:
-        $ref: '#/definitions/internal_api_handlers.CaasWalletData'
+        $ref: '#/definitions/handlers.CaasWalletData'
       success:
         example: true
         type: boolean
     type: object
-  internal_api_handlers.CreateWalletRequest:
+  handlers.CreateWalletRequest:
     properties:
       network:
         description: 'Network is the blockchain network. Supported: BTC BCH LTC BSC
@@ -97,15 +97,15 @@ definitions:
         example: ETH
         type: string
     type: object
-  internal_api_handlers.CryptoBalanceResponse:
+  handlers.CryptoBalanceResponse:
     properties:
       data:
-        $ref: '#/definitions/internal_api_handlers.BalanceData'
+        $ref: '#/definitions/handlers.BalanceData'
       success:
         example: true
         type: boolean
     type: object
-  internal_api_handlers.CryptoTxData:
+  handlers.CryptoTxData:
     properties:
       amount:
         example: "50.00"
@@ -131,25 +131,25 @@ definitions:
       tx_hash:
         type: string
     type: object
-  internal_api_handlers.CryptoTxListResponse:
+  handlers.CryptoTxListResponse:
     properties:
       data:
         items:
-          $ref: '#/definitions/internal_api_handlers.CryptoTxData'
+          $ref: '#/definitions/handlers.CryptoTxData'
         type: array
       success:
         example: true
         type: boolean
     type: object
-  internal_api_handlers.CryptoTxResponse:
+  handlers.CryptoTxResponse:
     properties:
       data:
-        $ref: '#/definitions/internal_api_handlers.CryptoTxData'
+        $ref: '#/definitions/handlers.CryptoTxData'
       success:
         example: true
         type: boolean
     type: object
-  internal_api_handlers.DepositRequest:
+  handlers.DepositRequest:
     properties:
       amount:
         example: 5000
@@ -164,7 +164,36 @@ definitions:
         example: "+237612345678"
         type: string
     type: object
-  internal_api_handlers.ErrorResponse:
+  handlers.DeviceData:
+    properties:
+      created_at:
+        type: string
+      device_ip:
+        example: 41.202.207.10
+        type: string
+      device_name:
+        example: iPhone
+        type: string
+      id:
+        example: 550e8400-e29b-41d4-a716-446655440000
+        type: string
+      is_current:
+        example: true
+        type: boolean
+      last_used_at:
+        type: string
+    type: object
+  handlers.DeviceListResponse:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/handlers.DeviceData'
+        type: array
+      success:
+        example: true
+        type: boolean
+    type: object
+  handlers.ErrorResponse:
     properties:
       error:
         properties:
@@ -179,7 +208,13 @@ definitions:
         example: false
         type: boolean
     type: object
-  internal_api_handlers.FundAccountRequest:
+  handlers.ForgotPINRequest:
+    properties:
+      email_or_phone:
+        example: alice@example.com
+        type: string
+    type: object
+  handlers.FundAccountRequest:
     properties:
       amount:
         description: Amount in local fiat (minimum 100)
@@ -215,7 +250,7 @@ definitions:
         example: USDC
         type: string
     type: object
-  internal_api_handlers.HUB2WebhookRequest:
+  handlers.HUB2WebhookRequest:
     properties:
       amount:
         example: 20000
@@ -244,7 +279,7 @@ definitions:
         example: COLLECTION
         type: string
     type: object
-  internal_api_handlers.Hub2PaymentRequest:
+  handlers.Hub2PaymentRequest:
     properties:
       amount:
         example: 5000
@@ -270,21 +305,21 @@ definitions:
         example: "+237612345678"
         type: string
     type: object
-  internal_api_handlers.Hub2RefData:
+  handlers.Hub2RefData:
     properties:
       hub2_reference:
         example: HUB2-REF-001
         type: string
     type: object
-  internal_api_handlers.Hub2RefResponse:
+  handlers.Hub2RefResponse:
     properties:
       data:
-        $ref: '#/definitions/internal_api_handlers.Hub2RefData'
+        $ref: '#/definitions/handlers.Hub2RefData'
       success:
         example: true
         type: boolean
     type: object
-  internal_api_handlers.InternalTransferRequest:
+  handlers.InternalTransferRequest:
     properties:
       amount:
         example: 5000
@@ -299,7 +334,7 @@ definitions:
         example: "+237698765432"
         type: string
     type: object
-  internal_api_handlers.KYCDocumentData:
+  handlers.KYCDocumentData:
     properties:
       created_at:
         type: string
@@ -318,17 +353,17 @@ definitions:
       user_id:
         type: string
     type: object
-  internal_api_handlers.KYCDocumentListResponse:
+  handlers.KYCDocumentListResponse:
     properties:
       data:
         items:
-          $ref: '#/definitions/internal_api_handlers.KYCDocumentData'
+          $ref: '#/definitions/handlers.KYCDocumentData'
         type: array
       success:
         example: true
         type: boolean
     type: object
-  internal_api_handlers.KYCDocumentRequest:
+  handlers.KYCDocumentRequest:
     properties:
       doc_type:
         description: 'DocType one of: national_id | passport | selfie | proof_of_address'
@@ -345,15 +380,15 @@ definitions:
         example: https://storage.googleapis.com/digitalfx-kyc-dev/doc.jpg
         type: string
     type: object
-  internal_api_handlers.KYCDocumentResponse:
+  handlers.KYCDocumentResponse:
     properties:
       data:
-        $ref: '#/definitions/internal_api_handlers.KYCDocumentData'
+        $ref: '#/definitions/handlers.KYCDocumentData'
       success:
         example: true
         type: boolean
     type: object
-  internal_api_handlers.KYCStatusData:
+  handlers.KYCStatusData:
     properties:
       kyc_status:
         enum:
@@ -363,15 +398,15 @@ definitions:
         example: pending
         type: string
     type: object
-  internal_api_handlers.KYCStatusResponse:
+  handlers.KYCStatusResponse:
     properties:
       data:
-        $ref: '#/definitions/internal_api_handlers.KYCStatusData'
+        $ref: '#/definitions/handlers.KYCStatusData'
       success:
         example: true
         type: boolean
     type: object
-  internal_api_handlers.LoginRequest:
+  handlers.LoginRequest:
     properties:
       phone:
         example: "+237612345678"
@@ -380,7 +415,7 @@ definitions:
         example: "123456"
         type: string
     type: object
-  internal_api_handlers.MessageResponse:
+  handlers.MessageResponse:
     properties:
       message:
         example: OTP sent
@@ -389,7 +424,30 @@ definitions:
         example: true
         type: boolean
     type: object
-  internal_api_handlers.PaginationMeta:
+  handlers.MetaMapInitData:
+    properties:
+      applicant_id:
+        example: 60f1a2b3c4d5e6f7a8b9c0d1
+        type: string
+      flow_id:
+        example: 60f1a2b3c4d5e6f7a8b9c0d2
+        type: string
+      identity_access:
+        example: eyJhbGci...
+        type: string
+      status:
+        example: pending
+        type: string
+    type: object
+  handlers.MetaMapInitResponse:
+    properties:
+      data:
+        $ref: '#/definitions/handlers.MetaMapInitData'
+      success:
+        example: true
+        type: boolean
+    type: object
+  handlers.PaginationMeta:
     properties:
       page:
         example: 1
@@ -404,13 +462,55 @@ definitions:
         example: 5
         type: integer
     type: object
-  internal_api_handlers.RefreshTokenRequest:
+  handlers.ProfileData:
+    properties:
+      avatar_url:
+        type: string
+      bio:
+        example: Digital finance enthusiast from Cameroon
+        type: string
+      date_of_birth:
+        example: "1995-06-15"
+        type: string
+      email:
+        example: alice@example.com
+        type: string
+      first_name:
+        example: Alice
+        type: string
+      id:
+        type: string
+      is_email_verified:
+        example: false
+        type: boolean
+      kyc_status:
+        example: pending
+        type: string
+      last_name:
+        example: Dupont
+        type: string
+      nationality:
+        example: Cameroonian
+        type: string
+      phone_number:
+        example: "+237612345678"
+        type: string
+    type: object
+  handlers.ProfileResponse:
+    properties:
+      data:
+        $ref: '#/definitions/handlers.ProfileData'
+      success:
+        example: true
+        type: boolean
+    type: object
+  handlers.RefreshTokenRequest:
     properties:
       refresh_token:
         example: eyJhbGci...
         type: string
     type: object
-  internal_api_handlers.RegisterRequest:
+  handlers.RegisterRequest:
     properties:
       email:
         example: alice@example.com
@@ -428,7 +528,19 @@ definitions:
         example: "123456"
         type: string
     type: object
-  internal_api_handlers.SendCryptoRequest:
+  handlers.ResetPINRequest:
+    properties:
+      code:
+        example: "123456"
+        type: string
+      email_or_phone:
+        example: alice@example.com
+        type: string
+      new_pin:
+        example: "654321"
+        type: string
+    type: object
+  handlers.SendCryptoRequest:
     properties:
       amount:
         example: "50.00"
@@ -444,13 +556,13 @@ definitions:
         example: USDC
         type: string
     type: object
-  internal_api_handlers.SendOTPRequest:
+  handlers.SendOTPRequest:
     properties:
       phone:
         example: "+237612345678"
         type: string
     type: object
-  internal_api_handlers.TokenPairData:
+  handlers.TokenPairData:
     properties:
       access_token:
         example: eyJhbGci...
@@ -462,15 +574,15 @@ definitions:
         example: eyJhbGci...
         type: string
     type: object
-  internal_api_handlers.TokenPairResponse:
+  handlers.TokenPairResponse:
     properties:
       data:
-        $ref: '#/definitions/internal_api_handlers.TokenPairData'
+        $ref: '#/definitions/handlers.TokenPairData'
       success:
         example: true
         type: boolean
     type: object
-  internal_api_handlers.TransactionData:
+  handlers.TransactionData:
     properties:
       account_id:
         type: string
@@ -501,27 +613,53 @@ definitions:
         example: credit
         type: string
     type: object
-  internal_api_handlers.TransactionListResponse:
+  handlers.TransactionListResponse:
     properties:
       data:
         items:
-          $ref: '#/definitions/internal_api_handlers.TransactionData'
+          $ref: '#/definitions/handlers.TransactionData'
         type: array
       meta:
-        $ref: '#/definitions/internal_api_handlers.PaginationMeta'
+        $ref: '#/definitions/handlers.PaginationMeta'
       success:
         example: true
         type: boolean
     type: object
-  internal_api_handlers.TransactionResponse:
+  handlers.TransactionResponse:
     properties:
       data:
-        $ref: '#/definitions/internal_api_handlers.TransactionData'
+        $ref: '#/definitions/handlers.TransactionData'
       success:
         example: true
         type: boolean
     type: object
-  internal_api_handlers.VerifyOTPRequest:
+  handlers.UpdateProfileRequest:
+    properties:
+      avatar_url:
+        type: string
+      bio:
+        example: Digital finance enthusiast
+        type: string
+      date_of_birth:
+        example: "1995-06-15"
+        type: string
+      first_name:
+        example: Alice
+        type: string
+      last_name:
+        example: Dupont
+        type: string
+      nationality:
+        example: Cameroonian
+        type: string
+    type: object
+  handlers.VerifyEmailRequest:
+    properties:
+      code:
+        example: "123456"
+        type: string
+    type: object
+  handlers.VerifyOTPRequest:
     properties:
       code:
         example: "123456"
@@ -530,7 +668,7 @@ definitions:
         example: "+237612345678"
         type: string
     type: object
-  internal_api_handlers.WalletData:
+  handlers.WalletData:
     properties:
       address:
         example: 0xabc123...
@@ -551,25 +689,25 @@ definitions:
         example: cust_abc123
         type: string
     type: object
-  internal_api_handlers.WalletListResponse:
+  handlers.WalletListResponse:
     properties:
       data:
         items:
-          $ref: '#/definitions/internal_api_handlers.WalletData'
+          $ref: '#/definitions/handlers.WalletData'
         type: array
       success:
         example: true
         type: boolean
     type: object
-  internal_api_handlers.WalletResponse:
+  handlers.WalletResponse:
     properties:
       data:
-        $ref: '#/definitions/internal_api_handlers.WalletData'
+        $ref: '#/definitions/handlers.WalletData'
       success:
         example: true
         type: boolean
     type: object
-  internal_api_handlers.WithdrawalRequest:
+  handlers.WithdrawalRequest:
     properties:
       amount:
         example: 5000
@@ -607,15 +745,15 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/internal_api_handlers.AccountListResponse'
+            $ref: '#/definitions/handlers.AccountListResponse'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/internal_api_handlers.ErrorResponse'
+            $ref: '#/definitions/handlers.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/internal_api_handlers.ErrorResponse'
+            $ref: '#/definitions/handlers.ErrorResponse'
       security:
       - BearerAuth: []
       summary: List accounts
@@ -642,15 +780,15 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/internal_api_handlers.AccountResponse'
+            $ref: '#/definitions/handlers.AccountResponse'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/internal_api_handlers.ErrorResponse'
+            $ref: '#/definitions/handlers.ErrorResponse'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/internal_api_handlers.ErrorResponse'
+            $ref: '#/definitions/handlers.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Get account by currency
@@ -686,19 +824,19 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/internal_api_handlers.TransactionListResponse'
+            $ref: '#/definitions/handlers.TransactionListResponse'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/internal_api_handlers.ErrorResponse'
+            $ref: '#/definitions/handlers.ErrorResponse'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/internal_api_handlers.ErrorResponse'
+            $ref: '#/definitions/handlers.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/internal_api_handlers.ErrorResponse'
+            $ref: '#/definitions/handlers.ErrorResponse'
       security:
       - BearerAuth: []
       summary: List transactions for an account
@@ -730,179 +868,377 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/internal_api_handlers.TransactionResponse'
+            $ref: '#/definitions/handlers.TransactionResponse'
         "400":
           description: Invalid UUID
           schema:
-            $ref: '#/definitions/internal_api_handlers.ErrorResponse'
+            $ref: '#/definitions/handlers.ErrorResponse'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/internal_api_handlers.ErrorResponse'
+            $ref: '#/definitions/handlers.ErrorResponse'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/internal_api_handlers.ErrorResponse'
+            $ref: '#/definitions/handlers.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Get a single transaction
       tags:
       - accounts
+  /auth/devices:
+    delete:
+      description: Revokes all active sessions except the current one.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.MessageResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Disconnect all other devices
+      tags:
+      - auth
+    get:
+      description: Returns all active login sessions with device name, IP, and last
+        activity.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.DeviceListResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List active devices
+      tags:
+      - auth
+  /auth/devices/{id}:
+    delete:
+      description: Revokes a specific login session. The device is signed out on next
+        token refresh.
+      parameters:
+      - description: Session ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.MessageResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Disconnect a device
+      tags:
+      - auth
+  /auth/email/resend-otp:
+    post:
+      description: Sends a new 6-digit code to the authenticated user's registered
+        email address.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.MessageResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Resend email verification OTP
+      tags:
+      - auth
+  /auth/email/verify:
+    post:
+      consumes:
+      - application/json
+      description: Confirms the 6-digit OTP sent to the user's email and marks it
+        as verified.
+      parameters:
+      - description: OTP code
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.VerifyEmailRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.MessageResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Verify email address
+      tags:
+      - auth
+  /auth/forgot-pin:
+    post:
+      consumes:
+      - application/json
+      description: Sends a 6-digit reset code to the registered email. Accepts email
+        or phone. Always returns 200 to prevent account enumeration.
+      parameters:
+      - description: Email or phone
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.ForgotPINRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.MessageResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      summary: Forgot PIN
+      tags:
+      - auth
   /auth/login:
     post:
       consumes:
       - application/json
-      description: Authenticates a user with phone + PIN and returns a JWT token pair.
+      description: Authenticates with phone + PIN. Creates a device session and sends
+        a login notification email. Returns a JWT pair with a session_id for device
+        management.
       parameters:
       - description: Credentials
         in: body
         name: body
         required: true
         schema:
-          $ref: '#/definitions/internal_api_handlers.LoginRequest'
+          $ref: '#/definitions/handlers.LoginRequest'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/internal_api_handlers.TokenPairResponse'
+            $ref: '#/definitions/handlers.TokenPairResponse'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/internal_api_handlers.ErrorResponse'
+            $ref: '#/definitions/handlers.ErrorResponse'
         "403":
           description: Account inactive
           schema:
-            $ref: '#/definitions/internal_api_handlers.ErrorResponse'
+            $ref: '#/definitions/handlers.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/internal_api_handlers.ErrorResponse'
+            $ref: '#/definitions/handlers.ErrorResponse'
       summary: Login
+      tags:
+      - auth
+  /auth/logout:
+    post:
+      description: Revokes the current device session. The refresh token is immediately
+        invalidated; access token remains valid until expiry (max 30 min). A sign-out
+        notification email is sent.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.MessageResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Logout
       tags:
       - auth
   /auth/otp/send:
     post:
       consumes:
       - application/json
-      description: Sends a 6-digit OTP to the provided phone number. Must be called
-        before register or login.
+      description: Sends a 6-digit OTP to the phone number via SMS. Required before
+        register.
       parameters:
-      - description: Phone number in E.164 format
+      - description: Phone number (E.164)
         in: body
         name: body
         required: true
         schema:
-          $ref: '#/definitions/internal_api_handlers.SendOTPRequest'
+          $ref: '#/definitions/handlers.SendOTPRequest'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/internal_api_handlers.MessageResponse'
+            $ref: '#/definitions/handlers.MessageResponse'
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/internal_api_handlers.ErrorResponse'
+            $ref: '#/definitions/handlers.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/internal_api_handlers.ErrorResponse'
-      summary: Send OTP
+            $ref: '#/definitions/handlers.ErrorResponse'
+      summary: Send phone OTP
       tags:
       - auth
   /auth/otp/verify:
     post:
       consumes:
       - application/json
-      description: Confirms that the OTP sent to the phone is correct. Call before
-        register for new users.
+      description: Confirms the OTP sent to the phone. Call before register for new
+        users.
       parameters:
       - description: Phone + OTP code
         in: body
         name: body
         required: true
         schema:
-          $ref: '#/definitions/internal_api_handlers.VerifyOTPRequest'
+          $ref: '#/definitions/handlers.VerifyOTPRequest'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/internal_api_handlers.MessageResponse'
+            $ref: '#/definitions/handlers.MessageResponse'
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/internal_api_handlers.ErrorResponse'
-      summary: Verify OTP
+            $ref: '#/definitions/handlers.ErrorResponse'
+      summary: Verify phone OTP
       tags:
       - auth
   /auth/register:
     post:
       consumes:
       - application/json
-      description: Creates a new user account and returns a JWT token pair. OTP must
-        have been verified first.
+      description: Creates a new user account, provisions fiat accounts, and returns
+        a JWT pair. A welcome email and email verification OTP are sent asynchronously.
       parameters:
       - description: New user details
         in: body
         name: body
         required: true
         schema:
-          $ref: '#/definitions/internal_api_handlers.RegisterRequest'
+          $ref: '#/definitions/handlers.RegisterRequest'
       produces:
       - application/json
       responses:
         "201":
           description: Created
           schema:
-            $ref: '#/definitions/internal_api_handlers.TokenPairResponse'
+            $ref: '#/definitions/handlers.TokenPairResponse'
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/internal_api_handlers.ErrorResponse'
+            $ref: '#/definitions/handlers.ErrorResponse'
         "409":
-          description: Phone number already registered
+          description: Phone already registered
           schema:
-            $ref: '#/definitions/internal_api_handlers.ErrorResponse'
+            $ref: '#/definitions/handlers.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/internal_api_handlers.ErrorResponse'
+            $ref: '#/definitions/handlers.ErrorResponse'
       summary: Register
       tags:
       - auth
-  /auth/token/refresh:
+  /auth/reset-pin:
     post:
       consumes:
       - application/json
-      description: Issues a new access + refresh token pair using a valid refresh
-        token.
+      description: Verifies the 6-digit OTP and sets a new PIN. All active sessions
+        are revoked. A confirmation email is sent.
       parameters:
-      - description: Refresh token
+      - description: Email/phone + OTP + new PIN
         in: body
         name: body
         required: true
         schema:
-          $ref: '#/definitions/internal_api_handlers.RefreshTokenRequest'
+          $ref: '#/definitions/handlers.ResetPINRequest'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/internal_api_handlers.TokenPairResponse'
+            $ref: '#/definitions/handlers.MessageResponse'
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/internal_api_handlers.ErrorResponse'
-        "401":
-          description: Invalid or expired refresh token
+            $ref: '#/definitions/handlers.ErrorResponse'
+      summary: Reset PIN
+      tags:
+      - auth
+  /auth/token/refresh:
+    post:
+      consumes:
+      - application/json
+      description: Issues a new rotated access + refresh token pair. The old refresh
+        token is invalidated. Validates the session is still active.
+      parameters:
+      - description: Refresh token
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.RefreshTokenRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
           schema:
-            $ref: '#/definitions/internal_api_handlers.ErrorResponse'
+            $ref: '#/definitions/handlers.TokenPairResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
       summary: Refresh token
       tags:
       - auth
@@ -916,15 +1252,15 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/internal_api_handlers.CryptoBalanceResponse'
+            $ref: '#/definitions/handlers.CryptoBalanceResponse'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/internal_api_handlers.ErrorResponse'
+            $ref: '#/definitions/handlers.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/internal_api_handlers.ErrorResponse'
+            $ref: '#/definitions/handlers.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Get stablecoin balances
@@ -946,7 +1282,7 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/internal_api_handlers.FundAccountRequest'
+          $ref: '#/definitions/handlers.FundAccountRequest'
       produces:
       - application/json
       responses:
@@ -954,19 +1290,19 @@ paths:
           description: HUB2 collection reference — poll status or wait for balance
             update
           schema:
-            $ref: '#/definitions/internal_api_handlers.Hub2RefResponse'
+            $ref: '#/definitions/handlers.Hub2RefResponse'
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/internal_api_handlers.ErrorResponse'
+            $ref: '#/definitions/handlers.ErrorResponse'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/internal_api_handlers.ErrorResponse'
+            $ref: '#/definitions/handlers.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/internal_api_handlers.ErrorResponse'
+            $ref: '#/definitions/handlers.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Fund Instant USD Account via Mobile Money
@@ -986,26 +1322,26 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/internal_api_handlers.SendCryptoRequest'
+          $ref: '#/definitions/handlers.SendCryptoRequest'
       produces:
       - application/json
       responses:
         "201":
           description: Created
           schema:
-            $ref: '#/definitions/internal_api_handlers.CryptoTxResponse'
+            $ref: '#/definitions/handlers.CryptoTxResponse'
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/internal_api_handlers.ErrorResponse'
+            $ref: '#/definitions/handlers.ErrorResponse'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/internal_api_handlers.ErrorResponse'
+            $ref: '#/definitions/handlers.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/internal_api_handlers.ErrorResponse'
+            $ref: '#/definitions/handlers.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Send USDT or USDC to another user
@@ -1030,15 +1366,15 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/internal_api_handlers.CryptoTxListResponse'
+            $ref: '#/definitions/handlers.CryptoTxListResponse'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/internal_api_handlers.ErrorResponse'
+            $ref: '#/definitions/handlers.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/internal_api_handlers.ErrorResponse'
+            $ref: '#/definitions/handlers.ErrorResponse'
       security:
       - BearerAuth: []
       summary: List crypto transactions
@@ -1059,19 +1395,19 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/internal_api_handlers.CryptoTxResponse'
+            $ref: '#/definitions/handlers.CryptoTxResponse'
         "400":
           description: Invalid UUID
           schema:
-            $ref: '#/definitions/internal_api_handlers.ErrorResponse'
+            $ref: '#/definitions/handlers.ErrorResponse'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/internal_api_handlers.ErrorResponse'
+            $ref: '#/definitions/handlers.ErrorResponse'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/internal_api_handlers.ErrorResponse'
+            $ref: '#/definitions/handlers.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Get a crypto transaction
@@ -1088,15 +1424,15 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/internal_api_handlers.CaasWalletResponse'
+            $ref: '#/definitions/handlers.CaasWalletResponse'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/internal_api_handlers.ErrorResponse'
+            $ref: '#/definitions/handlers.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/internal_api_handlers.ErrorResponse'
+            $ref: '#/definitions/handlers.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Get or create ERC-4337 abstraction wallet
@@ -1111,15 +1447,15 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/internal_api_handlers.KYCDocumentListResponse'
+            $ref: '#/definitions/handlers.KYCDocumentListResponse'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/internal_api_handlers.ErrorResponse'
+            $ref: '#/definitions/handlers.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/internal_api_handlers.ErrorResponse'
+            $ref: '#/definitions/handlers.ErrorResponse'
       security:
       - BearerAuth: []
       summary: List KYC documents
@@ -1136,29 +1472,54 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/internal_api_handlers.KYCDocumentRequest'
+          $ref: '#/definitions/handlers.KYCDocumentRequest'
       produces:
       - application/json
       responses:
         "201":
           description: Created
           schema:
-            $ref: '#/definitions/internal_api_handlers.KYCDocumentResponse'
+            $ref: '#/definitions/handlers.KYCDocumentResponse'
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/internal_api_handlers.ErrorResponse'
+            $ref: '#/definitions/handlers.ErrorResponse'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/internal_api_handlers.ErrorResponse'
+            $ref: '#/definitions/handlers.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/internal_api_handlers.ErrorResponse'
+            $ref: '#/definitions/handlers.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Submit a KYC document
+      tags:
+      - kyc
+  /kyc/metamap/init:
+    post:
+      description: Creates (or returns an existing) MetaMap applicant for the user.
+        The returned identity_access token is used with the MetaMap mobile SDK to
+        launch the verification flow.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.MetaMapInitResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Start MetaMap identity verification
       tags:
       - kyc
   /kyc/status:
@@ -1171,20 +1532,80 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/internal_api_handlers.KYCStatusResponse'
+            $ref: '#/definitions/handlers.KYCStatusResponse'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/internal_api_handlers.ErrorResponse'
+            $ref: '#/definitions/handlers.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/internal_api_handlers.ErrorResponse'
+            $ref: '#/definitions/handlers.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Get KYC status
       tags:
       - kyc
+  /profile:
+    get:
+      description: Returns the full profile of the authenticated user including bio,
+        avatar, and KYC/email verification status.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.ProfileResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get profile
+      tags:
+      - profile
+    patch:
+      consumes:
+      - application/json
+      description: 'Updates the authenticated user''s profile fields: name, bio, avatar
+        URL, date of birth, and nationality.'
+      parameters:
+      - description: Profile fields to update
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.UpdateProfileRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.ProfileResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Update profile
+      tags:
+      - profile
   /transfers/exchange:
     post:
       consumes:
@@ -1197,11 +1618,11 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/internal_api_handlers.MessageResponse'
+            $ref: '#/definitions/handlers.MessageResponse'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/internal_api_handlers.ErrorResponse'
+            $ref: '#/definitions/handlers.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Exchange currency
@@ -1219,26 +1640,26 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/internal_api_handlers.Hub2PaymentRequest'
+          $ref: '#/definitions/handlers.Hub2PaymentRequest'
       produces:
       - application/json
       responses:
         "201":
           description: Created
           schema:
-            $ref: '#/definitions/internal_api_handlers.Hub2RefResponse'
+            $ref: '#/definitions/handlers.Hub2RefResponse'
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/internal_api_handlers.ErrorResponse'
+            $ref: '#/definitions/handlers.ErrorResponse'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/internal_api_handlers.ErrorResponse'
+            $ref: '#/definitions/handlers.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/internal_api_handlers.ErrorResponse'
+            $ref: '#/definitions/handlers.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Mobile Money payment via HUB2
@@ -1256,26 +1677,26 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/internal_api_handlers.InternalTransferRequest'
+          $ref: '#/definitions/handlers.InternalTransferRequest'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/internal_api_handlers.MessageResponse'
+            $ref: '#/definitions/handlers.MessageResponse'
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/internal_api_handlers.ErrorResponse'
+            $ref: '#/definitions/handlers.ErrorResponse'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/internal_api_handlers.ErrorResponse'
+            $ref: '#/definitions/handlers.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/internal_api_handlers.ErrorResponse'
+            $ref: '#/definitions/handlers.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Internal fiat transfer
@@ -1291,15 +1712,15 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/internal_api_handlers.WalletListResponse'
+            $ref: '#/definitions/handlers.WalletListResponse'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/internal_api_handlers.ErrorResponse'
+            $ref: '#/definitions/handlers.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/internal_api_handlers.ErrorResponse'
+            $ref: '#/definitions/handlers.ErrorResponse'
       security:
       - BearerAuth: []
       summary: List HD wallets
@@ -1317,26 +1738,26 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/internal_api_handlers.CreateWalletRequest'
+          $ref: '#/definitions/handlers.CreateWalletRequest'
       produces:
       - application/json
       responses:
         "201":
           description: Created
           schema:
-            $ref: '#/definitions/internal_api_handlers.WalletResponse'
+            $ref: '#/definitions/handlers.WalletResponse'
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/internal_api_handlers.ErrorResponse'
+            $ref: '#/definitions/handlers.ErrorResponse'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/internal_api_handlers.ErrorResponse'
+            $ref: '#/definitions/handlers.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/internal_api_handlers.ErrorResponse'
+            $ref: '#/definitions/handlers.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Create HD wallet for a network
@@ -1357,15 +1778,15 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/internal_api_handlers.WalletResponse'
+            $ref: '#/definitions/handlers.WalletResponse'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/internal_api_handlers.ErrorResponse'
+            $ref: '#/definitions/handlers.ErrorResponse'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/internal_api_handlers.ErrorResponse'
+            $ref: '#/definitions/handlers.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Get deposit address
@@ -1384,26 +1805,26 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/internal_api_handlers.DepositRequest'
+          $ref: '#/definitions/handlers.DepositRequest'
       produces:
       - application/json
       responses:
         "201":
           description: Created
           schema:
-            $ref: '#/definitions/internal_api_handlers.Hub2RefResponse'
+            $ref: '#/definitions/handlers.Hub2RefResponse'
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/internal_api_handlers.ErrorResponse'
+            $ref: '#/definitions/handlers.ErrorResponse'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/internal_api_handlers.ErrorResponse'
+            $ref: '#/definitions/handlers.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/internal_api_handlers.ErrorResponse'
+            $ref: '#/definitions/handlers.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Initiate Mobile Money deposit
@@ -1421,26 +1842,26 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/internal_api_handlers.WithdrawalRequest'
+          $ref: '#/definitions/handlers.WithdrawalRequest'
       produces:
       - application/json
       responses:
         "201":
           description: Created
           schema:
-            $ref: '#/definitions/internal_api_handlers.Hub2RefResponse'
+            $ref: '#/definitions/handlers.Hub2RefResponse'
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/internal_api_handlers.ErrorResponse'
+            $ref: '#/definitions/handlers.ErrorResponse'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/internal_api_handlers.ErrorResponse'
+            $ref: '#/definitions/handlers.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/internal_api_handlers.ErrorResponse'
+            $ref: '#/definitions/handlers.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Initiate Mobile Money withdrawal
@@ -1465,27 +1886,47 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/internal_api_handlers.HUB2WebhookRequest'
+          $ref: '#/definitions/handlers.HUB2WebhookRequest'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/internal_api_handlers.MessageResponse'
+            $ref: '#/definitions/handlers.MessageResponse'
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/internal_api_handlers.ErrorResponse'
+            $ref: '#/definitions/handlers.ErrorResponse'
         "403":
           description: Invalid signature
           schema:
-            $ref: '#/definitions/internal_api_handlers.ErrorResponse'
+            $ref: '#/definitions/handlers.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/internal_api_handlers.ErrorResponse'
+            $ref: '#/definitions/handlers.ErrorResponse'
       summary: HUB2 payment webhook
+      tags:
+      - webhooks
+  /webhooks/metamap:
+    post:
+      consumes:
+      - application/json
+      description: Receives verification result events from MetaMap. Updates KYC status
+        to approved or rejected.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.MessageResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      summary: MetaMap verification webhook
       tags:
       - webhooks
 securityDefinitions:

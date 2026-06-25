@@ -1,64 +1,108 @@
 BINARY     = bin/server
 MIGRATE    = migrate
-DB_URL    ?= $(DATABASE_URL)
+MIGRATIONS = internal/db/migrations
 
-.PHONY: build run deps sqlc \
-        migrate migrate-down migrate-create \
-        docker-up docker-down docker-build \
+# Load .env so DATABASE_URL is available without exporting it manually
+ifneq (,$(wildcard .env))
+  include .env
+  export
+endif
+
+DB_URL ?= $(DATABASE_URL)
+
+.PHONY: build run deps sqlc swagger \
+        migrate-up migrate-down migrate-create migrate-force migrate-version \
+        docker-up docker-down docker-db docker-logs \
         test lint clean
 
-## Build the binary
+# ── Build ─────────────────────────────────────────────────────────────────────
+
+## Compile the server binary to bin/server
 build:
 	@mkdir -p bin
-	@go build -o $(BINARY) ./cmd/server
+	go build -o $(BINARY) ./cmd/server
 
-## Run locally (requires .env)
+## Run locally (reads .env automatically)
 run:
-	@go run ./cmd/server
+	go run ./cmd/server
 
 ## Download and tidy dependencies
 deps:
-	@go mod tidy
-	@go mod download
+	go mod tidy
+	go mod download
 
-## Generate SQLC code from queries + schema
+# ── Code generation ───────────────────────────────────────────────────────────
+
+## Regenerate SQLC query code from schema + queries
 sqlc:
-	@sqlc generate
+	sqlc generate
 
-## Run all pending migrations
-migrate:
-	@$(MIGRATE) -path internal/db/migrations -database "$(DB_URL)" up
+## Regenerate Swagger docs from handler annotations  →  make swagger
+swagger:
+	swag init -g cmd/server/main.go -o docs --parseInternal
 
-## Roll back one migration
+# ── Migrations ────────────────────────────────────────────────────────────────
+
+## Apply all pending migrations  →  make migrate-up
+migrate-up:
+	$(MIGRATE) -path $(MIGRATIONS) -database "$(DB_URL)" up
+
+## Short alias
+migrate: migrate-up
+
+## Roll back the most recent migration
 migrate-down:
-	@$(MIGRATE) -path internal/db/migrations -database "$(DB_URL)" down 1
+	$(MIGRATE) -path $(MIGRATIONS) -database "$(DB_URL)" down 1
 
-## Create a new migration: make migrate-create name=add_cards_table
+## Roll back ALL migrations (full wipe — use carefully)
+migrate-reset:
+	$(MIGRATE) -path $(MIGRATIONS) -database "$(DB_URL)" down -all
+
+## Create a new migration file pair:  make migrate-create name=add_cards_table
 migrate-create:
-	@$(MIGRATE) create -ext sql -dir internal/db/migrations -seq $(name)
+	$(MIGRATE) create -ext sql -dir $(MIGRATIONS) -seq $(name)
 
-## Start local services (postgres + redis) in background
+## Force the schema version without running SQL (use after a manual schema load)
+##   make migrate-force v=1
+migrate-force:
+	$(MIGRATE) -path $(MIGRATIONS) -database "$(DB_URL)" force $(v)
+
+## Print the current migration version
+migrate-version:
+	$(MIGRATE) -path $(MIGRATIONS) -database "$(DB_URL)" version
+
+# ── Docker ────────────────────────────────────────────────────────────────────
+
+## Start postgres + redis only (recommended for local dev)
+docker-db:
+	docker compose up -d db redis
+
+## Start all services (db, redis, app)
 docker-up:
-	@docker compose up -d
+	docker compose up -d
 
-## Stop and remove local services
+## Stop and remove containers (data volume is preserved)
 docker-down:
-	@docker compose down
+	docker compose down
 
-## Build the Docker image
-docker-build:
-	@docker build -t digitalfx:local .
+## Tail logs for db and redis
+docker-logs:
+	docker compose logs -f db redis
 
-## Run tests
+# ── Quality ───────────────────────────────────────────────────────────────────
+
+## Run tests with race detector and coverage
 test:
-	@go test -race -cover ./...
+	go test -race -cover ./...
 
 ## Run linter (requires golangci-lint)
 lint:
-	@golangci-lint run ./...
+	golangci-lint run ./...
 
-## Remove built binaries
+# ── Housekeeping ──────────────────────────────────────────────────────────────
+
+## Remove compiled binaries
 clean:
-	@rm -rf bin/
+	rm -rf bin/
 
 .DEFAULT_GOAL := build

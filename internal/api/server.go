@@ -12,8 +12,10 @@ import (
 
 	"github.com/rachfinance/digitalfx/internal/clients/caas"
 	"github.com/rachfinance/digitalfx/internal/clients/hub2"
+	"github.com/rachfinance/digitalfx/internal/clients/metamap"
 	"github.com/rachfinance/digitalfx/internal/clients/payments"
 	"github.com/rachfinance/digitalfx/internal/config"
+	"github.com/rachfinance/digitalfx/internal/pkg/email"
 	"github.com/rachfinance/digitalfx/internal/services"
 )
 
@@ -43,12 +45,25 @@ func NewServer(cfg *config.Config) (*Server, error) {
 	rdb := redis.NewClient(opts)
 
 	// External clients
-	paymentsClient := payments.NewClient(cfg.PaymentsAPI.BaseURL, cfg.PaymentsAPI.APIKey)
-	caasClient := caas.NewClient(cfg.CaaS.BaseURL, cfg.CaaS.APIKey)
+	paymentsClient := payments.New(cfg.PaymentsAPI.APIKey, payments.WithBaseURL(cfg.PaymentsAPI.BaseURL))
+	caasClient := caas.New(cfg.CaaS.APIKey, caas.WithBaseURL(cfg.CaaS.BaseURL))
 	hub2Client := hub2.NewClient(cfg.HUB2.BaseURL, cfg.HUB2.APIKey, cfg.HUB2.SecretKey, cfg.HUB2.Mode)
+	emailClient := email.New(
+		cfg.Brevo.SMTPHost,
+		cfg.Brevo.SMTPPort,
+		cfg.Brevo.FromName,
+		cfg.Brevo.FromEmail,
+		cfg.Brevo.SMTPUser,
+		cfg.Brevo.SMTPKey,
+	)
+	metamapClient := metamap.New(
+		cfg.MetaMap.ClientID,
+		cfg.MetaMap.ClientSecret,
+		cfg.MetaMap.FlowID,
+	)
 
 	// Service layer
-	svc := services.New(pool, rdb, paymentsClient, caasClient, hub2Client, cfg, logger)
+	svc := services.New(pool, rdb, paymentsClient, caasClient, hub2Client, emailClient, metamapClient, cfg, logger)
 
 	// Router
 	r := newRouter(cfg, svc, logger)

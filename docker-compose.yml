@@ -7,7 +7,7 @@ services:
       POSTGRES_USER:     digitalfx
       POSTGRES_PASSWORD: localpass
     ports:
-      - "5432:5432"
+      - "5436:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -33,6 +33,10 @@ services:
     ports:
       - "8080:8080"
     env_file: .env
+    environment:
+      # Override localhost URLs from .env with Docker-internal service names
+      DATABASE_URL: postgres://digitalfx:localpass@db:5432/digitalfx?sslmode=disable
+      REDIS_URL: redis://redis:6379/0
     depends_on:
       db:
         condition: service_healthy

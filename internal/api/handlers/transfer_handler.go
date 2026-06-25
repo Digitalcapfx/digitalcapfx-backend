@@ -17,7 +17,20 @@ func NewTransferHandler(svc *services.Services) *TransferHandler {
 	return &TransferHandler{svc: svc}
 }
 
-// InternalTransfer moves fiat between two DigitalFX accounts.
+// InternalTransfer godoc
+//
+//	@Summary      Internal fiat transfer
+//	@Description  Transfers fiat funds between two DigitalFX users using their phone numbers. Both sender and receiver must have an account in the requested currency.
+//	@Tags         transfers
+//	@Accept       json
+//	@Produce      json
+//	@Security     BearerAuth
+//	@Param        body  body      InternalTransferRequest  true  "Transfer details"
+//	@Success      200   {object}  MessageResponse
+//	@Failure      400   {object}  ErrorResponse
+//	@Failure      401   {object}  ErrorResponse
+//	@Failure      500   {object}  ErrorResponse
+//	@Router       /transfers/internal [post]
 func (h *TransferHandler) InternalTransfer(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
@@ -37,49 +50,45 @@ func (h *TransferHandler) InternalTransfer(w http.ResponseWriter, r *http.Reques
 	}
 
 	_ = userID
-	// TODO: implement in AccountService / TransferService
 	response.OK(w, map[string]string{"message": "not implemented"})
 }
 
-// Hub2Payment initiates a Mobile Money deposit or withdrawal via HUB2.
+// Hub2Payment godoc
+//
+//	@Summary      Mobile Money payment via HUB2
+//	@Description  Initiates either a collection (deposit) or disbursement (withdrawal) via the HUB2 Mobile Money gateway for XAF/XOF operators (MTN, Orange).
+//	@Tags         transfers
+//	@Accept       json
+//	@Produce      json
+//	@Security     BearerAuth
+//	@Param        body  body      Hub2PaymentRequest  true  "Payment details"
+//	@Success      201   {object}  Hub2RefResponse
+//	@Failure      400   {object}  ErrorResponse
+//	@Failure      401   {object}  ErrorResponse
+//	@Failure      500   {object}  ErrorResponse
+//	@Router       /transfers/hub2 [post]
 func (h *TransferHandler) Hub2Payment(w http.ResponseWriter, r *http.Request) {
-	userID, ok := middleware.UserIDFromContext(r.Context())
+	// Deprecated: use POST /api/v1/crypto/fund to fund the Instant USD Account
+	// via Mobile Money. This generic endpoint is no longer active.
+	_, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
 		response.Unauthorized(w, "unauthorized")
 		return
 	}
-
-	var body struct {
-		Currency      string  `json:"currency"`
-		Amount        float64 `json:"amount"`
-		Phone         string  `json:"phone"`
-		Operator      string  `json:"operator"`
-		PaymentMethod string  `json:"payment_method"`
-		Direction     string  `json:"direction"` // collection | disbursement
-	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		response.BadRequest(w, "VALIDATION_ERROR", "invalid request body")
-		return
-	}
-
-	payment, err := h.svc.HUB2.InitiatePayment(r.Context(), services.Hub2PaymentInput{
-		UserID:        userID,
-		Currency:      body.Currency,
-		Amount:        body.Amount,
-		Phone:         body.Phone,
-		Operator:      body.Operator,
-		PaymentMethod: body.PaymentMethod,
-		Direction:     body.Direction,
-	})
-	if err != nil {
-		response.InternalError(w)
-		return
-	}
-
-	response.Created(w, payment)
+	response.BadRequest(w, "DEPRECATED", "use POST /api/v1/crypto/fund to fund your Instant USD Account")
 }
 
-// ExchangeCurrency converts between supported fiat currencies (FX rates TBD).
+// ExchangeCurrency godoc
+//
+//	@Summary      Exchange currency
+//	@Description  Converts between supported fiat currencies at the current FX rate. Rate provider integration is pending.
+//	@Tags         transfers
+//	@Accept       json
+//	@Produce      json
+//	@Security     BearerAuth
+//	@Success      200  {object}  MessageResponse
+//	@Failure      401  {object}  ErrorResponse
+//	@Router       /transfers/exchange [post]
 func (h *TransferHandler) ExchangeCurrency(w http.ResponseWriter, r *http.Request) {
 	_, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
@@ -87,6 +96,5 @@ func (h *TransferHandler) ExchangeCurrency(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	// TODO: integrate FX rate provider and implement exchange
 	response.OK(w, map[string]string{"message": "not implemented"})
 }

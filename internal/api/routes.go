@@ -6,6 +6,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
+	httpSwagger "github.com/swaggo/http-swagger"
 	"go.uber.org/zap"
 
 	"github.com/rachfinance/digitalfx/internal/api/handlers"
@@ -31,12 +32,14 @@ func newRouter(cfg *config.Config, svc *services.Services, logger *zap.Logger) h
 	}))
 
 	// Handlers
-	authH := handlers.NewAuthHandler(svc, cfg)
+	authH    := handlers.NewAuthHandler(svc, cfg)
+	profileH := handlers.NewProfileHandler(svc)
 	accountH := handlers.NewAccountHandler(svc)
-	walletH := handlers.NewWalletHandler(svc)
-	cryptoH := handlers.NewCryptoHandler(svc)
+	walletH  := handlers.NewWalletHandler(svc)
+	cryptoH  := handlers.NewCryptoHandler(svc)
 	transferH := handlers.NewTransferHandler(svc)
-	kycH := handlers.NewKYCHandler(svc)
+	kycH     := handlers.NewKYCHandler(svc)
+	webhookH := handlers.NewWebhookHandler(svc, cfg.HUB2.SecretKey, logger)
 
 	// Health
 	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
@@ -44,21 +47,44 @@ func newRouter(cfg *config.Config, svc *services.Services, logger *zap.Logger) h
 		_, _ = w.Write([]byte(`{"status":"ok"}`))
 	})
 
+	// Public webhooks — no JWT required
+	r.Post("/webhooks/hub2", webhookH.HUB2)
+	r.Post("/webhooks/metamap", kycH.MetaMapWebhook)
+
+	// Swagger UI
+	r.Get("/swagger/*", httpSwagger.Handler(
+		httpSwagger.URL("/swagger/doc.json"),
+	))
+
 	// API v1
 	r.Route("/api/v1", func(r chi.Router) {
 
-		// Public — no auth required
+		// ── Public routes (no auth) ──────────────────────────────────────────
 		r.Route("/auth", func(r chi.Router) {
 			r.Post("/otp/send", authH.SendOTP)
 			r.Post("/otp/verify", authH.VerifyOTP)
 			r.Post("/register", authH.Register)
 			r.Post("/login", authH.Login)
 			r.Post("/token/refresh", authH.RefreshToken)
+			r.Post("/forgot-pin", authH.ForgotPIN)
+			r.Post("/reset-pin", authH.ResetPIN)
 		})
 
-		// Protected — JWT required
+		// ── Protected routes (JWT required) ─────────────────────────────────
 		r.Group(func(r chi.Router) {
 			r.Use(middleware.Auth(cfg.JWT.Secret))
+
+			// Auth — session & email management
+			r.Post("/auth/logout", authH.Logout)
+			r.Post("/auth/email/resend-otp", authH.SendEmailOTP)
+			r.Post("/auth/email/verify", authH.VerifyEmail)
+			r.Get("/auth/devices", authH.ListDevices)
+			r.Delete("/auth/devices", authH.DisconnectAllDevices)
+			r.Delete("/auth/devices/{id}", authH.DisconnectDevice)
+
+			// Profile
+			r.Get("/profile", profileH.GetProfile)
+			r.Patch("/profile", profileH.UpdateProfile)
 
 			// Accounts (fiat — XAF, XOF, USD, GBP, EUR)
 			r.Route("/accounts", func(r chi.Router) {
@@ -68,7 +94,7 @@ func newRouter(cfg *config.Config, svc *services.Services, logger *zap.Logger) h
 				r.Get("/{currency}/transactions/{id}", accountH.GetTransaction)
 			})
 
-			// WaaS — crypto wallets via Payments API
+			// WaaS — custody wallets via Payments API
 			r.Route("/wallets", func(r chi.Router) {
 				r.Get("/", walletH.ListWallets)
 				r.Post("/", walletH.CreateWallet)
@@ -77,16 +103,17 @@ func newRouter(cfg *config.Config, svc *services.Services, logger *zap.Logger) h
 				r.Post("/withdraw", walletH.InitiateWithdrawal)
 			})
 
-			// CaaS — USDT/USDC P2P by phone number
+			// CaaS — Instant USD Account (ERC-4337 SCW)
 			r.Route("/crypto", func(r chi.Router) {
 				r.Get("/wallet", cryptoH.GetWallet)
+				r.Post("/fund", cryptoH.FundAccount)
 				r.Get("/balances", cryptoH.GetBalances)
 				r.Post("/send", cryptoH.Send)
 				r.Get("/transactions", cryptoH.ListTransactions)
 				r.Get("/transactions/{id}", cryptoH.GetTransaction)
 			})
 
-			// Transfers (fiat — internal between DigitalFX users)
+			// Transfers (fiat internal)
 			r.Route("/transfers", func(r chi.Router) {
 				r.Post("/internal", transferH.InternalTransfer)
 				r.Post("/hub2", transferH.Hub2Payment)
@@ -98,6 +125,7 @@ func newRouter(cfg *config.Config, svc *services.Services, logger *zap.Logger) h
 				r.Get("/status", kycH.GetStatus)
 				r.Get("/documents", kycH.ListDocuments)
 				r.Post("/documents", kycH.UploadDocument)
+				r.Post("/metamap/init", kycH.InitiateMetaMap)
 			})
 		})
 	})

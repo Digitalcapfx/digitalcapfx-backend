@@ -3,11 +3,28 @@ package hub2
 import (
 	"bytes"
 	"context"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"time"
 )
+
+// VerifySignature validates the HMAC-SHA256 signature that HUB2 sends in the
+// X-Hub2-Signature header for every webhook delivery.
+// Expected format: "sha256=<lowercase-hex>"
+func VerifySignature(payload []byte, signatureHeader, secret string) bool {
+	const prefix = "sha256="
+	if len(signatureHeader) <= len(prefix) || signatureHeader[:len(prefix)] != prefix {
+		return false
+	}
+	mac := hmac.New(sha256.New, []byte(secret))
+	mac.Write(payload)
+	expected := hex.EncodeToString(mac.Sum(nil))
+	return hmac.Equal([]byte(signatureHeader[len(prefix):]), []byte(expected))
+}
 
 // Client wraps the HUB2 API for XAF/XOF Mobile Money collection and disbursement.
 // Docs: https://docs.hub2.io
@@ -60,12 +77,18 @@ type DisburseResponse struct {
 	Status    string `json:"status"`
 }
 
+// WebhookPayload is the body HUB2 POSTs to our /webhooks/hub2 endpoint.
+// HUB2 signs the raw body with HMAC-SHA256 and sends the signature in
+// the X-Hub2-Signature header as "sha256=<hex>".
 type WebhookPayload struct {
-	Reference string `json:"reference"`
-	Status    string `json:"status"`   // SUCCESSFUL | FAILED | CANCELLED | PENDING
-	Amount    float64 `json:"amount"`
-	Currency  string  `json:"currency"`
-	Phone     string  `json:"phone"`
+	Reference string  `json:"reference"`
+	// Status values: SUCCESSFUL | FAILED | CANCELLED | PENDING
+	Status   string  `json:"status"`
+	Amount   float64 `json:"amount"`
+	Currency string  `json:"currency"` // XAF | XOF
+	Phone    string  `json:"phone"`    // E.164 — the payer's number
+	// Type distinguishes collection (deposit) from disbursement (withdrawal).
+	Type string `json:"type"` // COLLECTION | DISBURSEMENT
 }
 
 // ── Methods ──────────────────────────────────────────────────────────────────

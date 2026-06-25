@@ -10,6 +10,7 @@ import (
 )
 
 type Config struct {
+	App         AppConfig
 	Server      ServerConfig
 	Database    DatabaseConfig
 	Redis       RedisConfig
@@ -18,6 +19,13 @@ type Config struct {
 	CaaS        CaaSConfig
 	HUB2        HUB2Config
 	GCP         GCPConfig
+	Brevo       BrevoConfig
+	MetaMap     MetaMapConfig
+}
+
+type AppConfig struct {
+	Name    string
+	BaseURL string
 }
 
 type ServerConfig struct {
@@ -67,6 +75,25 @@ type GCPConfig struct {
 	KYCBucket string
 }
 
+// BrevoConfig holds Brevo SMTP credentials for transactional email.
+// SMTP host: smtp-relay.brevo.com, port 587 (STARTTLS).
+type BrevoConfig struct {
+	SMTPHost  string
+	SMTPPort  int
+	FromName  string
+	FromEmail string
+	SMTPUser  string // Brevo login email
+	SMTPKey   string // Brevo SMTP API key
+}
+
+// MetaMapConfig holds credentials for MetaMap identity verification.
+type MetaMapConfig struct {
+	ClientID      string
+	ClientSecret  string
+	FlowID        string
+	WebhookSecret string
+}
+
 func Load() (*Config, error) {
 	_ = godotenv.Load()
 
@@ -80,6 +107,9 @@ func Load() (*Config, error) {
 	}
 
 	cfg := &Config{}
+
+	cfg.App.Name = getEnv("APP_NAME", "DigitalFX")
+	cfg.App.BaseURL = getEnv("APP_BASE_URL", "https://api.digitalfx.finance")
 
 	cfg.Server.Port = getEnv("PORT", "8080")
 	cfg.Server.Env = getEnv("ENV", "development")
@@ -108,6 +138,18 @@ func Load() (*Config, error) {
 
 	cfg.GCP.ProjectID = getEnv("GCP_PROJECT_ID", "")
 	cfg.GCP.KYCBucket = getEnv("KYC_BUCKET", "")
+
+	cfg.Brevo.SMTPHost = getEnv("BREVO_SMTP_HOST", "smtp-relay.brevo.com")
+	cfg.Brevo.SMTPPort = getEnvInt("BREVO_SMTP_PORT", 587)
+	cfg.Brevo.FromName = getEnv("BREVO_FROM_NAME", "DigitalFX")
+	cfg.Brevo.FromEmail = getEnv("BREVO_FROM_EMAIL", "noreply@digitalfx.finance")
+	cfg.Brevo.SMTPUser = getEnv("BREVO_SMTP_USER", "")
+	cfg.Brevo.SMTPKey = getEnv("BREVO_SMTP_KEY", "")
+
+	cfg.MetaMap.ClientID = getEnv("METAMAP_CLIENT_ID", "")
+	cfg.MetaMap.ClientSecret = getEnv("METAMAP_CLIENT_SECRET", "")
+	cfg.MetaMap.FlowID = getEnv("METAMAP_FLOW_ID", "")
+	cfg.MetaMap.WebhookSecret = getEnv("METAMAP_WEBHOOK_SECRET", "")
 
 	if len(errs) > 0 {
 		return nil, fmt.Errorf("config errors:\n  %s", joinErrors(errs))

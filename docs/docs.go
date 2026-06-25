@@ -37,19 +37,19 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/internal_api_handlers.AccountListResponse"
+                            "$ref": "#/definitions/handlers.AccountListResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/internal_api_handlers.ErrorResponse"
+                            "$ref": "#/definitions/handlers.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/internal_api_handlers.ErrorResponse"
+                            "$ref": "#/definitions/handlers.ErrorResponse"
                         }
                     }
                 }
@@ -90,19 +90,19 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/internal_api_handlers.AccountResponse"
+                            "$ref": "#/definitions/handlers.AccountResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/internal_api_handlers.ErrorResponse"
+                            "$ref": "#/definitions/handlers.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "Not Found",
                         "schema": {
-                            "$ref": "#/definitions/internal_api_handlers.ErrorResponse"
+                            "$ref": "#/definitions/handlers.ErrorResponse"
                         }
                     }
                 }
@@ -155,25 +155,25 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/internal_api_handlers.TransactionListResponse"
+                            "$ref": "#/definitions/handlers.TransactionListResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/internal_api_handlers.ErrorResponse"
+                            "$ref": "#/definitions/handlers.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "Not Found",
                         "schema": {
-                            "$ref": "#/definitions/internal_api_handlers.ErrorResponse"
+                            "$ref": "#/definitions/handlers.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/internal_api_handlers.ErrorResponse"
+                            "$ref": "#/definitions/handlers.ErrorResponse"
                         }
                     }
                 }
@@ -221,25 +221,253 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/internal_api_handlers.TransactionResponse"
+                            "$ref": "#/definitions/handlers.TransactionResponse"
                         }
                     },
                     "400": {
                         "description": "Invalid UUID",
                         "schema": {
-                            "$ref": "#/definitions/internal_api_handlers.ErrorResponse"
+                            "$ref": "#/definitions/handlers.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/internal_api_handlers.ErrorResponse"
+                            "$ref": "#/definitions/handlers.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "Not Found",
                         "schema": {
-                            "$ref": "#/definitions/internal_api_handlers.ErrorResponse"
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/auth/devices": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns all active login sessions with device name, IP, and last activity.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "summary": "List active devices",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.DeviceListResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Revokes all active sessions except the current one.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Disconnect all other devices",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.MessageResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/auth/devices/{id}": {
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Revokes a specific login session. The device is signed out on next token refresh.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Disconnect a device",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Session ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.MessageResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/auth/email/resend-otp": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Sends a new 6-digit code to the authenticated user's registered email address.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Resend email verification OTP",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.MessageResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/auth/email/verify": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Confirms the 6-digit OTP sent to the user's email and marks it as verified.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Verify email address",
+                "parameters": [
+                    {
+                        "description": "OTP code",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.VerifyEmailRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.MessageResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/auth/forgot-pin": {
+            "post": {
+                "description": "Sends a 6-digit reset code to the registered email. Accepts email or phone. Always returns 200 to prevent account enumeration.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Forgot PIN",
+                "parameters": [
+                    {
+                        "description": "Email or phone",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ForgotPINRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.MessageResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
                         }
                     }
                 }
@@ -247,7 +475,7 @@ const docTemplate = `{
         },
         "/auth/login": {
             "post": {
-                "description": "Authenticates a user with phone + PIN and returns a JWT token pair.",
+                "description": "Authenticates with phone + PIN. Creates a device session and sends a login notification email. Returns a JWT pair with a session_id for device management.",
                 "consumes": [
                     "application/json"
                 ],
@@ -265,7 +493,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_api_handlers.LoginRequest"
+                            "$ref": "#/definitions/handlers.LoginRequest"
                         }
                     }
                 ],
@@ -273,25 +501,56 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/internal_api_handlers.TokenPairResponse"
+                            "$ref": "#/definitions/handlers.TokenPairResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/internal_api_handlers.ErrorResponse"
+                            "$ref": "#/definitions/handlers.ErrorResponse"
                         }
                     },
                     "403": {
                         "description": "Account inactive",
                         "schema": {
-                            "$ref": "#/definitions/internal_api_handlers.ErrorResponse"
+                            "$ref": "#/definitions/handlers.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/internal_api_handlers.ErrorResponse"
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/auth/logout": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Revokes the current device session. The refresh token is immediately invalidated; access token remains valid until expiry (max 30 min). A sign-out notification email is sent.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Logout",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.MessageResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
                         }
                     }
                 }
@@ -299,7 +558,7 @@ const docTemplate = `{
         },
         "/auth/otp/send": {
             "post": {
-                "description": "Sends a 6-digit OTP to the provided phone number. Must be called before register or login.",
+                "description": "Sends a 6-digit OTP to the phone number via SMS. Required before register.",
                 "consumes": [
                     "application/json"
                 ],
@@ -309,15 +568,15 @@ const docTemplate = `{
                 "tags": [
                     "auth"
                 ],
-                "summary": "Send OTP",
+                "summary": "Send phone OTP",
                 "parameters": [
                     {
-                        "description": "Phone number in E.164 format",
+                        "description": "Phone number (E.164)",
                         "name": "body",
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_api_handlers.SendOTPRequest"
+                            "$ref": "#/definitions/handlers.SendOTPRequest"
                         }
                     }
                 ],
@@ -325,19 +584,19 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/internal_api_handlers.MessageResponse"
+                            "$ref": "#/definitions/handlers.MessageResponse"
                         }
                     },
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/internal_api_handlers.ErrorResponse"
+                            "$ref": "#/definitions/handlers.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/internal_api_handlers.ErrorResponse"
+                            "$ref": "#/definitions/handlers.ErrorResponse"
                         }
                     }
                 }
@@ -345,7 +604,7 @@ const docTemplate = `{
         },
         "/auth/otp/verify": {
             "post": {
-                "description": "Confirms that the OTP sent to the phone is correct. Call before register for new users.",
+                "description": "Confirms the OTP sent to the phone. Call before register for new users.",
                 "consumes": [
                     "application/json"
                 ],
@@ -355,7 +614,7 @@ const docTemplate = `{
                 "tags": [
                     "auth"
                 ],
-                "summary": "Verify OTP",
+                "summary": "Verify phone OTP",
                 "parameters": [
                     {
                         "description": "Phone + OTP code",
@@ -363,7 +622,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_api_handlers.VerifyOTPRequest"
+                            "$ref": "#/definitions/handlers.VerifyOTPRequest"
                         }
                     }
                 ],
@@ -371,13 +630,13 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/internal_api_handlers.MessageResponse"
+                            "$ref": "#/definitions/handlers.MessageResponse"
                         }
                     },
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/internal_api_handlers.ErrorResponse"
+                            "$ref": "#/definitions/handlers.ErrorResponse"
                         }
                     }
                 }
@@ -385,7 +644,7 @@ const docTemplate = `{
         },
         "/auth/register": {
             "post": {
-                "description": "Creates a new user account and returns a JWT token pair. OTP must have been verified first.",
+                "description": "Creates a new user account, provisions fiat accounts, and returns a JWT pair. A welcome email and email verification OTP are sent asynchronously.",
                 "consumes": [
                     "application/json"
                 ],
@@ -403,7 +662,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_api_handlers.RegisterRequest"
+                            "$ref": "#/definitions/handlers.RegisterRequest"
                         }
                     }
                 ],
@@ -411,25 +670,65 @@ const docTemplate = `{
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "$ref": "#/definitions/internal_api_handlers.TokenPairResponse"
+                            "$ref": "#/definitions/handlers.TokenPairResponse"
                         }
                     },
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/internal_api_handlers.ErrorResponse"
+                            "$ref": "#/definitions/handlers.ErrorResponse"
                         }
                     },
                     "409": {
-                        "description": "Phone number already registered",
+                        "description": "Phone already registered",
                         "schema": {
-                            "$ref": "#/definitions/internal_api_handlers.ErrorResponse"
+                            "$ref": "#/definitions/handlers.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/internal_api_handlers.ErrorResponse"
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/auth/reset-pin": {
+            "post": {
+                "description": "Verifies the 6-digit OTP and sets a new PIN. All active sessions are revoked. A confirmation email is sent.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Reset PIN",
+                "parameters": [
+                    {
+                        "description": "Email/phone + OTP + new PIN",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ResetPINRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.MessageResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
                         }
                     }
                 }
@@ -437,7 +736,7 @@ const docTemplate = `{
         },
         "/auth/token/refresh": {
             "post": {
-                "description": "Issues a new access + refresh token pair using a valid refresh token.",
+                "description": "Issues a new rotated access + refresh token pair. The old refresh token is invalidated. Validates the session is still active.",
                 "consumes": [
                     "application/json"
                 ],
@@ -455,7 +754,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_api_handlers.RefreshTokenRequest"
+                            "$ref": "#/definitions/handlers.RefreshTokenRequest"
                         }
                     }
                 ],
@@ -463,19 +762,19 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/internal_api_handlers.TokenPairResponse"
+                            "$ref": "#/definitions/handlers.TokenPairResponse"
                         }
                     },
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/internal_api_handlers.ErrorResponse"
+                            "$ref": "#/definitions/handlers.ErrorResponse"
                         }
                     },
                     "401": {
-                        "description": "Invalid or expired refresh token",
+                        "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/internal_api_handlers.ErrorResponse"
+                            "$ref": "#/definitions/handlers.ErrorResponse"
                         }
                     }
                 }
@@ -500,19 +799,19 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/internal_api_handlers.CryptoBalanceResponse"
+                            "$ref": "#/definitions/handlers.CryptoBalanceResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/internal_api_handlers.ErrorResponse"
+                            "$ref": "#/definitions/handlers.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/internal_api_handlers.ErrorResponse"
+                            "$ref": "#/definitions/handlers.ErrorResponse"
                         }
                     }
                 }
@@ -543,7 +842,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_api_handlers.FundAccountRequest"
+                            "$ref": "#/definitions/handlers.FundAccountRequest"
                         }
                     }
                 ],
@@ -551,25 +850,25 @@ const docTemplate = `{
                     "201": {
                         "description": "HUB2 collection reference — poll status or wait for balance update",
                         "schema": {
-                            "$ref": "#/definitions/internal_api_handlers.Hub2RefResponse"
+                            "$ref": "#/definitions/handlers.Hub2RefResponse"
                         }
                     },
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/internal_api_handlers.ErrorResponse"
+                            "$ref": "#/definitions/handlers.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/internal_api_handlers.ErrorResponse"
+                            "$ref": "#/definitions/handlers.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/internal_api_handlers.ErrorResponse"
+                            "$ref": "#/definitions/handlers.ErrorResponse"
                         }
                     }
                 }
@@ -600,7 +899,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_api_handlers.SendCryptoRequest"
+                            "$ref": "#/definitions/handlers.SendCryptoRequest"
                         }
                     }
                 ],
@@ -608,25 +907,25 @@ const docTemplate = `{
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "$ref": "#/definitions/internal_api_handlers.CryptoTxResponse"
+                            "$ref": "#/definitions/handlers.CryptoTxResponse"
                         }
                     },
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/internal_api_handlers.ErrorResponse"
+                            "$ref": "#/definitions/handlers.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/internal_api_handlers.ErrorResponse"
+                            "$ref": "#/definitions/handlers.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/internal_api_handlers.ErrorResponse"
+                            "$ref": "#/definitions/handlers.ErrorResponse"
                         }
                     }
                 }
@@ -665,19 +964,19 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/internal_api_handlers.CryptoTxListResponse"
+                            "$ref": "#/definitions/handlers.CryptoTxListResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/internal_api_handlers.ErrorResponse"
+                            "$ref": "#/definitions/handlers.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/internal_api_handlers.ErrorResponse"
+                            "$ref": "#/definitions/handlers.ErrorResponse"
                         }
                     }
                 }
@@ -711,25 +1010,25 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/internal_api_handlers.CryptoTxResponse"
+                            "$ref": "#/definitions/handlers.CryptoTxResponse"
                         }
                     },
                     "400": {
                         "description": "Invalid UUID",
                         "schema": {
-                            "$ref": "#/definitions/internal_api_handlers.ErrorResponse"
+                            "$ref": "#/definitions/handlers.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/internal_api_handlers.ErrorResponse"
+                            "$ref": "#/definitions/handlers.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "Not Found",
                         "schema": {
-                            "$ref": "#/definitions/internal_api_handlers.ErrorResponse"
+                            "$ref": "#/definitions/handlers.ErrorResponse"
                         }
                     }
                 }
@@ -754,19 +1053,19 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/internal_api_handlers.CaasWalletResponse"
+                            "$ref": "#/definitions/handlers.CaasWalletResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/internal_api_handlers.ErrorResponse"
+                            "$ref": "#/definitions/handlers.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/internal_api_handlers.ErrorResponse"
+                            "$ref": "#/definitions/handlers.ErrorResponse"
                         }
                     }
                 }
@@ -791,19 +1090,19 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/internal_api_handlers.KYCDocumentListResponse"
+                            "$ref": "#/definitions/handlers.KYCDocumentListResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/internal_api_handlers.ErrorResponse"
+                            "$ref": "#/definitions/handlers.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/internal_api_handlers.ErrorResponse"
+                            "$ref": "#/definitions/handlers.ErrorResponse"
                         }
                     }
                 }
@@ -832,7 +1131,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_api_handlers.KYCDocumentRequest"
+                            "$ref": "#/definitions/handlers.KYCDocumentRequest"
                         }
                     }
                 ],
@@ -840,25 +1139,62 @@ const docTemplate = `{
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "$ref": "#/definitions/internal_api_handlers.KYCDocumentResponse"
+                            "$ref": "#/definitions/handlers.KYCDocumentResponse"
                         }
                     },
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/internal_api_handlers.ErrorResponse"
+                            "$ref": "#/definitions/handlers.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/internal_api_handlers.ErrorResponse"
+                            "$ref": "#/definitions/handlers.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/internal_api_handlers.ErrorResponse"
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/kyc/metamap/init": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Creates (or returns an existing) MetaMap applicant for the user. The returned identity_access token is used with the MetaMap mobile SDK to launch the verification flow.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "kyc"
+                ],
+                "summary": "Start MetaMap identity verification",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.MetaMapInitResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
                         }
                     }
                 }
@@ -883,19 +1219,111 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/internal_api_handlers.KYCStatusResponse"
+                            "$ref": "#/definitions/handlers.KYCStatusResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/internal_api_handlers.ErrorResponse"
+                            "$ref": "#/definitions/handlers.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/internal_api_handlers.ErrorResponse"
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/profile": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns the full profile of the authenticated user including bio, avatar, and KYC/email verification status.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "profile"
+                ],
+                "summary": "Get profile",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ProfileResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "patch": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Updates the authenticated user's profile fields: name, bio, avatar URL, date of birth, and nationality.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "profile"
+                ],
+                "summary": "Update profile",
+                "parameters": [
+                    {
+                        "description": "Profile fields to update",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.UpdateProfileRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ProfileResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
                         }
                     }
                 }
@@ -923,13 +1351,13 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/internal_api_handlers.MessageResponse"
+                            "$ref": "#/definitions/handlers.MessageResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/internal_api_handlers.ErrorResponse"
+                            "$ref": "#/definitions/handlers.ErrorResponse"
                         }
                     }
                 }
@@ -960,7 +1388,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_api_handlers.Hub2PaymentRequest"
+                            "$ref": "#/definitions/handlers.Hub2PaymentRequest"
                         }
                     }
                 ],
@@ -968,25 +1396,25 @@ const docTemplate = `{
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "$ref": "#/definitions/internal_api_handlers.Hub2RefResponse"
+                            "$ref": "#/definitions/handlers.Hub2RefResponse"
                         }
                     },
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/internal_api_handlers.ErrorResponse"
+                            "$ref": "#/definitions/handlers.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/internal_api_handlers.ErrorResponse"
+                            "$ref": "#/definitions/handlers.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/internal_api_handlers.ErrorResponse"
+                            "$ref": "#/definitions/handlers.ErrorResponse"
                         }
                     }
                 }
@@ -1017,7 +1445,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_api_handlers.InternalTransferRequest"
+                            "$ref": "#/definitions/handlers.InternalTransferRequest"
                         }
                     }
                 ],
@@ -1025,25 +1453,25 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/internal_api_handlers.MessageResponse"
+                            "$ref": "#/definitions/handlers.MessageResponse"
                         }
                     },
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/internal_api_handlers.ErrorResponse"
+                            "$ref": "#/definitions/handlers.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/internal_api_handlers.ErrorResponse"
+                            "$ref": "#/definitions/handlers.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/internal_api_handlers.ErrorResponse"
+                            "$ref": "#/definitions/handlers.ErrorResponse"
                         }
                     }
                 }
@@ -1068,19 +1496,19 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/internal_api_handlers.WalletListResponse"
+                            "$ref": "#/definitions/handlers.WalletListResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/internal_api_handlers.ErrorResponse"
+                            "$ref": "#/definitions/handlers.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/internal_api_handlers.ErrorResponse"
+                            "$ref": "#/definitions/handlers.ErrorResponse"
                         }
                     }
                 }
@@ -1109,7 +1537,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_api_handlers.CreateWalletRequest"
+                            "$ref": "#/definitions/handlers.CreateWalletRequest"
                         }
                     }
                 ],
@@ -1117,25 +1545,25 @@ const docTemplate = `{
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "$ref": "#/definitions/internal_api_handlers.WalletResponse"
+                            "$ref": "#/definitions/handlers.WalletResponse"
                         }
                     },
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/internal_api_handlers.ErrorResponse"
+                            "$ref": "#/definitions/handlers.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/internal_api_handlers.ErrorResponse"
+                            "$ref": "#/definitions/handlers.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/internal_api_handlers.ErrorResponse"
+                            "$ref": "#/definitions/handlers.ErrorResponse"
                         }
                     }
                 }
@@ -1166,7 +1594,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_api_handlers.DepositRequest"
+                            "$ref": "#/definitions/handlers.DepositRequest"
                         }
                     }
                 ],
@@ -1174,25 +1602,25 @@ const docTemplate = `{
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "$ref": "#/definitions/internal_api_handlers.Hub2RefResponse"
+                            "$ref": "#/definitions/handlers.Hub2RefResponse"
                         }
                     },
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/internal_api_handlers.ErrorResponse"
+                            "$ref": "#/definitions/handlers.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/internal_api_handlers.ErrorResponse"
+                            "$ref": "#/definitions/handlers.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/internal_api_handlers.ErrorResponse"
+                            "$ref": "#/definitions/handlers.ErrorResponse"
                         }
                     }
                 }
@@ -1223,7 +1651,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_api_handlers.WithdrawalRequest"
+                            "$ref": "#/definitions/handlers.WithdrawalRequest"
                         }
                     }
                 ],
@@ -1231,25 +1659,25 @@ const docTemplate = `{
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "$ref": "#/definitions/internal_api_handlers.Hub2RefResponse"
+                            "$ref": "#/definitions/handlers.Hub2RefResponse"
                         }
                     },
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/internal_api_handlers.ErrorResponse"
+                            "$ref": "#/definitions/handlers.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/internal_api_handlers.ErrorResponse"
+                            "$ref": "#/definitions/handlers.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/internal_api_handlers.ErrorResponse"
+                            "$ref": "#/definitions/handlers.ErrorResponse"
                         }
                     }
                 }
@@ -1283,19 +1711,19 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/internal_api_handlers.WalletResponse"
+                            "$ref": "#/definitions/handlers.WalletResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/internal_api_handlers.ErrorResponse"
+                            "$ref": "#/definitions/handlers.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "Not Found",
                         "schema": {
-                            "$ref": "#/definitions/internal_api_handlers.ErrorResponse"
+                            "$ref": "#/definitions/handlers.ErrorResponse"
                         }
                     }
                 }
@@ -1328,7 +1756,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_api_handlers.HUB2WebhookRequest"
+                            "$ref": "#/definitions/handlers.HUB2WebhookRequest"
                         }
                     }
                 ],
@@ -1336,25 +1764,54 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/internal_api_handlers.MessageResponse"
+                            "$ref": "#/definitions/handlers.MessageResponse"
                         }
                     },
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/internal_api_handlers.ErrorResponse"
+                            "$ref": "#/definitions/handlers.ErrorResponse"
                         }
                     },
                     "403": {
                         "description": "Invalid signature",
                         "schema": {
-                            "$ref": "#/definitions/internal_api_handlers.ErrorResponse"
+                            "$ref": "#/definitions/handlers.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/internal_api_handlers.ErrorResponse"
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/webhooks/metamap": {
+            "post": {
+                "description": "Receives verification result events from MetaMap. Updates KYC status to approved or rejected.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "webhooks"
+                ],
+                "summary": "MetaMap verification webhook",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.MessageResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
                         }
                     }
                 }
@@ -1362,7 +1819,7 @@ const docTemplate = `{
         }
     },
     "definitions": {
-        "internal_api_handlers.AccountData": {
+        "handlers.AccountData": {
             "type": "object",
             "properties": {
                 "account_number": {
@@ -1398,13 +1855,13 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_api_handlers.AccountListResponse": {
+        "handlers.AccountListResponse": {
             "type": "object",
             "properties": {
                 "data": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/internal_api_handlers.AccountData"
+                        "$ref": "#/definitions/handlers.AccountData"
                     }
                 },
                 "success": {
@@ -1413,11 +1870,11 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_api_handlers.AccountResponse": {
+        "handlers.AccountResponse": {
             "type": "object",
             "properties": {
                 "data": {
-                    "$ref": "#/definitions/internal_api_handlers.AccountData"
+                    "$ref": "#/definitions/handlers.AccountData"
                 },
                 "success": {
                     "type": "boolean",
@@ -1425,7 +1882,7 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_api_handlers.BalanceData": {
+        "handlers.BalanceData": {
             "type": "object",
             "properties": {
                 "balance_usdc": {
@@ -1438,7 +1895,7 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_api_handlers.CaasWalletData": {
+        "handlers.CaasWalletData": {
             "type": "object",
             "properties": {
                 "abstraction_address": {
@@ -1464,11 +1921,11 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_api_handlers.CaasWalletResponse": {
+        "handlers.CaasWalletResponse": {
             "type": "object",
             "properties": {
                 "data": {
-                    "$ref": "#/definitions/internal_api_handlers.CaasWalletData"
+                    "$ref": "#/definitions/handlers.CaasWalletData"
                 },
                 "success": {
                     "type": "boolean",
@@ -1476,7 +1933,7 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_api_handlers.CreateWalletRequest": {
+        "handlers.CreateWalletRequest": {
             "type": "object",
             "properties": {
                 "network": {
@@ -1497,11 +1954,11 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_api_handlers.CryptoBalanceResponse": {
+        "handlers.CryptoBalanceResponse": {
             "type": "object",
             "properties": {
                 "data": {
-                    "$ref": "#/definitions/internal_api_handlers.BalanceData"
+                    "$ref": "#/definitions/handlers.BalanceData"
                 },
                 "success": {
                     "type": "boolean",
@@ -1509,7 +1966,7 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_api_handlers.CryptoTxData": {
+        "handlers.CryptoTxData": {
             "type": "object",
             "properties": {
                 "amount": {
@@ -1546,13 +2003,13 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_api_handlers.CryptoTxListResponse": {
+        "handlers.CryptoTxListResponse": {
             "type": "object",
             "properties": {
                 "data": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/internal_api_handlers.CryptoTxData"
+                        "$ref": "#/definitions/handlers.CryptoTxData"
                     }
                 },
                 "success": {
@@ -1561,11 +2018,11 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_api_handlers.CryptoTxResponse": {
+        "handlers.CryptoTxResponse": {
             "type": "object",
             "properties": {
                 "data": {
-                    "$ref": "#/definitions/internal_api_handlers.CryptoTxData"
+                    "$ref": "#/definitions/handlers.CryptoTxData"
                 },
                 "success": {
                     "type": "boolean",
@@ -1573,7 +2030,7 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_api_handlers.DepositRequest": {
+        "handlers.DepositRequest": {
             "type": "object",
             "properties": {
                 "amount": {
@@ -1594,7 +2051,49 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_api_handlers.ErrorResponse": {
+        "handlers.DeviceData": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "device_ip": {
+                    "type": "string",
+                    "example": "41.202.207.10"
+                },
+                "device_name": {
+                    "type": "string",
+                    "example": "iPhone"
+                },
+                "id": {
+                    "type": "string",
+                    "example": "550e8400-e29b-41d4-a716-446655440000"
+                },
+                "is_current": {
+                    "type": "boolean",
+                    "example": true
+                },
+                "last_used_at": {
+                    "type": "string"
+                }
+            }
+        },
+        "handlers.DeviceListResponse": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/handlers.DeviceData"
+                    }
+                },
+                "success": {
+                    "type": "boolean",
+                    "example": true
+                }
+            }
+        },
+        "handlers.ErrorResponse": {
             "type": "object",
             "properties": {
                 "error": {
@@ -1616,7 +2115,16 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_api_handlers.FundAccountRequest": {
+        "handlers.ForgotPINRequest": {
+            "type": "object",
+            "properties": {
+                "email_or_phone": {
+                    "type": "string",
+                    "example": "alice@example.com"
+                }
+            }
+        },
+        "handlers.FundAccountRequest": {
             "type": "object",
             "properties": {
                 "amount": {
@@ -1662,7 +2170,7 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_api_handlers.HUB2WebhookRequest": {
+        "handlers.HUB2WebhookRequest": {
             "type": "object",
             "properties": {
                 "amount": {
@@ -1701,7 +2209,7 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_api_handlers.Hub2PaymentRequest": {
+        "handlers.Hub2PaymentRequest": {
             "type": "object",
             "properties": {
                 "amount": {
@@ -1736,7 +2244,7 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_api_handlers.Hub2RefData": {
+        "handlers.Hub2RefData": {
             "type": "object",
             "properties": {
                 "hub2_reference": {
@@ -1745,11 +2253,11 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_api_handlers.Hub2RefResponse": {
+        "handlers.Hub2RefResponse": {
             "type": "object",
             "properties": {
                 "data": {
-                    "$ref": "#/definitions/internal_api_handlers.Hub2RefData"
+                    "$ref": "#/definitions/handlers.Hub2RefData"
                 },
                 "success": {
                     "type": "boolean",
@@ -1757,7 +2265,7 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_api_handlers.InternalTransferRequest": {
+        "handlers.InternalTransferRequest": {
             "type": "object",
             "properties": {
                 "amount": {
@@ -1778,7 +2286,7 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_api_handlers.KYCDocumentData": {
+        "handlers.KYCDocumentData": {
             "type": "object",
             "properties": {
                 "created_at": {
@@ -1806,13 +2314,13 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_api_handlers.KYCDocumentListResponse": {
+        "handlers.KYCDocumentListResponse": {
             "type": "object",
             "properties": {
                 "data": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/internal_api_handlers.KYCDocumentData"
+                        "$ref": "#/definitions/handlers.KYCDocumentData"
                     }
                 },
                 "success": {
@@ -1821,7 +2329,7 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_api_handlers.KYCDocumentRequest": {
+        "handlers.KYCDocumentRequest": {
             "type": "object",
             "properties": {
                 "doc_type": {
@@ -1842,11 +2350,11 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_api_handlers.KYCDocumentResponse": {
+        "handlers.KYCDocumentResponse": {
             "type": "object",
             "properties": {
                 "data": {
-                    "$ref": "#/definitions/internal_api_handlers.KYCDocumentData"
+                    "$ref": "#/definitions/handlers.KYCDocumentData"
                 },
                 "success": {
                     "type": "boolean",
@@ -1854,7 +2362,7 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_api_handlers.KYCStatusData": {
+        "handlers.KYCStatusData": {
             "type": "object",
             "properties": {
                 "kyc_status": {
@@ -1868,11 +2376,11 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_api_handlers.KYCStatusResponse": {
+        "handlers.KYCStatusResponse": {
             "type": "object",
             "properties": {
                 "data": {
-                    "$ref": "#/definitions/internal_api_handlers.KYCStatusData"
+                    "$ref": "#/definitions/handlers.KYCStatusData"
                 },
                 "success": {
                     "type": "boolean",
@@ -1880,7 +2388,7 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_api_handlers.LoginRequest": {
+        "handlers.LoginRequest": {
             "type": "object",
             "properties": {
                 "phone": {
@@ -1893,7 +2401,7 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_api_handlers.MessageResponse": {
+        "handlers.MessageResponse": {
             "type": "object",
             "properties": {
                 "message": {
@@ -1906,7 +2414,40 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_api_handlers.PaginationMeta": {
+        "handlers.MetaMapInitData": {
+            "type": "object",
+            "properties": {
+                "applicant_id": {
+                    "type": "string",
+                    "example": "60f1a2b3c4d5e6f7a8b9c0d1"
+                },
+                "flow_id": {
+                    "type": "string",
+                    "example": "60f1a2b3c4d5e6f7a8b9c0d2"
+                },
+                "identity_access": {
+                    "type": "string",
+                    "example": "eyJhbGci..."
+                },
+                "status": {
+                    "type": "string",
+                    "example": "pending"
+                }
+            }
+        },
+        "handlers.MetaMapInitResponse": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "$ref": "#/definitions/handlers.MetaMapInitData"
+                },
+                "success": {
+                    "type": "boolean",
+                    "example": true
+                }
+            }
+        },
+        "handlers.PaginationMeta": {
             "type": "object",
             "properties": {
                 "page": {
@@ -1927,7 +2468,66 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_api_handlers.RefreshTokenRequest": {
+        "handlers.ProfileData": {
+            "type": "object",
+            "properties": {
+                "avatar_url": {
+                    "type": "string"
+                },
+                "bio": {
+                    "type": "string",
+                    "example": "Digital finance enthusiast from Cameroon"
+                },
+                "date_of_birth": {
+                    "type": "string",
+                    "example": "1995-06-15"
+                },
+                "email": {
+                    "type": "string",
+                    "example": "alice@example.com"
+                },
+                "first_name": {
+                    "type": "string",
+                    "example": "Alice"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "is_email_verified": {
+                    "type": "boolean",
+                    "example": false
+                },
+                "kyc_status": {
+                    "type": "string",
+                    "example": "pending"
+                },
+                "last_name": {
+                    "type": "string",
+                    "example": "Dupont"
+                },
+                "nationality": {
+                    "type": "string",
+                    "example": "Cameroonian"
+                },
+                "phone_number": {
+                    "type": "string",
+                    "example": "+237612345678"
+                }
+            }
+        },
+        "handlers.ProfileResponse": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "$ref": "#/definitions/handlers.ProfileData"
+                },
+                "success": {
+                    "type": "boolean",
+                    "example": true
+                }
+            }
+        },
+        "handlers.RefreshTokenRequest": {
             "type": "object",
             "properties": {
                 "refresh_token": {
@@ -1936,7 +2536,7 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_api_handlers.RegisterRequest": {
+        "handlers.RegisterRequest": {
             "type": "object",
             "properties": {
                 "email": {
@@ -1961,7 +2561,24 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_api_handlers.SendCryptoRequest": {
+        "handlers.ResetPINRequest": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string",
+                    "example": "123456"
+                },
+                "email_or_phone": {
+                    "type": "string",
+                    "example": "alice@example.com"
+                },
+                "new_pin": {
+                    "type": "string",
+                    "example": "654321"
+                }
+            }
+        },
+        "handlers.SendCryptoRequest": {
             "type": "object",
             "properties": {
                 "amount": {
@@ -1983,7 +2600,7 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_api_handlers.SendOTPRequest": {
+        "handlers.SendOTPRequest": {
             "type": "object",
             "properties": {
                 "phone": {
@@ -1992,7 +2609,7 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_api_handlers.TokenPairData": {
+        "handlers.TokenPairData": {
             "type": "object",
             "properties": {
                 "access_token": {
@@ -2009,11 +2626,11 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_api_handlers.TokenPairResponse": {
+        "handlers.TokenPairResponse": {
             "type": "object",
             "properties": {
                 "data": {
-                    "$ref": "#/definitions/internal_api_handlers.TokenPairData"
+                    "$ref": "#/definitions/handlers.TokenPairData"
                 },
                 "success": {
                     "type": "boolean",
@@ -2021,7 +2638,7 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_api_handlers.TransactionData": {
+        "handlers.TransactionData": {
             "type": "object",
             "properties": {
                 "account_id": {
@@ -2064,17 +2681,17 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_api_handlers.TransactionListResponse": {
+        "handlers.TransactionListResponse": {
             "type": "object",
             "properties": {
                 "data": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/internal_api_handlers.TransactionData"
+                        "$ref": "#/definitions/handlers.TransactionData"
                     }
                 },
                 "meta": {
-                    "$ref": "#/definitions/internal_api_handlers.PaginationMeta"
+                    "$ref": "#/definitions/handlers.PaginationMeta"
                 },
                 "success": {
                     "type": "boolean",
@@ -2082,11 +2699,11 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_api_handlers.TransactionResponse": {
+        "handlers.TransactionResponse": {
             "type": "object",
             "properties": {
                 "data": {
-                    "$ref": "#/definitions/internal_api_handlers.TransactionData"
+                    "$ref": "#/definitions/handlers.TransactionData"
                 },
                 "success": {
                     "type": "boolean",
@@ -2094,7 +2711,44 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_api_handlers.VerifyOTPRequest": {
+        "handlers.UpdateProfileRequest": {
+            "type": "object",
+            "properties": {
+                "avatar_url": {
+                    "type": "string"
+                },
+                "bio": {
+                    "type": "string",
+                    "example": "Digital finance enthusiast"
+                },
+                "date_of_birth": {
+                    "type": "string",
+                    "example": "1995-06-15"
+                },
+                "first_name": {
+                    "type": "string",
+                    "example": "Alice"
+                },
+                "last_name": {
+                    "type": "string",
+                    "example": "Dupont"
+                },
+                "nationality": {
+                    "type": "string",
+                    "example": "Cameroonian"
+                }
+            }
+        },
+        "handlers.VerifyEmailRequest": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string",
+                    "example": "123456"
+                }
+            }
+        },
+        "handlers.VerifyOTPRequest": {
             "type": "object",
             "properties": {
                 "code": {
@@ -2107,7 +2761,7 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_api_handlers.WalletData": {
+        "handlers.WalletData": {
             "type": "object",
             "properties": {
                 "address": {
@@ -2137,13 +2791,13 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_api_handlers.WalletListResponse": {
+        "handlers.WalletListResponse": {
             "type": "object",
             "properties": {
                 "data": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/internal_api_handlers.WalletData"
+                        "$ref": "#/definitions/handlers.WalletData"
                     }
                 },
                 "success": {
@@ -2152,11 +2806,11 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_api_handlers.WalletResponse": {
+        "handlers.WalletResponse": {
             "type": "object",
             "properties": {
                 "data": {
-                    "$ref": "#/definitions/internal_api_handlers.WalletData"
+                    "$ref": "#/definitions/handlers.WalletData"
                 },
                 "success": {
                     "type": "boolean",
@@ -2164,7 +2818,7 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_api_handlers.WithdrawalRequest": {
+        "handlers.WithdrawalRequest": {
             "type": "object",
             "properties": {
                 "amount": {

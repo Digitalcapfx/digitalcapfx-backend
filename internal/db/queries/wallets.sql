@@ -18,15 +18,4 @@ SELECT * FROM waas_wallets
 WHERE user_id = $1 AND is_default = true
 LIMIT 1;
 
--- ─── CaaS (abstraction wallets) ───────────────────────────────────────────
-
--- name: CreateCaasWallet :one
-INSERT INTO caas_wallets (user_id, caas_wallet_id, abstraction_address)
-VALUES ($1, $2, $3)
-RETURNING *;
-
--- name: GetCaasWalletByUserID :one
-SELECT * FROM caas_wallets WHERE user_id = $1 LIMIT 1;
-
--- name: GetCaasWalletByAddress :one
-SELECT * FROM caas_wallets WHERE abstraction_address = $1 LIMIT 1;
+-- CaaS wallet queries moved to caas.sql

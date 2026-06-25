@@ -2,24 +2,27 @@ package services
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"go.uber.org/zap"
 
+	"github.com/rachfinance/digitalfx/internal/clients/metamap"
 	"github.com/rachfinance/digitalfx/internal/config"
-	"github.com/rachfinance/digitalfx/internal/db/sqlc"
+	db "github.com/rachfinance/digitalfx/internal/db/sqlc"
 )
 
 type KYCService struct {
-	pool   *pgxpool.Pool
-	cfg    *config.Config
-	logger *zap.Logger
+	pool          *pgxpool.Pool
+	cfg           *config.Config
+	logger        *zap.Logger
+	metamapClient *metamap.Client
 }
 
-func NewKYCService(pool *pgxpool.Pool, cfg *config.Config, logger *zap.Logger) *KYCService {
-	return &KYCService{pool: pool, cfg: cfg, logger: logger}
+func NewKYCService(pool *pgxpool.Pool, cfg *config.Config, logger *zap.Logger, metamapClient *metamap.Client) *KYCService {
+	return &KYCService{pool: pool, cfg: cfg, logger: logger, metamapClient: metamapClient}
 }
 
 func (s *KYCService) GetStatus(ctx context.Context, userID uuid.UUID) (string, error) {
@@ -54,7 +57,6 @@ func (s *KYCService) UploadDocument(ctx context.Context, in UploadDocumentInput)
 		return nil, fmt.Errorf("create kyc document: %w", err)
 	}
 
-	// Mark user KYC as submitted once at least one document is uploaded
 	if _, err := q.UpdateUserKYCStatus(ctx, db.UpdateUserKYCStatusParams{
 		ID:        in.UserID,
 		KycStatus: "submitted",
@@ -63,4 +65,138 @@ func (s *KYCService) UploadDocument(ctx context.Context, in UploadDocumentInput)
 	}
 
 	return &doc, nil
+}
+
+// ─── MetaMap ──────────────────────────────────────────────────────────────────
+
+type MetaMapVerificationResult struct {
+	ApplicantID    string `json:"applicant_id"`
+	IdentityAccess string `json:"identity_access"` // SDK token for the mobile client
+	FlowID         string `json:"flow_id"`
+	Status         string `json:"status"`
+}
+
+// InitiateMetaMapVerification creates or returns an existing MetaMap applicant
+// for the user. The mobile client uses the returned identity_access token with
+// the MetaMap SDK to launch the verification flow.
+func (s *KYCService) InitiateMetaMapVerification(ctx context.Context, userID uuid.UUID) (*MetaMapVerificationResult, error) {
+	q := db.New(s.pool)
+
+	// Return existing record if already initiated.
+	existing, err := q.GetMetamapVerificationByUserID(ctx, userID)
+	if err == nil {
+		return &MetaMapVerificationResult{
+			ApplicantID:    existing.ApplicantID,
+			IdentityAccess: existing.IdentityAccess,
+			FlowID:         existing.FlowID,
+			Status:         existing.Status,
+		}, nil
+	}
+
+	user, err := q.GetUserByID(ctx, userID)
+	if err != nil {
+		return nil, ErrUserNotFound
+	}
+
+	emailStr := ""
+	if user.Email != nil {
+		emailStr = *user.Email
+	}
+
+	resp, err := s.metamapClient.CreateApplicant(ctx, metamap.CreateApplicantRequest{
+		Metadata: metamap.ApplicantMetadata{
+			UserID: userID.String(),
+			Phone:  user.PhoneNumber,
+			Email:  emailStr,
+		},
+	})
+	if err != nil {
+		return nil, fmt.Errorf("metamap create applicant: %w", err)
+	}
+
+	record, err := q.CreateMetamapVerification(ctx, db.CreateMetamapVerificationParams{
+		UserID:         userID,
+		ApplicantID:    resp.ID,
+		FlowID:         s.cfg.MetaMap.FlowID,
+		IdentityAccess: resp.IdentityAccess,
+	})
+	if err != nil {
+		s.logger.Error("store metamap verification", zap.Error(err))
+	}
+
+	return &MetaMapVerificationResult{
+		ApplicantID:    record.ApplicantID,
+		IdentityAccess: record.IdentityAccess,
+		FlowID:         record.FlowID,
+		Status:         record.Status,
+	}, nil
+}
+
+// HandleMetaMapWebhook processes a verification result pushed by MetaMap.
+// It updates the local status and, if approved, sets the user's KYC status to "approved".
+func (s *KYCService) HandleMetaMapWebhook(ctx context.Context, payload metamap.WebhookPayload) error {
+	q := db.New(s.pool)
+
+	applicantID := metamap.ApplicantIDFromResource(payload.Resource)
+	if applicantID == "" {
+		return fmt.Errorf("metamap webhook: empty applicant id in resource %q", payload.Resource)
+	}
+
+	verification, err := q.GetMetamapVerificationByApplicantID(ctx, applicantID)
+	if err != nil {
+		return fmt.Errorf("metamap verification not found for applicant %s", applicantID)
+	}
+
+	// Map MetaMap eventName to our internal status.
+	status := mapMetaMapEvent(payload.EventName)
+
+	resultJSON, _ := json.Marshal(payload.Status)
+	updated, err := q.UpdateMetamapVerificationStatus(ctx, db.UpdateMetamapVerificationStatusParams{
+		ApplicantID: applicantID,
+		Status:      status,
+		ResultData:  resultJSON,
+	})
+	if err != nil {
+		s.logger.Error("update metamap status", zap.Error(err))
+	}
+
+	s.logger.Info("metamap webhook processed",
+		zap.String("applicant_id", applicantID),
+		zap.String("event", payload.EventName),
+		zap.String("status", updated.Status),
+	)
+
+	// Promote user KYC status when MetaMap approves.
+	if status == "approved" {
+		if _, err := q.UpdateUserKYCStatus(ctx, db.UpdateUserKYCStatusParams{
+			ID:        verification.UserID,
+			KycStatus: "approved",
+		}); err != nil {
+			s.logger.Error("update user kyc status to approved", zap.Error(err))
+		}
+	}
+
+	if status == "rejected" {
+		if _, err := q.UpdateUserKYCStatus(ctx, db.UpdateUserKYCStatusParams{
+			ID:        verification.UserID,
+			KycStatus: "rejected",
+		}); err != nil {
+			s.logger.Error("update user kyc status to rejected", zap.Error(err))
+		}
+	}
+
+	return nil
+}
+
+func mapMetaMapEvent(eventName string) string {
+	switch eventName {
+	case "verification_completed", "step_completed":
+		return "approved"
+	case "verification_rejected", "step_rejected":
+		return "rejected"
+	case "verification_started", "step_started":
+		return "processing"
+	default:
+		return "pending"
+	}
 }

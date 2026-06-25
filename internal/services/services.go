@@ -7,18 +7,20 @@ import (
 
 	"github.com/rachfinance/digitalfx/internal/clients/caas"
 	"github.com/rachfinance/digitalfx/internal/clients/hub2"
+	"github.com/rachfinance/digitalfx/internal/clients/metamap"
 	"github.com/rachfinance/digitalfx/internal/clients/payments"
 	"github.com/rachfinance/digitalfx/internal/config"
+	"github.com/rachfinance/digitalfx/internal/pkg/email"
 )
 
 // Services bundles every domain service, passed to handlers as a single dependency.
 type Services struct {
-	Auth     *AuthService
-	Account  *AccountService
-	Wallet   *WalletService
-	Crypto   *CryptoService
-	KYC      *KYCService
-	HUB2     *HUB2Service
+	Auth    *AuthService
+	Account *AccountService
+	Wallet  *WalletService
+	Crypto  *CryptoService
+	KYC     *KYCService
+	HUB2    *HUB2Service
 }
 
 func New(
@@ -27,15 +29,17 @@ func New(
 	paymentsClient *payments.Client,
 	caasClient *caas.Client,
 	hub2Client *hub2.Client,
+	emailClient *email.Client,
+	metamapClient *metamap.Client,
 	cfg *config.Config,
 	logger *zap.Logger,
 ) *Services {
 	return &Services{
-		Auth:    NewAuthService(pool, rdb, cfg, logger),
+		Auth:    NewAuthService(pool, rdb, cfg, logger, emailClient),
 		Account: NewAccountService(pool, logger),
-		Wallet:  NewWalletService(pool, paymentsClient, logger),
-		Crypto:  NewCryptoService(pool, caasClient, logger),
-		KYC:     NewKYCService(pool, cfg, logger),
-		HUB2:    NewHUB2Service(pool, hub2Client, logger),
+		Wallet:  NewWalletService(pool, paymentsClient, hub2Client, logger),
+		Crypto:  NewCryptoService(pool, caasClient, hub2Client, logger),
+		KYC:     NewKYCService(pool, cfg, logger, metamapClient),
+		HUB2:    NewHUB2Service(pool, hub2Client, caasClient, logger),
 	}
 }
