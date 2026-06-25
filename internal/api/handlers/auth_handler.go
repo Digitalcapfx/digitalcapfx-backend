@@ -224,6 +224,55 @@ func (h *AuthHandler) RefreshToken(w http.ResponseWriter, r *http.Request) {
 	response.OK(w, pair)
 }
 
+// ─── Google Sign-In ───────────────────────────────────────────────────────────
+
+// GoogleSignIn godoc
+//
+//	@Summary      Google Sign-In
+//	@Description  Verifies a Google ID token (from the mobile SDK or web client). Creates an account on first sign-in or logs into the existing linked account. New users must complete KYC before financial features unlock.
+//	@Tags         auth
+//	@Accept       json
+//	@Produce      json
+//	@Param        body  body      GoogleSignInRequest   true  "Google ID token from the client SDK"
+//	@Success      200   {object}  GoogleSignInResponse
+//	@Failure      400   {object}  ErrorResponse
+//	@Failure      401   {object}  ErrorResponse
+//	@Router       /auth/google [post]
+func (h *AuthHandler) GoogleSignIn(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		IDToken string `json:"id_token"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.IDToken == "" {
+		response.BadRequest(w, "VALIDATION_ERROR", "id_token is required")
+		return
+	}
+
+	result, err := h.svc.Auth.GoogleSignIn(r.Context(), services.GoogleSignInInput{
+		IDToken:  body.IDToken,
+		DeviceIP: realIP(r),
+		DeviceUA: r.UserAgent(),
+	})
+	if errors.Is(err, services.ErrInvalidToken) {
+		response.Unauthorized(w, "invalid Google ID token")
+		return
+	}
+	if err != nil {
+		response.InternalError(w)
+		return
+	}
+
+	response.JSON(w, http.StatusOK, GoogleSignInResponse{
+		Success:   true,
+		IsNewUser: result.IsNewUser,
+		Data: TokenPairData{
+			AccessToken:  result.Pair.AccessToken,
+			RefreshToken: result.Pair.RefreshToken,
+			ExpiresIn:    result.Pair.ExpiresIn,
+			SessionID:    result.Pair.SessionID,
+		},
+	})
+}
+
 // ─── Forgot / Reset PIN ───────────────────────────────────────────────────────
 
 // ForgotPIN godoc

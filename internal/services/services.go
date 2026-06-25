@@ -39,7 +39,7 @@ func New(
 		Account: NewAccountService(pool, logger),
 		Wallet:  NewWalletService(pool, paymentsClient, hub2Client, logger),
 		Crypto:  NewCryptoService(pool, caasClient, hub2Client, logger),
-		KYC:     NewKYCService(pool, cfg, logger, metamapClient),
+		KYC:     NewKYCService(pool, cfg, logger, metamapClient, emailClient),
 		HUB2:    NewHUB2Service(pool, hub2Client, caasClient, logger),
 	}
 }

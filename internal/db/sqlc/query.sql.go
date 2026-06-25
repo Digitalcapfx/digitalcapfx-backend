@@ -26,11 +26,35 @@ type GetValidOTPParams struct {
 }
 
 type CreateUserParams struct {
-	PhoneNumber string
-	Email       *string
-	FirstName   string
-	LastName    string
-	PinHash     string
+	PhoneNumber  string
+	Email        *string
+	FirstName    string
+	LastName     string
+	PinHash      *string // nil for social-auth users
+	Role         string  // default "user"
+	AuthProvider string  // "phone" | "google"
+	GoogleSub    *string
+}
+
+type CreateGoogleUserParams struct {
+	Email        string
+	FirstName    string
+	LastName     string
+	GoogleSub    string
+	Role         string
+	AuthProvider string
+}
+
+type UpdateUserRoleParams struct {
+	ID   uuid.UUID
+	Role string
+}
+
+type RecordKycAdminActionParams struct {
+	UserID  uuid.UUID
+	AdminID uuid.UUID
+	Action  string
+	Reason  *string
 }
 
 type UpdateUserKYCStatusParams struct {
@@ -578,4 +602,28 @@ func (q *Queries) UpdateUserEmailVerified(ctx context.Context, id uuid.UUID) err
 
 func (q *Queries) GetUserFullByID(ctx context.Context, id uuid.UUID) (UserFull, error) {
 	return UserFull{}, errNotImplemented
+}
+
+// ── Social Auth ───────────────────────────────────────────────────────────────
+
+func (q *Queries) GetUserByGoogleSub(ctx context.Context, sub string) (User, error) {
+	return User{}, errNotImplemented
+}
+
+func (q *Queries) CreateGoogleUser(ctx context.Context, arg CreateGoogleUserParams) (User, error) {
+	return User{}, errNotImplemented
+}
+
+// ── Admin / KYC management ────────────────────────────────────────────────────
+
+func (q *Queries) ListUsersAwaitingKYCReview(ctx context.Context) ([]UserFull, error) {
+	return nil, errNotImplemented
+}
+
+func (q *Queries) UpdateUserRole(ctx context.Context, arg UpdateUserRoleParams) (User, error) {
+	return User{}, errNotImplemented
+}
+
+func (q *Queries) RecordKycAdminAction(ctx context.Context, arg RecordKycAdminActionParams) (KycAdminAction, error) {
+	return KycAdminAction{}, errNotImplemented
 }

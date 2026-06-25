@@ -10,16 +10,19 @@ import (
 )
 
 type User struct {
-	ID          uuid.UUID      `json:"id"`
-	PhoneNumber string         `json:"phone_number"`
-	Email       *string        `json:"email"`
-	FirstName   string         `json:"first_name"`
-	LastName    string         `json:"last_name"`
-	PinHash     string         `json:"pin_hash"`
-	KycStatus   string         `json:"kyc_status"`
-	IsActive    bool           `json:"is_active"`
-	CreatedAt   time.Time      `json:"created_at"`
-	UpdatedAt   time.Time      `json:"updated_at"`
+	ID           uuid.UUID `json:"id"`
+	PhoneNumber  string    `json:"phone_number"`
+	Email        *string   `json:"email"`
+	FirstName    string    `json:"first_name"`
+	LastName     string    `json:"last_name"`
+	PinHash      *string   `json:"pin_hash"` // nullable for social-auth users
+	KycStatus    string    `json:"kyc_status"`
+	IsActive     bool      `json:"is_active"`
+	Role         string    `json:"role"`          // "user" | "admin"
+	AuthProvider string    `json:"auth_provider"` // "phone" | "google"
+	GoogleSub    *string   `json:"google_sub"`
+	CreatedAt    time.Time `json:"created_at"`
+	UpdatedAt    time.Time `json:"updated_at"`
 }
 
 type Account struct {
@@ -197,9 +200,12 @@ type UserFull struct {
 	Email           *string   `json:"email"`
 	FirstName       string    `json:"first_name"`
 	LastName        string    `json:"last_name"`
-	PinHash         string    `json:"pin_hash"`
+	PinHash         *string   `json:"pin_hash"` // nullable for social-auth users
 	KycStatus       string    `json:"kyc_status"`
 	IsActive        bool      `json:"is_active"`
+	Role            string    `json:"role"`
+	AuthProvider    string    `json:"auth_provider"`
+	GoogleSub       *string   `json:"google_sub"`
 	Bio             *string   `json:"bio"`
 	AvatarURL       *string   `json:"avatar_url"`
 	DateOfBirth     *string   `json:"date_of_birth"` // ISO date string YYYY-MM-DD
@@ -207,4 +213,13 @@ type UserFull struct {
 	IsEmailVerified bool      `json:"is_email_verified"`
 	CreatedAt       time.Time `json:"created_at"`
 	UpdatedAt       time.Time `json:"updated_at"`
+}
+
+type KycAdminAction struct {
+	ID        uuid.UUID `json:"id"`
+	UserID    uuid.UUID `json:"user_id"`
+	AdminID   uuid.UUID `json:"admin_id"`
+	Action    string    `json:"action"` // "approved" | "rejected"
+	Reason    *string   `json:"reason"`
+	CreatedAt time.Time `json:"created_at"`
 }

@@ -51,6 +51,7 @@ type TokenPairData struct {
 	AccessToken  string `json:"access_token" example:"eyJhbGci..."`
 	RefreshToken string `json:"refresh_token" example:"eyJhbGci..."`
 	ExpiresIn    int64  `json:"expires_in" example:"1800"`
+	SessionID    string `json:"session_id" example:"550e8400-e29b-41d4-a716-446655440000"`
 }
 
 type TokenPairResponse struct {
@@ -253,7 +254,23 @@ type Hub2PaymentRequest struct {
 	Direction string `json:"direction" example:"collection" enums:"collection,disbursement"`
 }
 
+// ─── Admin ────────────────────────────────────────────────────────────────────
+
+type AdminKYCRejectRequest struct {
+	Reason string `json:"reason" example:"Document image is blurry or expired"`
+}
+
 // ─── Auth Extended ────────────────────────────────────────────────────────────
+
+type GoogleSignInRequest struct {
+	IDToken string `json:"id_token" example:"eyJhbGci..."`
+}
+
+type GoogleSignInResponse struct {
+	Success   bool          `json:"success" example:"true"`
+	IsNewUser bool          `json:"is_new_user" example:"true"`
+	Data      TokenPairData `json:"data"`
+}
 
 type ForgotPINRequest struct {
 	EmailOrPhone string `json:"email_or_phone" example:"alice@example.com"`

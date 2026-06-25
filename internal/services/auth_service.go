@@ -16,6 +16,7 @@ import (
 	"github.com/redis/go-redis/v9"
 	"go.uber.org/zap"
 
+	"github.com/rachfinance/digitalfx/internal/clients/google"
 	"github.com/rachfinance/digitalfx/internal/config"
 	db "github.com/rachfinance/digitalfx/internal/db/sqlc"
 	"github.com/rachfinance/digitalfx/internal/pkg/email"
@@ -31,6 +32,7 @@ var (
 	ErrAccountInactive = errors.New("account is inactive")
 	ErrSessionNotFound = errors.New("session not found")
 	ErrInvalidToken    = errors.New("invalid or expired token")
+	ErrSocialAuthUser  = errors.New("account uses social login — PIN not set")
 )
 
 type AuthService struct {
@@ -110,11 +112,13 @@ func (s *AuthService) Register(ctx context.Context, in RegisterInput) (*token.Pa
 	}
 
 	user, err := q.CreateUser(ctx, db.CreateUserParams{
-		PhoneNumber: in.Phone,
-		Email:       emailPtr,
-		FirstName:   in.FirstName,
-		LastName:    in.LastName,
-		PinHash:     pinHash,
+		PhoneNumber:  in.Phone,
+		Email:        emailPtr,
+		FirstName:    in.FirstName,
+		LastName:     in.LastName,
+		PinHash:      &pinHash,
+		Role:         "user",
+		AuthProvider: "phone",
 	})
 	if err != nil {
 		return nil, fmt.Errorf("create user: %w", err)
@@ -131,7 +135,7 @@ func (s *AuthService) Register(ctx context.Context, in RegisterInput) (*token.Pa
 		}
 	}
 
-	pair, err := s.createSession(ctx, q, user.ID, user.PhoneNumber, in.DeviceIP, in.DeviceUA)
+	pair, err := s.createSession(ctx, q, user.ID, user.PhoneNumber, user.Role, in.DeviceIP, in.DeviceUA)
 	if err != nil {
 		return nil, err
 	}
@@ -167,11 +171,14 @@ func (s *AuthService) Login(ctx context.Context, in LoginInput) (*token.Pair, er
 	if !user.IsActive {
 		return nil, ErrAccountInactive
 	}
-	if !hash.CheckPIN(user.PinHash, in.PIN) {
+	if user.PinHash == nil {
+		return nil, ErrSocialAuthUser
+	}
+	if !hash.CheckPIN(*user.PinHash, in.PIN) {
 		return nil, ErrInvalidPIN
 	}
 
-	pair, err := s.createSession(ctx, q, user.ID, user.PhoneNumber, in.DeviceIP, in.DeviceUA)
+	pair, err := s.createSession(ctx, q, user.ID, user.PhoneNumber, user.Role, in.DeviceIP, in.DeviceUA)
 	if err != nil {
 		return nil, err
 	}
@@ -193,6 +200,100 @@ func (s *AuthService) Login(ctx context.Context, in LoginInput) (*token.Pair, er
 	}
 
 	return pair, nil
+}
+
+// ─── Google Sign-In ───────────────────────────────────────────────────────────
+
+type GoogleSignInInput struct {
+	IDToken  string
+	DeviceIP string
+	DeviceUA string
+}
+
+type GoogleSignInResult struct {
+	Pair      *token.Pair
+	IsNewUser bool
+}
+
+// GoogleSignIn verifies a Google ID token, creates or retrieves the user account,
+// and returns a JWT pair. New users still need to submit KYC before financial features
+// are unlocked (kyc_status starts as "pending").
+func (s *AuthService) GoogleSignIn(ctx context.Context, in GoogleSignInInput) (*GoogleSignInResult, error) {
+	q := db.New(s.pool)
+
+	info, err := google.VerifyIDToken(ctx, in.IDToken, s.cfg.Google.ClientID)
+	if err != nil {
+		return nil, ErrInvalidToken
+	}
+
+	// Existing user by Google sub.
+	if user, err := q.GetUserByGoogleSub(ctx, info.Sub); err == nil {
+		pair, err := s.createSession(ctx, q, user.ID, user.PhoneNumber, user.Role, in.DeviceIP, in.DeviceUA)
+		if err != nil {
+			return nil, err
+		}
+		go func() {
+			if user.Email != nil {
+				deviceName := parseDeviceName(in.DeviceUA)
+				subj, html := email.LoginNotification(*user.Email, email.LoginNotificationData{
+					FirstName:  user.FirstName,
+					DeviceName: deviceName,
+					DeviceIP:   fallback(in.DeviceIP, "Unknown"),
+					DeviceUA:   in.DeviceUA,
+					Time:       time.Now().UTC().Format("02 Jan 2006 15:04 UTC"),
+				})
+				_ = s.emailClient.Send(*user.Email, subj, html)
+			}
+		}()
+		return &GoogleSignInResult{Pair: pair, IsNewUser: false}, nil
+	}
+
+	// Existing user by email — link the Google sub.
+	if info.Email != "" {
+		if user, err := q.GetUserByEmail(ctx, info.Email); err == nil {
+			// Link Google sub to existing account going forward.
+			sub := info.Sub
+			user.GoogleSub = &sub
+			pair, err := s.createSession(ctx, q, user.ID, user.PhoneNumber, user.Role, in.DeviceIP, in.DeviceUA)
+			if err != nil {
+				return nil, err
+			}
+			return &GoogleSignInResult{Pair: pair, IsNewUser: false}, nil
+		}
+	}
+
+	// New user — create account with Google as provider.
+	googleUser, err := q.CreateGoogleUser(ctx, db.CreateGoogleUserParams{
+		Email:        info.Email,
+		FirstName:    info.GivenName,
+		LastName:     info.FamilyName,
+		GoogleSub:    info.Sub,
+		Role:         "user",
+		AuthProvider: "google",
+	})
+	if err != nil {
+		return nil, fmt.Errorf("create google user: %w", err)
+	}
+
+	// Provision default fiat accounts.
+	for _, currency := range []string{"XAF", "XOF", "USD", "GBP", "EUR"} {
+		if _, err := q.CreateAccount(ctx, db.CreateAccountParams{
+			UserID:        googleUser.ID,
+			Currency:      currency,
+			AccountNumber: generateAccountNumber(),
+		}); err != nil {
+			s.logger.Error("create account for google user", zap.String("currency", currency), zap.Error(err))
+		}
+	}
+
+	pair, err := s.createSession(ctx, q, googleUser.ID, googleUser.PhoneNumber, googleUser.Role, in.DeviceIP, in.DeviceUA)
+	if err != nil {
+		return nil, err
+	}
+
+	go s.sendWelcomeEmail(info.Email, googleUser.FirstName)
+
+	return &GoogleSignInResult{Pair: pair, IsNewUser: true}, nil
 }
 
 // ─── Logout ───────────────────────────────────────────────────────────────────
@@ -254,8 +355,8 @@ func (s *AuthService) RefreshToken(ctx context.Context, refreshToken string) (*t
 		return nil, ErrUserNotFound
 	}
 
-	// Issue rotated pair with same session ID.
-	pair, err := token.NewPair(user.ID, user.PhoneNumber, session.ID.String(),
+	// Issue rotated pair with same session ID and role.
+	pair, err := token.NewPair(user.ID, user.PhoneNumber, session.ID.String(), user.Role,
 		s.cfg.JWT.Secret, s.cfg.JWT.AccessExpiry, s.cfg.JWT.RefreshExpiry)
 	if err != nil {
 		return nil, fmt.Errorf("generate token: %w", err)
@@ -494,12 +595,12 @@ func (s *AuthService) UpdateProfile(ctx context.Context, in UpdateProfileInput) 
 // createSession generates a JWT pair and persists a user_sessions row.
 // Because the DB auto-generates the session UUID, we issue the pair twice:
 // once to populate the row (any unique RT hash), then again with the real session.ID.
-func (s *AuthService) createSession(ctx context.Context, q *db.Queries, userID uuid.UUID, phone, deviceIP, deviceUA string) (*token.Pair, error) {
+func (s *AuthService) createSession(ctx context.Context, q *db.Queries, userID uuid.UUID, phone, role, deviceIP, deviceUA string) (*token.Pair, error) {
 	deviceName := parseDeviceName(deviceUA)
 
 	// First issue: placeholder session ID so we can get the DB row ID.
 	placeholder := uuid.New().String()
-	tmpPair, err := token.NewPair(userID, phone, placeholder,
+	tmpPair, err := token.NewPair(userID, phone, placeholder, role,
 		s.cfg.JWT.Secret, s.cfg.JWT.AccessExpiry, s.cfg.JWT.RefreshExpiry)
 	if err != nil {
 		return nil, fmt.Errorf("generate token pair: %w", err)
@@ -518,7 +619,7 @@ func (s *AuthService) createSession(ctx context.Context, q *db.Queries, userID u
 	}
 
 	// Reissue with the real session.ID embedded in claims.
-	pair, err := token.NewPair(userID, phone, session.ID.String(),
+	pair, err := token.NewPair(userID, phone, session.ID.String(), role,
 		s.cfg.JWT.Secret, s.cfg.JWT.AccessExpiry, s.cfg.JWT.RefreshExpiry)
 	if err != nil {
 		return nil, fmt.Errorf("reissue token pair: %w", err)

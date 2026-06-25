@@ -217,3 +217,47 @@ func LogoutNotification(toEmail, firstName, deviceName, logoutTime string) (subj
 	html = render(subject, toEmail, content)
 	return
 }
+
+// ─── KYC Approved ─────────────────────────────────────────────────────────────
+
+func KYCApproved(toEmail, firstName string) (subject, html string) {
+	subject = "🎉 Identity Verified — Your DigitalFX Account is Now Active"
+	content := fmt.Sprintf(`
+<h2>You're verified, %s!</h2>
+<p>Great news — our team has reviewed your identity documents and your account is now <strong>fully activated</strong>.</p>
+<p>You can now:</p>
+<ul style="color:#444;font-size:15px;line-height:2">
+  <li>Send and receive money across borders</li>
+  <li>Hold balances in XAF, XOF, USD, GBP and EUR</li>
+  <li>Access your Instant USD Account (USDC)</li>
+  <li>Trade crypto assets</li>
+</ul>
+<p>Welcome to the future of digital banking in Africa.</p>
+<hr class="divider"/>
+<p style="font-size:13px;color:#888">If you have any questions, reach us at <a href="mailto:support@digitalfx.finance" style="color:#0f3460">support@digitalfx.finance</a>.</p>
+`, firstName)
+	html = render(subject, toEmail, content)
+	return
+}
+
+// ─── KYC Rejected ─────────────────────────────────────────────────────────────
+
+func KYCRejected(toEmail, firstName, reason string) (subject, html string) {
+	subject = "Action Required — Identity Verification Unsuccessful"
+	content := fmt.Sprintf(`
+<h2>Hi %s, we couldn't verify your identity</h2>
+<p>Unfortunately our team was unable to approve your identity verification. Here's the reason:</p>
+<div class="alert">
+  <p>%s</p>
+</div>
+<p>You can resubmit your documents by opening the app and starting a new verification. Please make sure:</p>
+<ul style="color:#444;font-size:15px;line-height:2">
+  <li>Your document is valid and not expired</li>
+  <li>Photos are clear, well-lit, and not cropped</li>
+  <li>The selfie matches your ID photo</li>
+</ul>
+<p>If you believe this is an error, please <a href="mailto:support@digitalfx.finance" style="color:#0f3460">contact our support team</a>.</p>
+`, firstName, reason)
+	html = render(subject, toEmail, content)
+	return
+}

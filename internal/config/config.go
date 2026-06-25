@@ -21,6 +21,7 @@ type Config struct {
 	GCP         GCPConfig
 	Brevo       BrevoConfig
 	MetaMap     MetaMapConfig
+	Google      GoogleConfig
 }
 
 type AppConfig struct {
@@ -94,6 +95,11 @@ type MetaMapConfig struct {
 	WebhookSecret string
 }
 
+// GoogleConfig holds credentials for Google Sign-In token verification.
+type GoogleConfig struct {
+	ClientID string // OAuth2 client ID — used to validate aud claim
+}
+
 func Load() (*Config, error) {
 	_ = godotenv.Load()
 
@@ -150,6 +156,8 @@ func Load() (*Config, error) {
 	cfg.MetaMap.ClientSecret = getEnv("METAMAP_CLIENT_SECRET", "")
 	cfg.MetaMap.FlowID = getEnv("METAMAP_FLOW_ID", "")
 	cfg.MetaMap.WebhookSecret = getEnv("METAMAP_WEBHOOK_SECRET", "")
+
+	cfg.Google.ClientID = getEnv("GOOGLE_CLIENT_ID", "")
 
 	if len(errs) > 0 {
 		return nil, fmt.Errorf("config errors:\n  %s", joinErrors(errs))

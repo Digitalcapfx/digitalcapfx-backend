@@ -44,6 +44,12 @@ definitions:
         example: true
         type: boolean
     type: object
+  handlers.AdminKYCRejectRequest:
+    properties:
+      reason:
+        example: Document image is blurry or expired
+        type: string
+    type: object
   handlers.BalanceData:
     properties:
       balance_usdc:
@@ -249,6 +255,23 @@ definitions:
         - USDT
         example: USDC
         type: string
+    type: object
+  handlers.GoogleSignInRequest:
+    properties:
+      id_token:
+        example: eyJhbGci...
+        type: string
+    type: object
+  handlers.GoogleSignInResponse:
+    properties:
+      data:
+        $ref: '#/definitions/handlers.TokenPairData'
+      is_new_user:
+        example: true
+        type: boolean
+      success:
+        example: true
+        type: boolean
     type: object
   handlers.HUB2WebhookRequest:
     properties:
@@ -573,6 +596,9 @@ definitions:
       refresh_token:
         example: eyJhbGci...
         type: string
+      session_id:
+        example: 550e8400-e29b-41d4-a716-446655440000
+        type: string
     type: object
   handlers.TokenPairResponse:
     properties:
@@ -886,6 +912,106 @@ paths:
       summary: Get a single transaction
       tags:
       - accounts
+  /admin/kyc/{id}/approve:
+    post:
+      description: Marks the user's identity as verified and activates full account
+        access. Sends a confirmation email to the user.
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.MessageResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Approve user KYC
+      tags:
+      - admin
+  /admin/kyc/{id}/reject:
+    post:
+      consumes:
+      - application/json
+      description: Marks the user's identity verification as rejected and notifies
+        them with the reason. The user can resubmit.
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Rejection reason
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.AdminKYCRejectRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.MessageResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Reject user KYC
+      tags:
+      - admin
+  /admin/kyc/pending:
+    get:
+      description: Returns all users whose identity verification status is "under_review"
+        or "submitted" — ready for admin decision.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List users awaiting KYC review
+      tags:
+      - admin
   /auth/devices:
     delete:
       description: Revokes all active sessions except the current one.
@@ -1032,6 +1158,38 @@ paths:
           schema:
             $ref: '#/definitions/handlers.ErrorResponse'
       summary: Forgot PIN
+      tags:
+      - auth
+  /auth/google:
+    post:
+      consumes:
+      - application/json
+      description: Verifies a Google ID token (from the mobile SDK or web client).
+        Creates an account on first sign-in or logs into the existing linked account.
+        New users must complete KYC before financial features unlock.
+      parameters:
+      - description: Google ID token from the client SDK
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.GoogleSignInRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.GoogleSignInResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      summary: Google Sign-In
       tags:
       - auth
   /auth/login:

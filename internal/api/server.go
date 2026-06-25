@@ -66,7 +66,7 @@ func NewServer(cfg *config.Config) (*Server, error) {
 	svc := services.New(pool, rdb, paymentsClient, caasClient, hub2Client, emailClient, metamapClient, cfg, logger)
 
 	// Router
-	r := newRouter(cfg, svc, logger)
+	r := newRouter(cfg, svc, pool, logger)
 
 	return &Server{
 		cfg:    cfg,

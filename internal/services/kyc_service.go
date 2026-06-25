@@ -12,6 +12,7 @@ import (
 	"github.com/rachfinance/digitalfx/internal/clients/metamap"
 	"github.com/rachfinance/digitalfx/internal/config"
 	db "github.com/rachfinance/digitalfx/internal/db/sqlc"
+	"github.com/rachfinance/digitalfx/internal/pkg/email"
 )
 
 type KYCService struct {
@@ -19,10 +20,11 @@ type KYCService struct {
 	cfg           *config.Config
 	logger        *zap.Logger
 	metamapClient *metamap.Client
+	emailClient   *email.Client
 }
 
-func NewKYCService(pool *pgxpool.Pool, cfg *config.Config, logger *zap.Logger, metamapClient *metamap.Client) *KYCService {
-	return &KYCService{pool: pool, cfg: cfg, logger: logger, metamapClient: metamapClient}
+func NewKYCService(pool *pgxpool.Pool, cfg *config.Config, logger *zap.Logger, metamapClient *metamap.Client, emailClient *email.Client) *KYCService {
+	return &KYCService{pool: pool, cfg: cfg, logger: logger, metamapClient: metamapClient, emailClient: emailClient}
 }
 
 func (s *KYCService) GetStatus(ctx context.Context, userID uuid.UUID) (string, error) {
@@ -191,7 +193,7 @@ func (s *KYCService) HandleMetaMapWebhook(ctx context.Context, payload metamap.W
 func mapMetaMapEvent(eventName string) string {
 	switch eventName {
 	case "verification_completed", "step_completed":
-		return "approved"
+		return "under_review" // awaits admin approval
 	case "verification_rejected", "step_rejected":
 		return "rejected"
 	case "verification_started", "step_started":
@@ -199,4 +201,81 @@ func mapMetaMapEvent(eventName string) string {
 	default:
 		return "pending"
 	}
+}
+
+// ─── Admin KYC Management ─────────────────────────────────────────────────────
+
+func (s *KYCService) ListPendingKYC(ctx context.Context) ([]db.UserFull, error) {
+	q := db.New(s.pool)
+	return q.ListUsersAwaitingKYCReview(ctx)
+}
+
+// AdminApproveKYC sets kyc_status to "approved", logs the admin action, and
+// notifies the user by email. Account financial features unlock immediately.
+func (s *KYCService) AdminApproveKYC(ctx context.Context, userID, adminID uuid.UUID) error {
+	q := db.New(s.pool)
+
+	if _, err := q.UpdateUserKYCStatus(ctx, db.UpdateUserKYCStatusParams{
+		ID:        userID,
+		KycStatus: "approved",
+	}); err != nil {
+		return fmt.Errorf("approve kyc: %w", err)
+	}
+
+	if _, err := q.RecordKycAdminAction(ctx, db.RecordKycAdminActionParams{
+		UserID:  userID,
+		AdminID: adminID,
+		Action:  "approved",
+	}); err != nil {
+		s.logger.Error("record kyc admin action", zap.Error(err))
+	}
+
+	user, err := q.GetUserByID(ctx, userID)
+	if err == nil && user.Email != nil {
+		go func() {
+			subj, html := email.KYCApproved(*user.Email, user.FirstName)
+			if err := s.emailClient.Send(*user.Email, subj, html); err != nil {
+				s.logger.Error("send kyc approved email", zap.Error(err))
+			}
+		}()
+	}
+
+	s.logger.Info("kyc approved by admin", zap.String("user_id", userID.String()), zap.String("admin_id", adminID.String()))
+	return nil
+}
+
+// AdminRejectKYC sets kyc_status to "rejected", logs the admin action, and
+// notifies the user with the rejection reason.
+func (s *KYCService) AdminRejectKYC(ctx context.Context, userID, adminID uuid.UUID, reason string) error {
+	q := db.New(s.pool)
+
+	if _, err := q.UpdateUserKYCStatus(ctx, db.UpdateUserKYCStatusParams{
+		ID:        userID,
+		KycStatus: "rejected",
+	}); err != nil {
+		return fmt.Errorf("reject kyc: %w", err)
+	}
+
+	reasonPtr := &reason
+	if _, err := q.RecordKycAdminAction(ctx, db.RecordKycAdminActionParams{
+		UserID:  userID,
+		AdminID: adminID,
+		Action:  "rejected",
+		Reason:  reasonPtr,
+	}); err != nil {
+		s.logger.Error("record kyc admin action", zap.Error(err))
+	}
+
+	user, err := q.GetUserByID(ctx, userID)
+	if err == nil && user.Email != nil {
+		go func() {
+			subj, html := email.KYCRejected(*user.Email, user.FirstName, reason)
+			if err := s.emailClient.Send(*user.Email, subj, html); err != nil {
+				s.logger.Error("send kyc rejected email", zap.Error(err))
+			}
+		}()
+	}
+
+	s.logger.Info("kyc rejected by admin", zap.String("user_id", userID.String()), zap.String("reason", reason))
+	return nil
 }
