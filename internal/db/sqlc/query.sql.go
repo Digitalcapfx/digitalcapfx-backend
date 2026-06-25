@@ -627,3 +627,112 @@ func (q *Queries) UpdateUserRole(ctx context.Context, arg UpdateUserRoleParams) 
 func (q *Queries) RecordKycAdminAction(ctx context.Context, arg RecordKycAdminActionParams) (KycAdminAction, error) {
 	return KycAdminAction{}, errNotImplemented
 }
+
+// ── Nilos / Card (migration 000005) ───────────────────────────────────────────
+
+type UpdateAccountNilosParams struct {
+	ID              uuid.UUID
+	NilosAccountID  string
+	NilosCustomerID string
+	IBAN            *string
+	BIC             *string
+}
+
+type CreateVirtualCardParams struct {
+	UserID      uuid.UUID
+	CardName    string
+	LastFour    string
+	Currency    string
+	CardNetwork string
+}
+
+type GetFXRateParams struct {
+	BaseCurrency  string
+	QuoteCurrency string
+}
+
+type UpsertFXRateParams struct {
+	BaseCurrency  string
+	QuoteCurrency string
+	Rate          string
+	Source        string
+}
+
+func (q *Queries) UpdateAccountNilos(ctx context.Context, arg UpdateAccountNilosParams) error {
+	return errNotImplemented
+}
+
+func (q *Queries) GetAccountWithNilos(ctx context.Context, id uuid.UUID) (AccountWithNilos, error) {
+	return AccountWithNilos{}, errNotImplemented
+}
+
+func (q *Queries) GetAccountsByUserIDWithNilos(ctx context.Context, userID uuid.UUID) ([]AccountWithNilos, error) {
+	return nil, errNotImplemented
+}
+
+func (q *Queries) CreateVirtualCard(ctx context.Context, arg CreateVirtualCardParams) (VirtualCard, error) {
+	return VirtualCard{}, errNotImplemented
+}
+
+func (q *Queries) GetActiveVirtualCard(ctx context.Context, userID uuid.UUID) (VirtualCard, error) {
+	return VirtualCard{}, errNotImplemented
+}
+
+func (q *Queries) GetFXRate(ctx context.Context, arg GetFXRateParams) (FXRate, error) {
+	return FXRate{}, errNotImplemented
+}
+
+func (q *Queries) GetAllFXRates(ctx context.Context) ([]FXRate, error) {
+	return nil, errNotImplemented
+}
+
+func (q *Queries) UpsertFXRate(ctx context.Context, arg UpsertFXRateParams) error {
+	return errNotImplemented
+}
+
+// ── Dashboard helpers ──────────────────────────────────────────────────────────
+
+type MonthlyTransactionSummary struct {
+	IncomeUSD   float64 `json:"income_usd"`
+	SpendingUSD float64 `json:"spending_usd"`
+	TxCount     int64   `json:"tx_count"`
+}
+
+type RecentContact struct {
+	Name          string `json:"name"`
+	PhoneNumber   string `json:"phone_number"`
+	LastContactAt time.Time `json:"last_contact_at"`
+}
+
+func (q *Queries) GetMonthlyTransactionSummary(ctx context.Context, userID uuid.UUID) (MonthlyTransactionSummary, error) {
+	return MonthlyTransactionSummary{}, errNotImplemented
+}
+
+func (q *Queries) GetRecentContacts(ctx context.Context, userID uuid.UUID, limit int) ([]RecentContact, error) {
+	return nil, errNotImplemented
+}
+
+// ListRecentActivityParams for unified activity feed
+type ListRecentActivityParams struct {
+	UserID uuid.UUID
+	Limit  int32
+	Offset int32
+}
+
+type ActivityItem struct {
+	ID          string    `json:"id"`
+	Source      string    `json:"source"`      // "fiat" | "crypto" | "caas"
+	Type        string    `json:"type"`        // "credit" | "debit" | "exchange"
+	Description string    `json:"description"` // "Received BTC", "Sent USD", etc.
+	Asset       string    `json:"asset"`       // "BTC", "USD", "USDC", "ETH"
+	Amount      string    `json:"amount"`      // absolute decimal string
+	AmountSign  string    `json:"amount_sign"` // "+" | "-"
+	Status      string    `json:"status"`      // "completed" | "pending" | "failed"
+	CounterName string    `json:"counter_name,omitempty"`
+	DaysAgo     int       `json:"days_ago"`
+	CreatedAt   time.Time `json:"created_at"`
+}
+
+func (q *Queries) ListRecentActivity(ctx context.Context, arg ListRecentActivityParams) ([]ActivityItem, error) {
+	return nil, errNotImplemented
+}

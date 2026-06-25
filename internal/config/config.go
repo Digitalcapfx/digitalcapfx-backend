@@ -22,6 +22,7 @@ type Config struct {
 	Brevo       BrevoConfig
 	MetaMap     MetaMapConfig
 	Google      GoogleConfig
+	Nilos       NilosConfig
 }
 
 type AppConfig struct {
@@ -100,6 +101,12 @@ type GoogleConfig struct {
 	ClientID string // OAuth2 client ID — used to validate aud claim
 }
 
+// NilosConfig holds credentials for the Nilos fiat banking API.
+type NilosConfig struct {
+	BaseURL string
+	APIKey  string
+}
+
 func Load() (*Config, error) {
 	_ = godotenv.Load()
 
@@ -158,6 +165,9 @@ func Load() (*Config, error) {
 	cfg.MetaMap.WebhookSecret = getEnv("METAMAP_WEBHOOK_SECRET", "")
 
 	cfg.Google.ClientID = getEnv("GOOGLE_CLIENT_ID", "")
+
+	cfg.Nilos.BaseURL = getEnv("NILOS_BASE_URL", "https://api.nilos.io/v1")
+	cfg.Nilos.APIKey = getEnv("NILOS_API_KEY", "")
 
 	if len(errs) > 0 {
 		return nil, fmt.Errorf("config errors:\n  %s", joinErrors(errs))

@@ -912,6 +912,36 @@ paths:
       summary: Get a single transaction
       tags:
       - accounts
+  /activity:
+    get:
+      description: Paginated list of all transactions across fiat (Nilos), crypto
+        (Rach Payments WaaS), and stablecoin (Rach CaaS). Each item carries type (credit/debit/exchange),
+        asset symbol, formatted amount, status, and counterparty name where available.
+      parameters:
+      - description: Page number (default 1)
+        in: query
+        name: page
+        type: integer
+      - description: Items per page (default 20, max 50)
+        in: query
+        name: per_page
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Unified activity feed
+      tags:
+      - dashboard
   /admin/kyc/{id}/approve:
     post:
       description: Marks the user's identity as verified and activates full account
@@ -1424,6 +1454,27 @@ paths:
       summary: Get stablecoin balances
       tags:
       - crypto
+  /crypto/contacts:
+    get:
+      description: Returns the 8 most recent recipients of CaaS phone-to-phone stablecoin
+        transfers. Used to populate the quick-pick contact chips in the Phone Send
+        widget.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Recent Phone Send contacts
+      tags:
+      - dashboard
   /crypto/fund:
     post:
       consumes:
@@ -1596,6 +1647,36 @@ paths:
       summary: Get or create ERC-4337 abstraction wallet
       tags:
       - crypto
+  /dashboard:
+    get:
+      description: Single aggregate endpoint for the home screen. Returns asset allocation
+        (fiat + crypto), fiat wallet balances (Nilos), CaaS USDC balance (Phone Send),
+        this month's income/spending summary, virtual card details, recent P2P contacts,
+        and a unified activity feed.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "403":
+          description: KYC not approved
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Home dashboard
+      tags:
+      - dashboard
   /kyc/documents:
     get:
       description: Returns all identity documents submitted by the authenticated user.

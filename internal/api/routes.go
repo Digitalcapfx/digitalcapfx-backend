@@ -33,15 +33,16 @@ func newRouter(cfg *config.Config, svc *services.Services, pool *pgxpool.Pool, l
 	}))
 
 	// Handlers
-	authH     := handlers.NewAuthHandler(svc, cfg)
-	profileH  := handlers.NewProfileHandler(svc)
-	accountH  := handlers.NewAccountHandler(svc)
-	walletH   := handlers.NewWalletHandler(svc)
-	cryptoH   := handlers.NewCryptoHandler(svc)
-	transferH := handlers.NewTransferHandler(svc)
-	kycH      := handlers.NewKYCHandler(svc)
-	adminH    := handlers.NewAdminHandler(svc)
-	webhookH  := handlers.NewWebhookHandler(svc, cfg.HUB2.SecretKey, logger)
+	authH      := handlers.NewAuthHandler(svc, cfg)
+	profileH   := handlers.NewProfileHandler(svc)
+	accountH   := handlers.NewAccountHandler(svc)
+	walletH    := handlers.NewWalletHandler(svc)
+	cryptoH    := handlers.NewCryptoHandler(svc)
+	transferH  := handlers.NewTransferHandler(svc)
+	kycH       := handlers.NewKYCHandler(svc)
+	adminH     := handlers.NewAdminHandler(svc)
+	dashboardH := handlers.NewDashboardHandler(svc)
+	webhookH   := handlers.NewWebhookHandler(svc, cfg.HUB2.SecretKey, logger)
 
 	kycRequired := middleware.KYCRequired(pool)
 
@@ -136,6 +137,11 @@ func newRouter(cfg *config.Config, svc *services.Services, pool *pgxpool.Pool, l
 					r.Post("/hub2", transferH.Hub2Payment)
 					r.Post("/exchange", transferH.ExchangeCurrency)
 				})
+
+				// Dashboard + activity feed
+				r.Get("/dashboard", dashboardH.GetDashboard)
+				r.Get("/activity", dashboardH.GetActivityFeed)
+				r.Get("/crypto/contacts", dashboardH.GetRecentContacts)
 			})
 
 			// ── Admin routes (JWT + admin role) ─────────────────────────────

@@ -223,3 +223,40 @@ type KycAdminAction struct {
 	Reason    *string   `json:"reason"`
 	CreatedAt time.Time `json:"created_at"`
 }
+
+// ─── Migration 000005 models ───────────────────────────────────────────────────
+
+type VirtualCard struct {
+	ID          uuid.UUID `json:"id"`
+	UserID      uuid.UUID `json:"user_id"`
+	CardName    string    `json:"card_name"`
+	LastFour    string    `json:"last_four"`
+	Currency    string    `json:"currency"`
+	CardNetwork string    `json:"card_network"` // "mastercard" | "visa"
+	IsActive    bool      `json:"is_active"`
+	CreatedAt   time.Time `json:"created_at"`
+}
+
+type FXRate struct {
+	BaseCurrency  string    `json:"base_currency"`
+	QuoteCurrency string    `json:"quote_currency"`
+	Rate          string    `json:"rate"` // decimal string
+	Source        string    `json:"source"`
+	FetchedAt     time.Time `json:"fetched_at"`
+}
+
+// AccountWithNilos extends Account with Nilos-specific fields from migration 000005.
+type AccountWithNilos struct {
+	ID               uuid.UUID `json:"id"`
+	UserID           uuid.UUID `json:"user_id"`
+	Currency         string    `json:"currency"`
+	Balance          string    `json:"balance"`           // from pgtype.Numeric as string
+	AvailableBalance string    `json:"available_balance"` // from pgtype.Numeric as string
+	AccountNumber    string    `json:"account_number"`
+	Status           string    `json:"status"`
+	NilosAccountID   *string   `json:"nilos_account_id"`
+	NilosCustomerID  *string   `json:"nilos_customer_id"`
+	IBAN             *string   `json:"iban"`
+	BIC              *string   `json:"bic"`
+	CreatedAt        time.Time `json:"created_at"`
+}

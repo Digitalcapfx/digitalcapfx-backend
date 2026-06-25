@@ -13,6 +13,7 @@ import (
 	"github.com/rachfinance/digitalfx/internal/clients/caas"
 	"github.com/rachfinance/digitalfx/internal/clients/hub2"
 	"github.com/rachfinance/digitalfx/internal/clients/metamap"
+	"github.com/rachfinance/digitalfx/internal/clients/nilos"
 	"github.com/rachfinance/digitalfx/internal/clients/payments"
 	"github.com/rachfinance/digitalfx/internal/config"
 	"github.com/rachfinance/digitalfx/internal/pkg/email"
@@ -61,9 +62,10 @@ func NewServer(cfg *config.Config) (*Server, error) {
 		cfg.MetaMap.ClientSecret,
 		cfg.MetaMap.FlowID,
 	)
+	nilosClient := nilos.New(cfg.Nilos.APIKey, nilos.WithBaseURL(cfg.Nilos.BaseURL))
 
 	// Service layer
-	svc := services.New(pool, rdb, paymentsClient, caasClient, hub2Client, emailClient, metamapClient, cfg, logger)
+	svc := services.New(pool, rdb, paymentsClient, caasClient, hub2Client, emailClient, metamapClient, nilosClient, cfg, logger)
 
 	// Router
 	r := newRouter(cfg, svc, pool, logger)
