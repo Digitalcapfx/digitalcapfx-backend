@@ -44,10 +44,11 @@ func newRouter(cfg *config.Config, svc *services.Services, pool *pgxpool.Pool, l
 	dashboardH    := handlers.NewDashboardHandler(svc)
 	notificationH := handlers.NewNotificationHandler(svc)
 	withdrawalH   := handlers.NewWithdrawalHandler(svc)
-	securityH     := handlers.NewSecurityHandler(svc)
-	prefsH        := handlers.NewPreferencesHandler(svc)
-	supportH      := handlers.NewSupportHandler(svc)
-	webhookH      := handlers.NewWebhookHandler(svc, cfg.HUB2.SecretKey, logger)
+	securityH      := handlers.NewSecurityHandler(svc)
+	prefsH         := handlers.NewPreferencesHandler(svc)
+	supportH       := handlers.NewSupportHandler(svc)
+	walletOverviewH := handlers.NewWalletOverviewHandler(svc)
+	webhookH       := handlers.NewWebhookHandler(svc, cfg.HUB2.SecretKey, logger)
 
 	kycRequired := middleware.KYCRequired(pool)
 
@@ -169,6 +170,16 @@ func newRouter(cfg *config.Config, svc *services.Services, pool *pgxpool.Pool, l
 				r.Get("/dashboard", dashboardH.GetDashboard)
 				r.Get("/activity", dashboardH.GetActivityFeed)
 				r.Get("/crypto/contacts", dashboardH.GetRecentContacts)
+
+				// ── Wallet overview + detail ────────────────────────────────
+				r.Get("/wallets/overview", walletOverviewH.GetOverview)
+				r.Get("/wallets/supported-assets", walletOverviewH.GetSupportedAssets)
+				r.Get("/wallets/fiat/{currency}", walletOverviewH.GetFiatWalletDetail)
+				r.Get("/wallets/fiat/{currency}/transactions", walletOverviewH.GetFiatTransactions)
+				r.Get("/wallets/crypto/{network}", walletOverviewH.GetCryptoWalletDetail)
+				r.Get("/wallets/crypto/{network}/transactions", walletOverviewH.GetCryptoTransactions)
+				r.Get("/wallets/stablecoin/{symbol}", walletOverviewH.GetStablecoinDetail)
+				r.Get("/wallets/stablecoin/{symbol}/transactions", walletOverviewH.GetStablecoinTransactions)
 
 				// Fiat withdrawals (Nilos-backed accounts → bank or mobile money)
 				r.Post("/withdrawals/quote", withdrawalH.Quote)

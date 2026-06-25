@@ -1123,3 +1123,35 @@ func (q *Queries) UpsertFAQ(ctx context.Context, arg UpsertFAQParams) (FAQ, erro
 func (q *Queries) DeleteFAQ(ctx context.Context, id uuid.UUID) error {
 	return errNotImplemented
 }
+
+// ─── Wallet detail + overview queries ────────────────────────────────────────
+
+// ListWalletTransactionsParams supports filtered + searchable transaction lists.
+// TypeFilter values: "" (all) | "transfer_in" | "transfer_out" | "exchange" | "deposit" | "withdrawal"
+type ListWalletTransactionsParams struct {
+	AccountID  uuid.UUID
+	TypeFilter string
+	Search     string // partial match on description or reference
+	Limit      int32
+	Offset     int32
+}
+
+// WalletTxStatsRow is the aggregate returned by GetWalletTxStats.
+type WalletTxStatsRow struct {
+	TotalIn  float64
+	TotalOut float64
+	Count    int64
+}
+
+func (q *Queries) ListWalletTransactions(ctx context.Context, arg ListWalletTransactionsParams) ([]Transaction, error) {
+	return nil, errNotImplemented
+}
+
+func (q *Queries) CountWalletTransactions(ctx context.Context, arg ListWalletTransactionsParams) (int64, error) {
+	return 0, errNotImplemented
+}
+
+// GetWalletTxStats returns aggregate in/out totals and count for an account.
+func (q *Queries) GetWalletTxStats(ctx context.Context, accountID uuid.UUID) (WalletTxStatsRow, error) {
+	return WalletTxStatsRow{}, errNotImplemented
+}

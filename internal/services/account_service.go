@@ -13,9 +13,10 @@ import (
 )
 
 var (
-	ErrAccountNotFound      = errors.New("account not found")
-	ErrInsufficientFunds    = errors.New("insufficient funds")
-	ErrUnsupportedCurrency  = errors.New("unsupported currency")
+	ErrAccountNotFound     = errors.New("account not found")
+	ErrWalletNotFound      = errors.New("wallet not found")
+	ErrInsufficientFunds   = errors.New("insufficient funds")
+	ErrUnsupportedCurrency = errors.New("unsupported currency")
 )
 
 type AccountService struct {
