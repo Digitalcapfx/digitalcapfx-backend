@@ -336,6 +336,27 @@ type UpdateProfileRequest struct {
 	Nationality *string `json:"nationality,omitempty" example:"Cameroonian"`
 }
 
+// ─── Exchange ─────────────────────────────────────────────────────────────────
+
+// ExchangeQuoteRequest is the body for POST /exchange/quote.
+type ExchangeQuoteRequest struct {
+	From   string  `json:"from" example:"USD" enums:"USD,EUR,GBP,XAF,XOF"`
+	To     string  `json:"to" example:"EUR" enums:"USD,EUR,GBP,XAF,XOF"`
+	Amount float64 `json:"amount" example:"500.00"`
+	// Side: SELL = you specify source amount, BUY = you specify target amount
+	Side string `json:"side,omitempty" example:"SELL" enums:"SELL,BUY"`
+}
+
+// ExchangeExecuteRequest is the body for POST /exchange/execute.
+type ExchangeExecuteRequest struct {
+	From    string  `json:"from" example:"USD" enums:"USD,EUR,GBP,XAF,XOF"`
+	To      string  `json:"to" example:"EUR" enums:"USD,EUR,GBP,XAF,XOF"`
+	Amount  float64 `json:"amount" example:"500.00"`
+	Side    string  `json:"side,omitempty" example:"SELL" enums:"SELL,BUY"`
+	// QuoteID is optional. Pass the quote_id from POST /exchange/quote to lock the rate.
+	QuoteID string `json:"quote_id,omitempty" example:"quo_abc123"`
+}
+
 // ─── Support ──────────────────────────────────────────────────────────────────
 
 // CreateTicketRequest is the body for POST /support/tickets.

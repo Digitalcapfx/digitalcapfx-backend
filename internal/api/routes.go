@@ -48,7 +48,8 @@ func newRouter(cfg *config.Config, svc *services.Services, pool *pgxpool.Pool, l
 	prefsH         := handlers.NewPreferencesHandler(svc)
 	supportH       := handlers.NewSupportHandler(svc)
 	walletOverviewH := handlers.NewWalletOverviewHandler(svc)
-	webhookH       := handlers.NewWebhookHandler(svc, cfg.HUB2.SecretKey, logger)
+	exchangeH       := handlers.NewExchangeHandler(svc)
+	webhookH        := handlers.NewWebhookHandler(svc, cfg.HUB2.SecretKey, logger)
 
 	kycRequired := middleware.KYCRequired(pool)
 
@@ -170,6 +171,12 @@ func newRouter(cfg *config.Config, svc *services.Services, pool *pgxpool.Pool, l
 				r.Get("/dashboard", dashboardH.GetDashboard)
 				r.Get("/activity", dashboardH.GetActivityFeed)
 				r.Get("/crypto/contacts", dashboardH.GetRecentContacts)
+
+				// ── Exchange ────────────────────────────────────────────────
+				r.Get("/exchange/rate", exchangeH.GetRate)
+				r.Post("/exchange/quote", exchangeH.GetQuote)
+				r.Post("/exchange/execute", exchangeH.Execute)
+				r.Get("/exchange/history", exchangeH.GetHistory)
 
 				// ── Wallet overview + detail ────────────────────────────────
 				r.Get("/wallets/overview", walletOverviewH.GetOverview)

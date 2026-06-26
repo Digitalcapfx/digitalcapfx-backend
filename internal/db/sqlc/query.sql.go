@@ -1155,3 +1155,62 @@ func (q *Queries) CountWalletTransactions(ctx context.Context, arg ListWalletTra
 func (q *Queries) GetWalletTxStats(ctx context.Context, accountID uuid.UUID) (WalletTxStatsRow, error) {
 	return WalletTxStatsRow{}, errNotImplemented
 }
+
+// ─── Exchange queries ─────────────────────────────────────────────────────────
+
+type CreateFiatTransactionParams struct {
+	ID          uuid.UUID
+	AccountID   uuid.UUID
+	Reference   string
+	Type        string // "exchange" | "transfer_in" | "transfer_out"
+	Amount      string // decimal string e.g. "500.00"
+	Currency    string
+	Fee         string // decimal string e.g. "0.00"
+	Description *string
+	Status      string
+	Metadata    json.RawMessage
+}
+
+// CreateFiatTransaction inserts a single leg of a fiat operation (exchange, transfer).
+func (q *Queries) CreateFiatTransaction(ctx context.Context, arg CreateFiatTransactionParams) (Transaction, error) {
+	return Transaction{}, errNotImplemented
+}
+
+type ListExchangesByUserParams struct {
+	UserID uuid.UUID
+	Limit  int32
+	Offset int32
+}
+
+// ExchangeHistoryRow is one row from the debit-leg of an exchange.
+type ExchangeHistoryRow struct {
+	Transaction
+	// Enriched fields decoded from Metadata.
+	FromCurrency string
+	ToCurrency   string
+	FromAmount   float64
+	ToAmount     float64
+	Rate         float64
+	NilosPayoutID string
+}
+
+// ListExchangesByUser returns the debit-leg exchange transactions for a user,
+// newest first. Metadata contains the full pair info.
+func (q *Queries) ListExchangesByUser(ctx context.Context, arg ListExchangesByUserParams) ([]Transaction, error) {
+	return nil, errNotImplemented
+}
+
+func (q *Queries) CountExchangesByUser(ctx context.Context, userID uuid.UUID) (int64, error) {
+	return 0, errNotImplemented
+}
+
+type ExchangeStatsRow struct {
+	TotalExchanges int64
+	TotalVolume    float64 // sum of from_amount across all exchanges
+	TotalFees      float64
+}
+
+// GetExchangeStats returns aggregate stats for the user's exchange history.
+func (q *Queries) GetExchangeStats(ctx context.Context, userID uuid.UUID) (ExchangeStatsRow, error) {
+	return ExchangeStatsRow{}, errNotImplemented
+}

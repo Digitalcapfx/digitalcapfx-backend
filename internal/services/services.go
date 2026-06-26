@@ -29,6 +29,7 @@ type Services struct {
 	Preferences    *PreferencesService
 	Support        *SupportService
 	WalletOverview *WalletOverviewService
+	Exchange       *ExchangeService
 }
 
 func New(
@@ -61,5 +62,6 @@ func New(
 		Preferences:    NewPreferencesService(pool, logger),
 		Support:        NewSupportService(pool, logger),
 		WalletOverview: NewWalletOverviewService(pool, caasClient, paymentsClient, logger),
+		Exchange:       NewExchangeService(pool, nilosClient, logger),
 	}
 }
