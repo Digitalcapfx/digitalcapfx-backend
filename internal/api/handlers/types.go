@@ -447,3 +447,29 @@ type KYCDocumentListResponse struct {
 	Success bool              `json:"success" example:"true"`
 	Data    []KYCDocumentData `json:"data"`
 }
+
+// ─── Admin Staff ──────────────────────────────────────────────────────────────
+
+type InviteStaffRequest struct {
+	Email               string   `json:"email"                example:"alice@example.com"`
+	Name                string   `json:"name"                 example:"Alice Dupont"`
+	Role                string   `json:"role"                 example:"compliance"        enums:"admin,compliance,support,finance,readonly"`
+	CustomPermissions   []string `json:"custom_permissions"   example:"[]"`
+	RevokedPermissions  []string `json:"revoked_permissions"  example:"[]"`
+}
+
+type UpdateStaffRequest struct {
+	Role               string   `json:"role"                example:"support"  enums:"admin,compliance,support,finance,readonly"`
+	CustomPermissions  []string `json:"custom_permissions"  example:"[]"`
+	RevokedPermissions []string `json:"revoked_permissions" example:"[]"`
+}
+
+type AcceptInviteRequest struct {
+	Token string `json:"token" example:"a3f8b2c1..."`
+}
+
+// ─── Admin Users ──────────────────────────────────────────────────────────────
+
+type DisableUserRequest struct {
+	Reason string `json:"reason" example:"Suspicious activity — pending investigation"`
+}

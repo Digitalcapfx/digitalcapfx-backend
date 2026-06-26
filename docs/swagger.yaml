@@ -1,5 +1,11 @@
 basePath: /api/v1
 definitions:
+  handlers.AcceptInviteRequest:
+    properties:
+      token:
+        example: a3f8b2c1...
+        type: string
+    type: object
   handlers.AccountData:
     properties:
       account_number:
@@ -238,6 +244,12 @@ definitions:
       success:
         example: true
         type: boolean
+    type: object
+  handlers.DisableUserRequest:
+    properties:
+      reason:
+        example: Suspicious activity — pending investigation
+        type: string
     type: object
   handlers.ErrorResponse:
     properties:
@@ -500,6 +512,36 @@ definitions:
         type: string
       receiver_phone:
         example: "+237698765432"
+        type: string
+    type: object
+  handlers.InviteStaffRequest:
+    properties:
+      custom_permissions:
+        example:
+        - '[]'
+        items:
+          type: string
+        type: array
+      email:
+        example: alice@example.com
+        type: string
+      name:
+        example: Alice Dupont
+        type: string
+      revoked_permissions:
+        example:
+        - '[]'
+        items:
+          type: string
+        type: array
+      role:
+        enum:
+        - admin
+        - compliance
+        - support
+        - finance
+        - readonly
+        example: compliance
         type: string
     type: object
   handlers.KYCDocumentData:
@@ -885,6 +927,30 @@ definitions:
         example: Cameroonian
         type: string
     type: object
+  handlers.UpdateStaffRequest:
+    properties:
+      custom_permissions:
+        example:
+        - '[]'
+        items:
+          type: string
+        type: array
+      revoked_permissions:
+        example:
+        - '[]'
+        items:
+          type: string
+        type: array
+      role:
+        enum:
+        - admin
+        - compliance
+        - support
+        - finance
+        - readonly
+        example: support
+        type: string
+    type: object
   handlers.VerifyEmailRequest:
     properties:
       code:
@@ -1163,6 +1229,71 @@ paths:
       summary: Unified activity feed
       tags:
       - dashboard
+  /admin/audit-log:
+    get:
+      description: Returns paginated log of all admin actions (KYC decisions, user
+        disables, staff changes, FX rate updates). Filterable by staff member, resource
+        type, or specific resource ID.
+      parameters:
+      - description: Filter by staff member ID
+        in: query
+        name: staff_id
+        type: string
+      - description: Filter by resource type (kyc, user, staff, withdrawal_rate)
+        in: query
+        name: resource
+        type: string
+      - description: Filter by specific resource ID
+        in: query
+        name: resource_id
+        type: string
+      - description: Page
+        in: query
+        name: page
+        type: integer
+      - description: Results per page (max 100)
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Admin audit trail
+      tags:
+      - admin-staff
+  /admin/dashboard:
+    get:
+      description: 'Returns aggregate platform stats: total/active/disabled users,
+        KYC pipeline counts, transaction volume (30d), new user growth (7d / 30d),
+        and active staff count.'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Admin dashboard statistics
+      tags:
+      - admin-users
   /admin/kyc/{id}/approve:
     post:
       description: Marks the user's identity as verified and activates full account
@@ -1263,6 +1394,488 @@ paths:
       summary: List users awaiting KYC review
       tags:
       - admin
+  /admin/roles:
+    get:
+      description: Returns all role definitions with their default permissions, labels,
+        and descriptions. Use this to populate the role selector in the invite/edit
+        UI.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              additionalProperties: true
+              type: object
+            type: array
+      security:
+      - BearerAuth: []
+      summary: List available staff roles
+      tags:
+      - admin-staff
+  /admin/roles/{name}:
+    get:
+      description: Returns the default permission list for the named role. Useful
+        for building custom permission selectors.
+      parameters:
+      - description: Role name
+        enum:
+        - admin
+        - compliance
+        - support
+        - finance
+        - readonly
+        in: path
+        name: name
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get permissions for a specific role
+      tags:
+      - admin-staff
+  /admin/staff:
+    get:
+      description: Returns all staff members with their roles, effective permissions,
+        and activity status. Supports optional filtering to include disabled accounts.
+      parameters:
+      - description: Include disabled staff (default false)
+        in: query
+        name: include_inactive
+        type: boolean
+      - description: Page
+        in: query
+        name: page
+        type: integer
+      - description: Results per page
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List all staff members
+      tags:
+      - admin-staff
+  /admin/staff/{id}:
+    get:
+      description: Returns the full profile for a single staff member including their
+        effective permissions (role defaults minus revocations plus custom grants).
+      parameters:
+      - description: Staff member ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get a staff member
+      tags:
+      - admin-staff
+    patch:
+      consumes:
+      - application/json
+      description: Changes the role or fine-tunes the permission set (custom grants
+        and revocations) for a staff member. Cannot be used to modify the owner account.
+        Omit a field to leave it unchanged.
+      parameters:
+      - description: Staff member ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Updated role/permissions
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.UpdateStaffRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Update a staff member's role or permissions
+      tags:
+      - admin-staff
+  /admin/staff/{id}/disable:
+    post:
+      description: Deactivates a staff member's access. Subsequent API requests from
+        that account will be rejected with 403. The account can be re-enabled at any
+        time. The owner cannot be disabled.
+      parameters:
+      - description: Staff member ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.MessageResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Disable a staff member
+      tags:
+      - admin-staff
+  /admin/staff/{id}/enable:
+    post:
+      description: Restores access for a previously disabled staff member.
+      parameters:
+      - description: Staff member ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.MessageResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Re-enable a disabled staff member
+      tags:
+      - admin-staff
+  /admin/staff/invite:
+    post:
+      consumes:
+      - application/json
+      description: Creates a pending staff member record and sends an invitation email.
+        The invitee must click the link in the email to accept and link their account.
+        Only owner and admin roles can invite staff. You cannot invite someone as
+        "owner".
+      parameters:
+      - description: Staff invitation details
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.InviteStaffRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Invite a new staff member
+      tags:
+      - admin-staff
+  /admin/staff/invite/accept:
+    post:
+      consumes:
+      - application/json
+      description: Links the authenticated user's account to the pending staff member
+        record identified by the invite token. Must be called after login/registration.
+      parameters:
+      - description: Invite token
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.AcceptInviteRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.MessageResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Accept a staff invitation
+      tags:
+      - admin-staff
+  /admin/users:
+    get:
+      description: Full user list with search, KYC status filter, and active/disabled
+        filter. Returns paginated AdminUserView items. Staff can only see users (not
+        each other's admin accounts — those are in /admin/staff).
+      parameters:
+      - description: Search by name, email, or phone
+        in: query
+        name: search
+        type: string
+      - description: Filter
+        enum:
+        - pending
+        - under_review
+        - approved
+        - rejected
+        in: query
+        name: kyc_status
+        type: string
+      - description: Filter
+        enum:
+        - "true"
+        - "false"
+        in: query
+        name: active
+        type: string
+      - description: Page
+        in: query
+        name: page
+        type: integer
+      - description: Results per page
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List all platform users
+      tags:
+      - admin-users
+  /admin/users/{id}:
+    get:
+      description: Returns complete user profile including fiat accounts, WaaS wallets,
+        CaaS wallet status, KYC state, and lifetime transaction stats.
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get full user detail
+      tags:
+      - admin-users
+  /admin/users/{id}/disable:
+    post:
+      consumes:
+      - application/json
+      description: Soft-disables the user (sets is_active = false). All subsequent
+        auth attempts are blocked. Existing sessions are invalidated. A reason is
+        logged in the audit trail. The account can be re-enabled at any time.
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Optional reason
+        in: body
+        name: body
+        schema:
+          $ref: '#/definitions/handlers.DisableUserRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.MessageResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Disable a user account
+      tags:
+      - admin-users
+  /admin/users/{id}/enable:
+    post:
+      description: Restores access for a previously disabled user. Does not restore
+        any suspended sessions — the user must log in fresh.
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.MessageResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Re-enable a disabled user account
+      tags:
+      - admin-users
+  /admin/users/{id}/kyc/reset:
+    post:
+      description: Sets the user's kyc_status back to "pending" so they can resubmit
+        identity documents. Use when documents are unreadable or the wrong document
+        type was submitted.
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.MessageResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Reset a user's KYC status
+      tags:
+      - admin-users
+  /admin/users/{id}/transactions:
+    get:
+      description: Returns paginated transaction history across all fiat accounts
+        for the user. Used by compliance and support staff for investigation.
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Page
+        in: query
+        name: page
+        type: integer
+      - description: Results per page
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List transactions for a specific user (admin view)
+      tags:
+      - admin-users
   /admin/withdrawal-rates:
     get:
       description: Returns all configured withdrawal FX rates (active and inactive).

@@ -51,6 +51,8 @@ func newRouter(cfg *config.Config, svc *services.Services, pool *pgxpool.Pool, l
 	exchangeH       := handlers.NewExchangeHandler(svc)
 	activityH       := handlers.NewActivityHandler(svc)
 	insightsH       := handlers.NewInsightsHandler(svc)
+	adminStaffH     := handlers.NewAdminStaffHandler(svc)
+	adminUsersH     := handlers.NewAdminUsersHandler(svc)
 	webhookH        := handlers.NewWebhookHandler(svc, cfg.HUB2.SecretKey, logger)
 
 	kycRequired := middleware.KYCRequired(pool)
@@ -207,15 +209,66 @@ func newRouter(cfg *config.Config, svc *services.Services, pool *pgxpool.Pool, l
 			r.Patch("/notifications/read-all", notificationH.MarkAllRead)
 			r.Patch("/notifications/{id}/read", notificationH.MarkRead)
 
-			// ── Admin routes (JWT + admin role) ─────────────────────────────
+			// ── Admin routes (JWT + staff permission check) ──────────────────
 			r.Group(func(r chi.Router) {
-				r.Use(middleware.AdminOnly)
+				r.Use(middleware.LoadStaffPermissions(pool))
 
-				r.Get("/admin/kyc/pending", adminH.ListPendingKYC)
-				r.Post("/admin/kyc/{id}/approve", adminH.ApproveKYC)
-				r.Post("/admin/kyc/{id}/reject", adminH.RejectKYC)
-				r.Post("/admin/withdrawal-rates", adminH.SetWithdrawalRate)
-				r.Get("/admin/withdrawal-rates", adminH.ListWithdrawalRates)
+				// Dashboard + audit
+				r.With(middleware.RequirePermission(services.PermAnalyticsView)).
+					Get("/admin/dashboard", adminUsersH.AdminDashboard)
+				r.With(middleware.RequirePermission(services.PermAuditView)).
+					Get("/admin/audit-log", adminStaffH.GetAuditLog)
+
+				// Staff — accept invite (any authenticated staff, no extra permission)
+				r.Post("/admin/staff/invite/accept", adminStaffH.AcceptInvite)
+
+				// Staff CRUD
+				r.With(middleware.RequirePermission(services.PermStaffInvite)).
+					Post("/admin/staff/invite", adminStaffH.InviteStaff)
+				r.With(middleware.RequirePermission(services.PermStaffView)).
+					Get("/admin/staff", adminStaffH.ListStaff)
+				r.With(middleware.RequirePermission(services.PermStaffView)).
+					Get("/admin/staff/{id}", adminStaffH.GetStaff)
+				r.With(middleware.RequirePermission(services.PermStaffUpdate)).
+					Patch("/admin/staff/{id}", adminStaffH.UpdateStaff)
+				r.With(middleware.RequirePermission(services.PermStaffDisable)).
+					Post("/admin/staff/{id}/disable", adminStaffH.DisableStaff)
+				r.With(middleware.RequirePermission(services.PermStaffDisable)).
+					Post("/admin/staff/{id}/enable", adminStaffH.EnableStaff)
+
+				// Roles catalogue (read-only, any staff can see)
+				r.With(middleware.RequirePermission(services.PermStaffView)).
+					Get("/admin/roles", adminStaffH.ListRoles)
+				r.With(middleware.RequirePermission(services.PermStaffView)).
+					Get("/admin/roles/{name}", adminStaffH.GetRolePermissions)
+
+				// User management
+				r.With(middleware.RequirePermission(services.PermUsersView)).
+					Get("/admin/users", adminUsersH.ListUsers)
+				r.With(middleware.RequirePermission(services.PermUsersView)).
+					Get("/admin/users/{id}", adminUsersH.GetUser)
+				r.With(middleware.RequirePermission(services.PermUsersDisable)).
+					Post("/admin/users/{id}/disable", adminUsersH.DisableUser)
+				r.With(middleware.RequirePermission(services.PermUsersEnable)).
+					Post("/admin/users/{id}/enable", adminUsersH.EnableUser)
+				r.With(middleware.RequirePermission(services.PermUsersResetKYC)).
+					Post("/admin/users/{id}/kyc/reset", adminUsersH.ResetUserKYC)
+				r.With(middleware.RequirePermission(services.PermTxView)).
+					Get("/admin/users/{id}/transactions", adminUsersH.ListUserTransactions)
+
+				// KYC review
+				r.With(middleware.RequirePermission(services.PermKYCView)).
+					Get("/admin/kyc/pending", adminH.ListPendingKYC)
+				r.With(middleware.RequirePermission(services.PermKYCApprove)).
+					Post("/admin/kyc/{id}/approve", adminH.ApproveKYC)
+				r.With(middleware.RequirePermission(services.PermKYCReject)).
+					Post("/admin/kyc/{id}/reject", adminH.RejectKYC)
+
+				// Withdrawal rates
+				r.With(middleware.RequirePermission(services.PermWithdrawalsRates)).
+					Post("/admin/withdrawal-rates", adminH.SetWithdrawalRate)
+				r.With(middleware.RequirePermission(services.PermWithdrawalsView)).
+					Get("/admin/withdrawal-rates", adminH.ListWithdrawalRates)
 			})
 		})
 	})
