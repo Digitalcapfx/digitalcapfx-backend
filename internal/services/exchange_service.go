@@ -420,13 +420,13 @@ func currencyRail(c string) string {
 // Rates are expressed as units-of-To per 1-unit-of-From.
 func fallbackRate(from, to string) float64 {
 	rates := defaultFXRates()
-	// Convert both to USD, then to target.
-	fromUSD := 1.0 / rates[from]
-	toUSD := rates[to]
-	if toUSD == 0 {
+	// rates[c] = units of c per 1 USD. To get units-of-to per 1-unit-of-from:
+	//   (to/USD) / (from/USD) = rates[to] / rates[from]
+	fromRate := rates[from]
+	if fromRate == 0 {
 		return 0
 	}
-	return roundTo(fromUSD/toUSD, 6)
+	return roundTo(rates[to]/fromRate, 6)
 }
 
 func roundTo(v float64, places int) float64 {

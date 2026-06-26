@@ -186,7 +186,7 @@ func formatActivityAmount(item db.ActivityItem) string {
 
 	switch asset {
 	case "BTC", "ETH", "SOL", "LTC", "TRX", "POL", "BCH", "XRP":
-		return fmt.Sprintf("%s%s %s", sign, formatCrypto(amount, asset), asset)
+		return sign + formatCrypto(amount, asset)
 	case "USDC", "USDT":
 		return fmt.Sprintf("%s%s %s", sign, formatNumber(amount, 2), asset)
 	case "USD":
