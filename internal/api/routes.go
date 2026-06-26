@@ -49,6 +49,8 @@ func newRouter(cfg *config.Config, svc *services.Services, pool *pgxpool.Pool, l
 	supportH       := handlers.NewSupportHandler(svc)
 	walletOverviewH := handlers.NewWalletOverviewHandler(svc)
 	exchangeH       := handlers.NewExchangeHandler(svc)
+	activityH       := handlers.NewActivityHandler(svc)
+	insightsH       := handlers.NewInsightsHandler(svc)
 	webhookH        := handlers.NewWebhookHandler(svc, cfg.HUB2.SecretKey, logger)
 
 	kycRequired := middleware.KYCRequired(pool)
@@ -167,9 +169,10 @@ func newRouter(cfg *config.Config, svc *services.Services, pool *pgxpool.Pool, l
 					r.Post("/exchange", transferH.ExchangeCurrency)
 				})
 
-				// Dashboard + activity feed
+				// Dashboard + activity feed + insights
 				r.Get("/dashboard", dashboardH.GetDashboard)
-				r.Get("/activity", dashboardH.GetActivityFeed)
+				r.Get("/activity", activityH.GetFeed)
+				r.Get("/insights", insightsH.GetInsights)
 				r.Get("/crypto/contacts", dashboardH.GetRecentContacts)
 
 				// ── Exchange ────────────────────────────────────────────────

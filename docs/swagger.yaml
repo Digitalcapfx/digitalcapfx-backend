@@ -254,6 +254,73 @@ definitions:
         example: false
         type: boolean
     type: object
+  handlers.ExchangeExecuteRequest:
+    properties:
+      amount:
+        example: 500
+        type: number
+      from:
+        enum:
+        - USD
+        - EUR
+        - GBP
+        - XAF
+        - XOF
+        example: USD
+        type: string
+      quote_id:
+        description: QuoteID is optional. Pass the quote_id from POST /exchange/quote
+          to lock the rate.
+        example: quo_abc123
+        type: string
+      side:
+        enum:
+        - SELL
+        - BUY
+        example: SELL
+        type: string
+      to:
+        enum:
+        - USD
+        - EUR
+        - GBP
+        - XAF
+        - XOF
+        example: EUR
+        type: string
+    type: object
+  handlers.ExchangeQuoteRequest:
+    properties:
+      amount:
+        example: 500
+        type: number
+      from:
+        enum:
+        - USD
+        - EUR
+        - GBP
+        - XAF
+        - XOF
+        example: USD
+        type: string
+      side:
+        description: 'Side: SELL = you specify source amount, BUY = you specify target
+          amount'
+        enum:
+        - SELL
+        - BUY
+        example: SELL
+        type: string
+      to:
+        enum:
+        - USD
+        - EUR
+        - GBP
+        - XAF
+        - XOF
+        example: EUR
+        type: string
+    type: object
   handlers.FiatWithdrawalResponse:
     type: object
   handlers.ForgotPINRequest:
@@ -1914,6 +1981,184 @@ paths:
       summary: Home dashboard
       tags:
       - dashboard
+  /exchange/execute:
+    post:
+      consumes:
+      - application/json
+      description: Converts fiat currency between the user's own accounts using a
+        Nilos swap. The from and to accounts must both exist. Optionally pass a quote_id
+        to lock the rate shown in the preview; otherwise the swap executes at the
+        current market rate.
+      parameters:
+      - description: Exchange details
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.ExchangeExecuteRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "422":
+          description: Unprocessable Entity
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Execute exchange
+      tags:
+      - exchange
+  /exchange/history:
+    get:
+      description: Returns the user's fiat exchange history with aggregate stats (total
+        exchanges, volume, fees paid) and transactions grouped as THIS WEEK / LAST
+        WEEK / EARLIER. Each row shows from/to currencies, amounts, rate used, and
+        status.
+      parameters:
+      - description: Page (default 1)
+        in: query
+        name: page
+        type: integer
+      - description: Results per page (default 20)
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Exchange history
+      tags:
+      - exchange
+  /exchange/quote:
+    post:
+      consumes:
+      - application/json
+      description: Returns a locked FX quote for a specific amount. The quote_id can
+        be passed to POST /exchange/execute to guarantee the displayed rate. Quotes
+        expire quickly — execute immediately after confirming.
+      parameters:
+      - description: Quote parameters
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.ExchangeQuoteRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Exchange quote
+      tags:
+      - exchange
+  /exchange/rate:
+    get:
+      description: Returns the live FX rate for 1 unit of the source currency converted
+        to the target currency. Rate is sourced from Nilos (green dot = live); falls
+        back to internal rates if Nilos is unavailable.
+      parameters:
+      - description: Source currency (USD, EUR, GBP, XAF, XOF)
+        in: query
+        name: from
+        required: true
+        type: string
+      - description: Target currency
+        in: query
+        name: to
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Live exchange rate
+      tags:
+      - exchange
+  /insights:
+    get:
+      description: 'Full analytics payload for the Financial Insights screen. Returns:
+        summary cards (total balance, income, spending, net flow), balance trend data
+        points (Fiat + Crypto lines) for chart rendering, asset allocation (fiat %
+        vs crypto %), monthly cash flow (last 6 months income vs spending), and spending
+        breakdown by type (Send/Exchange/Withdraw/Deposit split by fiat vs crypto).'
+      parameters:
+      - description: Time period
+        enum:
+        - 1w
+        - 1m
+        - 3m
+        - 6m
+        in: query
+        name: period
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Financial Insights
+      tags:
+      - insights
   /kyc/documents:
     get:
       description: Returns all identity documents submitted by the authenticated user.

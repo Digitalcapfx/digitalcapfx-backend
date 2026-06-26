@@ -738,6 +738,60 @@ func (q *Queries) ListRecentActivity(ctx context.Context, arg ListRecentActivity
 	return nil, errNotImplemented
 }
 
+// ListActivityParams is the full, filterable activity feed query.
+// TypeFilter: "" | "sent" | "received" | "exchanged" | "deposited" | "withdrawn"
+type ListActivityParams struct {
+	UserID     uuid.UUID
+	TypeFilter string
+	Search     string
+	Limit      int32
+	Offset     int32
+}
+
+func (q *Queries) ListActivity(ctx context.Context, arg ListActivityParams) ([]ActivityItem, error) {
+	return nil, errNotImplemented
+}
+
+func (q *Queries) CountActivity(ctx context.Context, arg ListActivityParams) (int64, error) {
+	return 0, errNotImplemented
+}
+
+// ─── Insights query stubs ─────────────────────────────────────────────────────
+
+type BalanceTrendRow struct {
+	Date      time.Time
+	FiatUSD   float64
+	CryptoUSD float64
+}
+
+type MonthlyFlowRow struct {
+	Month    string  // "Jan", "Feb", ...
+	Year     int
+	Income   float64
+	Spending float64
+}
+
+type SpendingByTypeRow struct {
+	TxType string  // "transfer_out" | "exchange" | "withdrawal" | "deposit" | "transfer_in"
+	Source string  // "fiat" | "crypto"
+	Total  float64
+}
+
+// GetBalanceTrend returns daily fiat + crypto balance snapshots from `since` to now.
+func (q *Queries) GetBalanceTrend(ctx context.Context, userID uuid.UUID, since time.Time) ([]BalanceTrendRow, error) {
+	return nil, errNotImplemented
+}
+
+// GetMonthlyFlow returns income and spending totals for the last N months.
+func (q *Queries) GetMonthlyFlow(ctx context.Context, userID uuid.UUID, months int) ([]MonthlyFlowRow, error) {
+	return nil, errNotImplemented
+}
+
+// GetSpendingByType returns spending aggregated by transaction type and source (fiat/crypto).
+func (q *Queries) GetSpendingByType(ctx context.Context, userID uuid.UUID, since time.Time) ([]SpendingByTypeRow, error) {
+	return nil, errNotImplemented
+}
+
 // ─── Notification queries ──────────────────────────────────────────────────────
 
 type CreateNotificationParams struct {

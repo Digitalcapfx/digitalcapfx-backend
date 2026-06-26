@@ -1518,6 +1518,262 @@ const docTemplate = `{
                 }
             }
         },
+        "/exchange/execute": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Converts fiat currency between the user's own accounts using a Nilos swap. The from and to accounts must both exist. Optionally pass a quote_id to lock the rate shown in the preview; otherwise the swap executes at the current market rate.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "exchange"
+                ],
+                "summary": "Execute exchange",
+                "parameters": [
+                    {
+                        "description": "Exchange details",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ExchangeExecuteRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "422": {
+                        "description": "Unprocessable Entity",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/exchange/history": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns the user's fiat exchange history with aggregate stats (total exchanges, volume, fees paid) and transactions grouped as THIS WEEK / LAST WEEK / EARLIER. Each row shows from/to currencies, amounts, rate used, and status.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "exchange"
+                ],
+                "summary": "Exchange history",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Page (default 1)",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Results per page (default 20)",
+                        "name": "limit",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/exchange/quote": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns a locked FX quote for a specific amount. The quote_id can be passed to POST /exchange/execute to guarantee the displayed rate. Quotes expire quickly — execute immediately after confirming.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "exchange"
+                ],
+                "summary": "Exchange quote",
+                "parameters": [
+                    {
+                        "description": "Quote parameters",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ExchangeQuoteRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/exchange/rate": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns the live FX rate for 1 unit of the source currency converted to the target currency. Rate is sourced from Nilos (green dot = live); falls back to internal rates if Nilos is unavailable.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "exchange"
+                ],
+                "summary": "Live exchange rate",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Source currency (USD, EUR, GBP, XAF, XOF)",
+                        "name": "from",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Target currency",
+                        "name": "to",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/insights": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Full analytics payload for the Financial Insights screen. Returns: summary cards (total balance, income, spending, net flow), balance trend data points (Fiat + Crypto lines) for chart rendering, asset allocation (fiat % vs crypto %), monthly cash flow (last 6 months income vs spending), and spending breakdown by type (Send/Exchange/Withdraw/Deposit split by fiat vs crypto).",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "insights"
+                ],
+                "summary": "Financial Insights",
+                "parameters": [
+                    {
+                        "enum": [
+                            "1w",
+                            "1m",
+                            "3m",
+                            "6m"
+                        ],
+                        "type": "string",
+                        "description": "Time period",
+                        "name": "period",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/kyc/documents": {
             "get": {
                 "security": [
@@ -4133,6 +4389,90 @@ const docTemplate = `{
                 "success": {
                     "type": "boolean",
                     "example": false
+                }
+            }
+        },
+        "handlers.ExchangeExecuteRequest": {
+            "type": "object",
+            "properties": {
+                "amount": {
+                    "type": "number",
+                    "example": 500
+                },
+                "from": {
+                    "type": "string",
+                    "enum": [
+                        "USD",
+                        "EUR",
+                        "GBP",
+                        "XAF",
+                        "XOF"
+                    ],
+                    "example": "USD"
+                },
+                "quote_id": {
+                    "description": "QuoteID is optional. Pass the quote_id from POST /exchange/quote to lock the rate.",
+                    "type": "string",
+                    "example": "quo_abc123"
+                },
+                "side": {
+                    "type": "string",
+                    "enum": [
+                        "SELL",
+                        "BUY"
+                    ],
+                    "example": "SELL"
+                },
+                "to": {
+                    "type": "string",
+                    "enum": [
+                        "USD",
+                        "EUR",
+                        "GBP",
+                        "XAF",
+                        "XOF"
+                    ],
+                    "example": "EUR"
+                }
+            }
+        },
+        "handlers.ExchangeQuoteRequest": {
+            "type": "object",
+            "properties": {
+                "amount": {
+                    "type": "number",
+                    "example": 500
+                },
+                "from": {
+                    "type": "string",
+                    "enum": [
+                        "USD",
+                        "EUR",
+                        "GBP",
+                        "XAF",
+                        "XOF"
+                    ],
+                    "example": "USD"
+                },
+                "side": {
+                    "description": "Side: SELL = you specify source amount, BUY = you specify target amount",
+                    "type": "string",
+                    "enum": [
+                        "SELL",
+                        "BUY"
+                    ],
+                    "example": "SELL"
+                },
+                "to": {
+                    "type": "string",
+                    "enum": [
+                        "USD",
+                        "EUR",
+                        "GBP",
+                        "XAF",
+                        "XOF"
+                    ],
+                    "example": "EUR"
                 }
             }
         },
