@@ -145,7 +145,7 @@ func (s *AuthService) Register(ctx context.Context, in RegisterInput) (*token.Pa
 		}
 	}
 
-	pair, err := s.createSession(ctx, q, user.ID, user.PhoneNumber, user.Role, in.DeviceIP, in.DeviceUA)
+	pair, _, err := s.createSession(ctx, q, user.ID, user.PhoneNumber, user.Role, in.DeviceIP, in.DeviceUA)
 	if err != nil {
 		return nil, err
 	}
@@ -196,25 +196,14 @@ func (s *AuthService) Login(ctx context.Context, in LoginInput) (*LoginResult, e
 		return &LoginResult{Requires2FA: true, TOTPRef: ref}, nil
 	}
 
-	pair, err := s.createSession(ctx, q, user.ID, user.PhoneNumber, user.Role, in.DeviceIP, in.DeviceUA)
+	pair, newDevice, err := s.createSession(ctx, q, user.ID, user.PhoneNumber, user.Role, in.DeviceIP, in.DeviceUA)
 	if err != nil {
 		return nil, err
 	}
 
 	if user.Email != nil {
 		deviceName := parseDeviceName(in.DeviceUA)
-		go func() {
-			subj, html := email.LoginNotification(*user.Email, email.LoginNotificationData{
-				FirstName:  user.FirstName,
-				DeviceName: deviceName,
-				DeviceIP:   fallback(in.DeviceIP, "Unknown"),
-				DeviceUA:   in.DeviceUA,
-				Time:       time.Now().UTC().Format("02 Jan 2006 15:04 UTC"),
-			})
-			if err := s.emailClient.Send(*user.Email, subj, html); err != nil {
-				s.logger.Error("send login notification", zap.Error(err))
-			}
-		}()
+		go s.sendLoginEmail(*user.Email, user.FirstName, deviceName, in.DeviceIP, in.DeviceUA, newDevice)
 	}
 
 	return &LoginResult{Pair: pair}, nil
@@ -249,7 +238,15 @@ func (s *AuthService) CompleteTOTPLogin(ctx context.Context, ref, code, deviceIP
 
 	s.rdb.Del(ctx, redisKey)
 
-	return s.createSession(ctx, q, user.ID, user.PhoneNumber, user.Role, deviceIP, deviceUA)
+	pair, newDevice, err := s.createSession(ctx, q, user.ID, user.PhoneNumber, user.Role, deviceIP, deviceUA)
+	if err != nil {
+		return nil, err
+	}
+	if user.Email != nil {
+		deviceName := parseDeviceName(deviceUA)
+		go s.sendLoginEmail(*user.Email, user.FirstName, deviceName, deviceIP, deviceUA, newDevice)
+	}
+	return pair, nil
 }
 
 // ─── Google Sign-In ───────────────────────────────────────────────────────────
@@ -278,23 +275,14 @@ func (s *AuthService) GoogleSignIn(ctx context.Context, in GoogleSignInInput) (*
 
 	// Existing user by Google sub.
 	if user, err := q.GetUserByGoogleSub(ctx, info.Sub); err == nil {
-		pair, err := s.createSession(ctx, q, user.ID, user.PhoneNumber, user.Role, in.DeviceIP, in.DeviceUA)
+		pair, newDevice, err := s.createSession(ctx, q, user.ID, user.PhoneNumber, user.Role, in.DeviceIP, in.DeviceUA)
 		if err != nil {
 			return nil, err
 		}
-		go func() {
-			if user.Email != nil {
-				deviceName := parseDeviceName(in.DeviceUA)
-				subj, html := email.LoginNotification(*user.Email, email.LoginNotificationData{
-					FirstName:  user.FirstName,
-					DeviceName: deviceName,
-					DeviceIP:   fallback(in.DeviceIP, "Unknown"),
-					DeviceUA:   in.DeviceUA,
-					Time:       time.Now().UTC().Format("02 Jan 2006 15:04 UTC"),
-				})
-				_ = s.emailClient.Send(*user.Email, subj, html)
-			}
-		}()
+		if user.Email != nil {
+			deviceName := parseDeviceName(in.DeviceUA)
+			go s.sendLoginEmail(*user.Email, user.FirstName, deviceName, in.DeviceIP, in.DeviceUA, newDevice)
+		}
 		return &GoogleSignInResult{Pair: pair, IsNewUser: false}, nil
 	}
 
@@ -304,9 +292,13 @@ func (s *AuthService) GoogleSignIn(ctx context.Context, in GoogleSignInInput) (*
 			// Link Google sub to existing account going forward.
 			sub := info.Sub
 			user.GoogleSub = &sub
-			pair, err := s.createSession(ctx, q, user.ID, user.PhoneNumber, user.Role, in.DeviceIP, in.DeviceUA)
+			pair, newDevice, err := s.createSession(ctx, q, user.ID, user.PhoneNumber, user.Role, in.DeviceIP, in.DeviceUA)
 			if err != nil {
 				return nil, err
+			}
+			if user.Email != nil {
+				deviceName := parseDeviceName(in.DeviceUA)
+				go s.sendLoginEmail(*user.Email, user.FirstName, deviceName, in.DeviceIP, in.DeviceUA, newDevice)
 			}
 			return &GoogleSignInResult{Pair: pair, IsNewUser: false}, nil
 		}
@@ -336,7 +328,7 @@ func (s *AuthService) GoogleSignIn(ctx context.Context, in GoogleSignInInput) (*
 		}
 	}
 
-	pair, err := s.createSession(ctx, q, googleUser.ID, googleUser.PhoneNumber, googleUser.Role, in.DeviceIP, in.DeviceUA)
+	pair, _, err := s.createSession(ctx, q, googleUser.ID, googleUser.PhoneNumber, googleUser.Role, in.DeviceIP, in.DeviceUA)
 	if err != nil {
 		return nil, err
 	}
@@ -645,15 +637,21 @@ func (s *AuthService) UpdateProfile(ctx context.Context, in UpdateProfileInput) 
 // createSession generates a JWT pair and persists a user_sessions row.
 // Because the DB auto-generates the session UUID, we issue the pair twice:
 // once to populate the row (any unique RT hash), then again with the real session.ID.
-func (s *AuthService) createSession(ctx context.Context, q *db.Queries, userID uuid.UUID, phone, role, deviceIP, deviceUA string) (*token.Pair, error) {
+// Returns the token pair and whether the user already had other active sessions
+// (used by callers to decide between LoginNotification and NewDeviceAlert).
+func (s *AuthService) createSession(ctx context.Context, q *db.Queries, userID uuid.UUID, phone, role, deviceIP, deviceUA string) (*token.Pair, bool, error) {
 	deviceName := parseDeviceName(deviceUA)
+
+	// Check existing sessions before creating — determines which email alert to send.
+	existingSessions, _ := q.ListActiveSessionsByUserID(ctx, userID)
+	hasOtherSessions := len(existingSessions) > 0
 
 	// First issue: placeholder session ID so we can get the DB row ID.
 	placeholder := uuid.New().String()
 	tmpPair, err := token.NewPair(userID, phone, placeholder, role,
 		s.cfg.JWT.Secret, s.cfg.JWT.AccessExpiry, s.cfg.JWT.RefreshExpiry)
 	if err != nil {
-		return nil, fmt.Errorf("generate token pair: %w", err)
+		return nil, false, fmt.Errorf("generate token pair: %w", err)
 	}
 
 	session, err := q.CreateUserSession(ctx, db.CreateUserSessionParams{
@@ -665,14 +663,14 @@ func (s *AuthService) createSession(ctx context.Context, q *db.Queries, userID u
 		ExpiresAt:        time.Now().Add(s.cfg.JWT.RefreshExpiry),
 	})
 	if err != nil {
-		return nil, fmt.Errorf("create session: %w", err)
+		return nil, false, fmt.Errorf("create session: %w", err)
 	}
 
 	// Reissue with the real session.ID embedded in claims.
 	pair, err := token.NewPair(userID, phone, session.ID.String(), role,
 		s.cfg.JWT.Secret, s.cfg.JWT.AccessExpiry, s.cfg.JWT.RefreshExpiry)
 	if err != nil {
-		return nil, fmt.Errorf("reissue token pair: %w", err)
+		return nil, false, fmt.Errorf("reissue token pair: %w", err)
 	}
 
 	// Update the stored hash to match the final refresh token.
@@ -681,7 +679,29 @@ func (s *AuthService) createSession(ctx context.Context, q *db.Queries, userID u
 		RefreshTokenHash: sha256Hex(pair.RefreshToken),
 	})
 
-	return pair, nil
+	return pair, hasOtherSessions, nil
+}
+
+// sendLoginEmail fires the appropriate security email after a successful login.
+// When the user already had other active sessions (concurrent devices), the more
+// specific NewDeviceAlert is sent; otherwise the standard LoginNotification is used.
+func (s *AuthService) sendLoginEmail(toEmail, firstName, deviceName, deviceIP, deviceUA string, newDevice bool) {
+	loginTime := time.Now().UTC().Format("02 Jan 2006 15:04 UTC")
+	var subj, html string
+	if newDevice {
+		subj, html = email.NewDeviceAlert(toEmail, firstName, deviceName, fallback(deviceIP, "Unknown"), loginTime)
+	} else {
+		subj, html = email.LoginNotification(toEmail, email.LoginNotificationData{
+			FirstName:  firstName,
+			DeviceName: deviceName,
+			DeviceIP:   fallback(deviceIP, "Unknown"),
+			DeviceUA:   deviceUA,
+			Time:       loginTime,
+		})
+	}
+	if err := s.emailClient.Send(toEmail, subj, html); err != nil {
+		s.logger.Error("send login email", zap.String("to", toEmail), zap.Bool("new_device", newDevice), zap.Error(err))
+	}
 }
 
 func (s *AuthService) sendWelcomeEmail(toEmail, firstName string) {

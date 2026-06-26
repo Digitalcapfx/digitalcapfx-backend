@@ -240,6 +240,26 @@ func KYCApproved(toEmail, firstName string) (subject, html string) {
 	return
 }
 
+// ─── Staff Invite ─────────────────────────────────────────────────────────────
+
+func StaffInvite(toEmail, name, role, roleLabel, inviteURL string) (subject, html string) {
+	subject = "You've been invited to join DigitalFX Staff"
+	content := fmt.Sprintf(`
+<h2>You're invited, %s!</h2>
+<p>You've been added to the <strong>DigitalFX</strong> admin platform as a <strong>%s</strong>.</p>
+<p>Click the button below to accept your invitation and activate your staff account. The link is valid for <strong>7 days</strong>.</p>
+<p style="text-align:center;margin:32px 0">
+  <a href="%s" class="btn">Accept Invitation</a>
+</p>
+<p>Or copy and paste this link into your browser:</p>
+<p style="background:#f4f6f9;border-radius:6px;padding:12px 16px;font-size:13px;word-break:break-all;color:#555">%s</p>
+<hr class="divider"/>
+<p style="font-size:13px;color:#777">If you were not expecting this invitation, you can safely ignore this email. If you have questions, contact <a href="mailto:support@digitalfx.finance" style="color:#0f3460">support@digitalfx.finance</a>.</p>
+`, name, roleLabel, inviteURL, inviteURL)
+	html = render(subject, toEmail, content)
+	return
+}
+
 // ─── KYC Rejected ─────────────────────────────────────────────────────────────
 
 func KYCRejected(toEmail, firstName, reason string) (subject, html string) {

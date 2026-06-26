@@ -69,7 +69,7 @@ func New(
 		Exchange:       NewExchangeService(pool, nilosClient, logger),
 		Activity:       NewActivityService(pool, logger),
 		Insights:       NewInsightsService(pool, caasClient, paymentsClient, logger),
-		Staff:          NewStaffService(pool, emailClient, logger),
+		Staff:          NewStaffService(pool, emailClient, cfg.App.BaseURL, logger),
 		UserManagement: NewUserManagementService(pool, logger),
 	}
 }

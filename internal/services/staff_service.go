@@ -79,11 +79,12 @@ type UpdateStaffInput struct {
 type StaffService struct {
 	pool        *pgxpool.Pool
 	emailClient *email.Client
+	baseURL     string
 	logger      *zap.Logger
 }
 
-func NewStaffService(pool *pgxpool.Pool, emailClient *email.Client, logger *zap.Logger) *StaffService {
-	return &StaffService{pool: pool, emailClient: emailClient, logger: logger}
+func NewStaffService(pool *pgxpool.Pool, emailClient *email.Client, baseURL string, logger *zap.Logger) *StaffService {
+	return &StaffService{pool: pool, emailClient: emailClient, baseURL: baseURL, logger: logger}
 }
 
 // InviteStaff creates a pending staff member record and sends an invitation email.
@@ -377,15 +378,21 @@ func mustParseUUID(s string) uuid.UUID {
 	return id
 }
 
-func (s *StaffService) sendInviteEmail(toEmail, name, role, token string) {
+func (s *StaffService) sendInviteEmail(toEmail, name, role, inviteToken string) {
 	if s.emailClient == nil {
 		return
 	}
-	s.logger.Info("sending staff invite email",
-		zap.String("to", toEmail),
-		zap.String("role", role),
-	)
-	// Actual email sending wired to emailClient.Send when email service is ready.
-	// For now this logs the intent; the token can be found in the audit log.
-	_ = token
+	roleLabel := RoleLabels[role]
+	if roleLabel == "" {
+		roleLabel = role
+	}
+	inviteURL := s.baseURL + "/staff/accept-invite?token=" + inviteToken
+	subj, html := email.StaffInvite(toEmail, name, role, roleLabel, inviteURL)
+	if err := s.emailClient.Send(toEmail, subj, html); err != nil {
+		s.logger.Error("send staff invite email",
+			zap.String("to", toEmail),
+			zap.String("role", role),
+			zap.Error(err),
+		)
+	}
 }
