@@ -310,8 +310,16 @@ func TestGroupByCalendarDay_Empty(t *testing.T) {
 	}
 }
 
+// middayToday returns today at 12:00 local time so hour offsets in these
+// tests never cross a calendar-day boundary, and dayLabel's internal
+// time.Now() comparisons agree regardless of when the tests run.
+func middayToday() time.Time {
+	n := time.Now()
+	return time.Date(n.Year(), n.Month(), n.Day(), 12, 0, 0, 0, time.Local)
+}
+
 func TestGroupByCalendarDay_SingleDay(t *testing.T) {
-	now := time.Now()
+	now := middayToday()
 	entries := []ActivityEntry{
 		makeEntry("1", now, "sent"),
 		makeEntry("2", now.Add(-time.Hour), "received"),
@@ -330,7 +338,7 @@ func TestGroupByCalendarDay_SingleDay(t *testing.T) {
 }
 
 func TestGroupByCalendarDay_MultipleDays(t *testing.T) {
-	now := time.Now()
+	now := middayToday()
 	yesterday := now.AddDate(0, 0, -1)
 	twoDaysAgo := now.AddDate(0, 0, -2)
 

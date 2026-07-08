@@ -1,5 +1,83 @@
 basePath: /api/v1
 definitions:
+  db.CaasWithdrawal:
+    properties:
+      amount:
+        type: string
+      caas_withdrawal_id:
+        type: string
+      created_at:
+        type: string
+      id:
+        type: string
+      idempotency_key:
+        type: string
+      payout_mobile:
+        type: string
+      payout_network:
+        type: string
+      phone:
+        type: string
+      status:
+        type: string
+      token:
+        type: string
+      updated_at:
+        type: string
+      user_id:
+        type: string
+    type: object
+  db.MerchantStaff:
+    properties:
+      business_user_id:
+        type: string
+      created_at:
+        type: string
+      email:
+        type: string
+      id:
+        type: string
+      invite_token:
+        type: string
+      role:
+        type: string
+      staff_user_id:
+        type: string
+      status:
+        type: string
+      updated_at:
+        type: string
+    type: object
+  db.PointsLedger:
+    properties:
+      amount:
+        type: integer
+      created_at:
+        type: string
+      description:
+        type: string
+      id:
+        type: string
+      user_id:
+        type: string
+    type: object
+  db.WaasWallet:
+    properties:
+      address:
+        type: string
+      created_at:
+        type: string
+      id:
+        type: string
+      is_default:
+        type: boolean
+      network:
+        type: string
+      user_id:
+        type: string
+      waas_wallet_id:
+        type: string
+    type: object
   handlers.AcceptInviteRequest:
     properties:
       token:
@@ -333,6 +411,21 @@ definitions:
         example: EUR
         type: string
     type: object
+  handlers.ExecuteSwapRequest:
+    properties:
+      amount_in:
+        type: string
+      amount_out_min:
+        type: string
+      from_chain:
+        type: string
+      from_token:
+        type: string
+      to_chain:
+        type: string
+      to_token:
+        type: string
+    type: object
   handlers.FiatWithdrawalResponse:
     type: object
   handlers.ForgotPINRequest:
@@ -544,6 +637,19 @@ definitions:
         example: compliance
         type: string
     type: object
+  handlers.InviteTeamMemberRequest:
+    properties:
+      email:
+        example: staff@acme.example.com
+        type: string
+      role:
+        enum:
+        - manager
+        - developer
+        - viewer
+        example: manager
+        type: string
+    type: object
   handlers.KYCDocumentData:
     properties:
       created_at:
@@ -672,6 +778,32 @@ definitions:
         example: 5
         type: integer
     type: object
+  handlers.PaymentsWebhookData:
+    properties:
+      address:
+        type: string
+      amount:
+        type: string
+      currency:
+        type: string
+      customer_id:
+        type: string
+      network:
+        type: string
+      safe_to_credit:
+        type: boolean
+      status:
+        type: string
+      tx_hash:
+        type: string
+    type: object
+  handlers.PaymentsWebhookPayload:
+    properties:
+      data:
+        $ref: '#/definitions/handlers.PaymentsWebhookData'
+      event:
+        type: string
+    type: object
   handlers.ProfileData:
     properties:
       avatar_url:
@@ -722,11 +854,39 @@ definitions:
     type: object
   handlers.RegisterRequest:
     properties:
+      account_type:
+        description: '"individual" (default) | "business"'
+        example: individual
+        type: string
+      annual_revenue:
+        example: $50k-$500k
+        type: string
+      business_website:
+        example: https://acme.example.com
+        type: string
+      company_legal_name:
+        description: Business accounts only — company-level KYB fields collected at
+          signup.
+        example: Acme SARL
+        type: string
+      company_registration_no:
+        example: RC/DLA/2020/B/1234
+        type: string
+      country:
+        description: ISO 3166-1 alpha-2
+        example: CM
+        type: string
+      country_of_incorporation:
+        example: CM
+        type: string
       email:
         example: alice@example.com
         type: string
       first_name:
         example: Alice
+        type: string
+      industry:
+        example: fintech
         type: string
       last_name:
         example: Dupont
@@ -749,6 +909,34 @@ definitions:
       new_pin:
         example: "654321"
         type: string
+    type: object
+  handlers.RolePermissionsEntry:
+    properties:
+      permissions:
+        example:
+        - team:view
+        - team:invite
+        items:
+          type: string
+        type: array
+      role:
+        example: manager
+        type: string
+    type: object
+  handlers.RolesPermissionsData:
+    properties:
+      roles:
+        items:
+          $ref: '#/definitions/handlers.RolePermissionsEntry'
+        type: array
+    type: object
+  handlers.RolesPermissionsResponse:
+    properties:
+      data:
+        $ref: '#/definitions/handlers.RolesPermissionsData'
+      success:
+        example: true
+        type: boolean
     type: object
   handlers.SaveBeneficiaryRequestBody:
     properties:
@@ -807,6 +995,32 @@ definitions:
       ref:
         example: a1b2c3d4-totp-pending-ref
         type: string
+    type: object
+  handlers.TeamInviteData:
+    properties:
+      invite_token:
+        example: inv_8f3a2b...
+        type: string
+      staff:
+        $ref: '#/definitions/db.MerchantStaff'
+    type: object
+  handlers.TeamInviteResponse:
+    properties:
+      data:
+        $ref: '#/definitions/handlers.TeamInviteData'
+      success:
+        example: true
+        type: boolean
+    type: object
+  handlers.TeamMemberResponse:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/db.MerchantStaff'
+        type: array
+      success:
+        example: true
+        type: boolean
     type: object
   handlers.TokenPairData:
     properties:
@@ -927,6 +1141,16 @@ definitions:
         example: Cameroonian
         type: string
     type: object
+  handlers.UpdateRoleRequest:
+    properties:
+      role:
+        enum:
+        - manager
+        - developer
+        - viewer
+        example: developer
+        type: string
+    type: object
   handlers.UpdateStaffRequest:
     properties:
       custom_permissions:
@@ -1005,6 +1229,34 @@ definitions:
         example: true
         type: boolean
     type: object
+  handlers.WithdrawCryptoRequest:
+    properties:
+      amount:
+        description: Amount is the stablecoin amount to withdraw (decimal string)
+        example: "50.00"
+        type: string
+      payout_mobile:
+        description: PayoutMobile is the Mobile Money number to disburse fiat to (E.164)
+        example: "+22507000000"
+        type: string
+      payout_network:
+        description: PayoutNetwork is the MNO operator
+        enum:
+        - Orange
+        - MTN
+        - Wave
+        - Moov
+        - Airtel
+        example: MTN
+        type: string
+      token:
+        description: Token must be USDT or USDC
+        enum:
+        - USDC
+        - USDT
+        example: USDC
+        type: string
+    type: object
   handlers.WithdrawalListResponse:
     type: object
   handlers.WithdrawalQuoteData:
@@ -1033,6 +1285,129 @@ definitions:
         type: string
       phone:
         example: "+237612345678"
+        type: string
+    type: object
+  payments.ExecuteSwapResponse:
+    properties:
+      status:
+        type: string
+      tx_hash:
+        type: string
+    type: object
+  payments.GetSwapHistoryResponse:
+    properties:
+      limit:
+        type: integer
+      page:
+        type: integer
+      swaps:
+        items:
+          $ref: '#/definitions/payments.SwapRecord'
+        type: array
+      total:
+        type: integer
+    type: object
+  payments.SwapQuoteResponse:
+    properties:
+      estimated_seconds:
+        type: number
+      expires_at:
+        type: integer
+      from_amount:
+        type: string
+      from_chain:
+        type: string
+      from_token:
+        type: string
+      platform_fee:
+        type: string
+      to_amount_expected:
+        type: string
+      to_amount_min:
+        type: string
+      to_chain:
+        type: string
+      to_token:
+        type: string
+    type: object
+  payments.SwapRecord:
+    properties:
+      amount_in:
+        type: string
+      amount_out:
+        type: string
+      approve_tx_hash:
+        type: string
+      confirmed_at:
+        type: string
+      created_at:
+        type: string
+      customer_id:
+        type: string
+      dex:
+        type: string
+      error_msg:
+        type: string
+      from_chain:
+        type: string
+      id:
+        type: integer
+      platform_fee:
+        type: string
+      router_address:
+        type: string
+      status:
+        description: pending | confirmed | failed
+        type: string
+      swap_tx_hash:
+        type: string
+      to_chain:
+        type: string
+      token_in:
+        type: string
+      token_out:
+        type: string
+      type:
+        description: '"dex" | "bridge"'
+        type: string
+      updated_at:
+        type: string
+    type: object
+  services.PointsHistoryResponse:
+    properties:
+      history:
+        items:
+          $ref: '#/definitions/db.PointsLedger'
+        type: array
+      limit:
+        type: integer
+      page:
+        type: integer
+    type: object
+  services.ReferralData:
+    properties:
+      count:
+        type: integer
+      points:
+        type: integer
+      referral_code:
+        type: string
+      referrals:
+        items:
+          $ref: '#/definitions/services.ReferralItem'
+        type: array
+    type: object
+  services.ReferralItem:
+    properties:
+      created_at:
+        type: string
+      email:
+        type: string
+      first_name:
+        type: string
+      id:
+        type: string
+      last_name:
         type: string
     type: object
 host: localhost:8080
@@ -1201,17 +1576,31 @@ paths:
       - accounts
   /activity:
     get:
-      description: Paginated list of all transactions across fiat (Nilos), crypto
-        (Rach Payments WaaS), and stablecoin (Rach CaaS). Each item carries type (credit/debit/exchange),
-        asset symbol, formatted amount, status, and counterparty name where available.
+      description: Unified, filterable transaction feed across all wallet types (fiat,
+        crypto, stablecoin). Results are grouped by calendar day (Today / Yesterday
+        / Monday / …). Supports a type filter tab and full-text search.
       parameters:
-      - description: Page number (default 1)
+      - description: Filter
+        enum:
+        - sent
+        - received
+        - exchanged
+        - deposited
+        - withdrawn
+        in: query
+        name: type
+        type: string
+      - description: Search description, asset, or counterparty
+        in: query
+        name: search
+        type: string
+      - description: Page (default 1)
         in: query
         name: page
         type: integer
-      - description: Items per page (default 20, max 50)
+      - description: Results per page (default 20)
         in: query
-        name: per_page
+        name: limit
         type: integer
       produces:
       - application/json
@@ -1219,6 +1608,7 @@ paths:
         "200":
           description: OK
           schema:
+            additionalProperties: true
             type: object
         "401":
           description: Unauthorized
@@ -1226,9 +1616,9 @@ paths:
             $ref: '#/definitions/handlers.ErrorResponse'
       security:
       - BearerAuth: []
-      summary: Unified activity feed
+      summary: Activity feed
       tags:
-      - dashboard
+      - activity
   /admin/audit-log:
     get:
       description: Returns paginated log of all admin actions (KYC decisions, user
@@ -2258,8 +2648,10 @@ paths:
     post:
       consumes:
       - application/json
-      description: Creates a new user account, provisions fiat accounts, and returns
-        a JWT pair. A welcome email and email verification OTP are sent asynchronously.
+      description: Creates a new user account (individual or business), provisions
+        fiat accounts, and returns a JWT pair. Set account_type to "individual" or
+        "business". Business accounts require company-level fields; director info
+        and documents are submitted post-signup via /business/* endpoints.
       parameters:
       - description: New user details
         in: body
@@ -2562,6 +2954,43 @@ paths:
       security:
       - BearerAuth: []
       summary: Get or create ERC-4337 abstraction wallet
+      tags:
+      - crypto
+  /crypto/withdraw:
+    post:
+      consumes:
+      - application/json
+      description: Initiates a stablecoin (USDC/USDT) off-ramp withdrawal from the
+        user's ERC-4337 Smart Contract Wallet to their Mobile Money number.
+      parameters:
+      - description: Withdrawal details
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.WithdrawCryptoRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/db.CaasWithdrawal'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Initiate stablecoin off-ramp withdrawal
       tags:
       - crypto
   /dashboard:
@@ -3097,6 +3526,63 @@ paths:
       summary: Update preferences
       tags:
       - preferences
+  /referrals:
+    get:
+      description: Returns the authenticated user's referral code, aggregate reward
+        points, total referrals count, and list of referred users.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/services.ReferralData'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get referral details
+      tags:
+      - referrals
+  /referrals/points/ledger:
+    get:
+      description: Returns a paginated list of point ledger entries (credits and debits)
+        for the authenticated user.
+      parameters:
+      - description: Page number (default 1)
+        in: query
+        name: page
+        type: integer
+      - description: Page limit (default 20)
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/services.PointsHistoryResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get reward points history
+      tags:
+      - referrals
   /security:
     get:
       description: Returns whether 2FA and biometrics are enabled for the authenticated
@@ -3465,6 +3951,182 @@ paths:
       summary: Reply to a ticket
       tags:
       - support
+  /team:
+    get:
+      description: Returns all staff members invited or active for this business.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/handlers.TeamMemberResponse'
+            type: array
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List team members
+      tags:
+      - team
+  /team/{id}:
+    delete:
+      description: Removes a staff member from the business account.
+      parameters:
+      - description: Staff member ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Remove a team member
+      tags:
+      - team
+  /team/{id}/role:
+    put:
+      consumes:
+      - application/json
+      description: Updates the role of an existing staff member within the business
+        account.
+      parameters:
+      - description: Staff member ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: New role
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.UpdateRoleRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.MessageResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Update a team member's role
+      tags:
+      - team
+  /team/accept-invite:
+    post:
+      consumes:
+      - application/json
+      description: Links an authenticated user to a pending staff invite using the
+        invite token.
+      parameters:
+      - description: Invite token
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.AcceptInviteRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.MessageResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Accept a team invite
+      tags:
+      - team
+  /team/invite:
+    post:
+      consumes:
+      - application/json
+      description: Sends an invite to a new staff member for this business account.
+      parameters:
+      - description: Invite details
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.InviteTeamMemberRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/handlers.TeamInviteResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Invite a team member
+      tags:
+      - team
+  /team/roles-permissions:
+    get:
+      description: Returns all available roles and the permissions they carry.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.RolesPermissionsResponse'
+      summary: Get available roles and permissions
+      tags:
+      - team
   /transfers/exchange:
     post:
       consumes:
@@ -3624,7 +4286,7 @@ paths:
       - wallets
   /wallets/{walletId}/address:
     get:
-      description: Returns the deposit address for the specified wallet ID.
+      description: Returns the deposit address details for the specified wallet ID.
       parameters:
       - description: Wallet UUID
         in: path
@@ -3637,7 +4299,11 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/handlers.WalletResponse'
+            $ref: '#/definitions/db.WaasWallet'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
         "401":
           description: Unauthorized
           schema:
@@ -3960,12 +4626,135 @@ paths:
       summary: Supported assets
       tags:
       - wallets
+  /wallets/swap/execute:
+    post:
+      consumes:
+      - application/json
+      description: Broadcasts a swap transaction from the caller's WaaS wallet using
+        a previously quoted route.
+      parameters:
+      - description: Swap details
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.ExecuteSwapRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/payments.ExecuteSwapResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Execute a WaaS token swap
+      tags:
+      - wallets
+  /wallets/swap/history:
+    get:
+      description: Returns the caller's paginated swap transaction history.
+      parameters:
+      - description: Page number (default 1)
+        in: query
+        name: page
+        type: integer
+      - description: Results per page (default 20)
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/payments.GetSwapHistoryResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get WaaS swap history
+      tags:
+      - wallets
+  /wallets/swap/quote:
+    get:
+      description: Returns a rate quote for swapping tokens across chains using WaaS
+        swap.
+      parameters:
+      - description: Source chain
+        in: query
+        name: from_chain
+        required: true
+        type: string
+      - description: Destination chain
+        in: query
+        name: to_chain
+        required: true
+        type: string
+      - description: Source token
+        in: query
+        name: from_token
+        required: true
+        type: string
+      - description: Destination token
+        in: query
+        name: to_token
+        required: true
+        type: string
+      - description: Amount in base units
+        in: query
+        name: amount_in
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/payments.SwapQuoteResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get a WaaS token swap quote
+      tags:
+      - wallets
   /wallets/withdraw:
     post:
       consumes:
       - application/json
       description: Initiates a Mobile Money disbursement (withdrawal) via HUB2, debiting
-        the user's fiat account. Returns the HUB2 reference for tracking.
+        the user's fiat balance.
       parameters:
       - description: Withdrawal details
         in: body
@@ -4057,6 +4846,38 @@ paths:
           schema:
             $ref: '#/definitions/handlers.ErrorResponse'
       summary: MetaMap verification webhook
+      tags:
+      - webhooks
+  /webhooks/payments:
+    post:
+      consumes:
+      - application/json
+      description: Handles transaction updates (detected/confirmed deposits) pushed
+        by the Payments WaaS microservice.
+      parameters:
+      - description: 'HMAC-SHA256 signature: hex'
+        in: header
+        name: X-Webhook-Signature
+        required: true
+        type: string
+      - description: Webhook payload
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.PaymentsWebhookPayload'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.MessageResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      summary: Rach WaaS Webhook
       tags:
       - webhooks
   /withdrawals:

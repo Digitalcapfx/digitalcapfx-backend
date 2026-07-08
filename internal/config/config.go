@@ -21,6 +21,8 @@ type Config struct {
 	GCP         GCPConfig
 	Brevo       BrevoConfig
 	MetaMap     MetaMapConfig
+	Sumsub      SumsubConfig
+	KYCProvider string // "metamap" (default) | "sumsub"
 	Google      GoogleConfig
 	Nilos       NilosConfig
 }
@@ -54,8 +56,10 @@ type JWTConfig struct {
 
 // PaymentsAPIConfig points to the Rach Payments service (WaaS).
 type PaymentsAPIConfig struct {
-	BaseURL string
-	APIKey  string
+	BaseURL       string
+	APIKey        string
+	WebhookSecret string
+	MarketDataURL string
 }
 
 // CaaSConfig points to the Rach CaaS service (abstraction wallets / P2P by phone).
@@ -93,6 +97,14 @@ type MetaMapConfig struct {
 	ClientID      string
 	ClientSecret  string
 	FlowID        string
+	WebhookSecret string
+}
+
+// SumsubConfig holds credentials for Sumsub identity verification.
+type SumsubConfig struct {
+	AppToken      string
+	SecretKey     string
+	LevelName     string
 	WebhookSecret string
 }
 
@@ -142,6 +154,8 @@ func Load() (*Config, error) {
 
 	cfg.PaymentsAPI.BaseURL = require("PAYMENTS_API_URL")
 	cfg.PaymentsAPI.APIKey = require("PAYMENTS_API_KEY")
+	cfg.PaymentsAPI.WebhookSecret = getEnv("PAYMENTS_WEBHOOK_SECRET", "")
+	cfg.PaymentsAPI.MarketDataURL = getEnv("PAYMENTS_MARKET_DATA_URL", "http://localhost:8090")
 
 	cfg.CaaS.BaseURL = require("CAAS_API_URL")
 	cfg.CaaS.APIKey = require("CAAS_API_KEY")
@@ -165,6 +179,12 @@ func Load() (*Config, error) {
 	cfg.MetaMap.ClientSecret = getEnv("METAMAP_CLIENT_SECRET", "")
 	cfg.MetaMap.FlowID = getEnv("METAMAP_FLOW_ID", "")
 	cfg.MetaMap.WebhookSecret = getEnv("METAMAP_WEBHOOK_SECRET", "")
+
+	cfg.Sumsub.AppToken = getEnv("SUMSUB_APP_TOKEN", "")
+	cfg.Sumsub.SecretKey = getEnv("SUMSUB_SECRET_KEY", "")
+	cfg.Sumsub.LevelName = getEnv("SUMSUB_LEVEL_NAME", "basic-kyc-level")
+	cfg.Sumsub.WebhookSecret = getEnv("SUMSUB_WEBHOOK_SECRET", "")
+	cfg.KYCProvider = getEnv("KYC_PROVIDER", "metamap")
 
 	cfg.Google.ClientID = getEnv("GOOGLE_CLIENT_ID", "")
 

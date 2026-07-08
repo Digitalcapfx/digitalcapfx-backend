@@ -252,25 +252,44 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Paginated list of all transactions across fiat (Nilos), crypto (Rach Payments WaaS), and stablecoin (Rach CaaS). Each item carries type (credit/debit/exchange), asset symbol, formatted amount, status, and counterparty name where available.",
+                "description": "Unified, filterable transaction feed across all wallet types (fiat, crypto, stablecoin). Results are grouped by calendar day (Today / Yesterday / Monday / …). Supports a type filter tab and full-text search.",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
-                    "dashboard"
+                    "activity"
                 ],
-                "summary": "Unified activity feed",
+                "summary": "Activity feed",
                 "parameters": [
                     {
+                        "enum": [
+                            "sent",
+                            "received",
+                            "exchanged",
+                            "deposited",
+                            "withdrawn"
+                        ],
+                        "type": "string",
+                        "description": "Filter",
+                        "name": "type",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Search description, asset, or counterparty",
+                        "name": "search",
+                        "in": "query"
+                    },
+                    {
                         "type": "integer",
-                        "description": "Page number (default 1)",
+                        "description": "Page (default 1)",
                         "name": "page",
                         "in": "query"
                     },
                     {
                         "type": "integer",
-                        "description": "Items per page (default 20, max 50)",
-                        "name": "per_page",
+                        "description": "Results per page (default 20)",
+                        "name": "limit",
                         "in": "query"
                     }
                 ],
@@ -278,7 +297,8 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "type": "object"
+                            "type": "object",
+                            "additionalProperties": true
                         }
                     },
                     "401": {
@@ -1834,7 +1854,7 @@ const docTemplate = `{
         },
         "/auth/register": {
             "post": {
-                "description": "Creates a new user account, provisions fiat accounts, and returns a JWT pair. A welcome email and email verification OTP are sent asynchronously.",
+                "description": "Creates a new user account (individual or business), provisions fiat accounts, and returns a JWT pair. Set account_type to \"individual\" or \"business\". Business accounts require company-level fields; director info and documents are submitted post-signup via /business/* endpoints.",
                 "consumes": [
                     "application/json"
                 ],
@@ -2275,6 +2295,63 @@ const docTemplate = `{
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/handlers.CaasWalletResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/crypto/withdraw": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Initiates a stablecoin (USDC/USDT) off-ramp withdrawal from the user's ERC-4337 Smart Contract Wallet to their Mobile Money number.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "crypto"
+                ],
+                "summary": "Initiate stablecoin off-ramp withdrawal",
+                "parameters": [
+                    {
+                        "description": "Withdrawal details",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.WithdrawCryptoRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/db.CaasWithdrawal"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
                         }
                     },
                     "401": {
@@ -3090,6 +3167,94 @@ const docTemplate = `{
                 }
             }
         },
+        "/referrals": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns the authenticated user's referral code, aggregate reward points, total referrals count, and list of referred users.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "referrals"
+                ],
+                "summary": "Get referral details",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/services.ReferralData"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/referrals/points/ledger": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns a paginated list of point ledger entries (credits and debits) for the authenticated user.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "referrals"
+                ],
+                "summary": "Get reward points history",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Page number (default 1)",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Page limit (default 20)",
+                        "name": "limit",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/services.PointsHistoryResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/security": {
             "get": {
                 "security": [
@@ -3642,6 +3807,281 @@ const docTemplate = `{
                     },
                     "400": {
                         "description": "Ticket resolved/closed",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/team": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns all staff members invited or active for this business.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "team"
+                ],
+                "summary": "List team members",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/handlers.TeamMemberResponse"
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/team/accept-invite": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Links an authenticated user to a pending staff invite using the invite token.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "team"
+                ],
+                "summary": "Accept a team invite",
+                "parameters": [
+                    {
+                        "description": "Invite token",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.AcceptInviteRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.MessageResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/team/invite": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Sends an invite to a new staff member for this business account.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "team"
+                ],
+                "summary": "Invite a team member",
+                "parameters": [
+                    {
+                        "description": "Invite details",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.InviteTeamMemberRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.TeamInviteResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/team/roles-permissions": {
+            "get": {
+                "description": "Returns all available roles and the permissions they carry.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "team"
+                ],
+                "summary": "Get available roles and permissions",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.RolesPermissionsResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/team/{id}": {
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Removes a staff member from the business account.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "team"
+                ],
+                "summary": "Remove a team member",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Staff member ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/team/{id}/role": {
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Updates the role of an existing staff member within the business account.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "team"
+                ],
+                "summary": "Update a team member's role",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Staff member ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "New role",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.UpdateRoleRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.MessageResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
                         "schema": {
                             "$ref": "#/definitions/handlers.ErrorResponse"
                         }
@@ -4363,6 +4803,194 @@ const docTemplate = `{
                 }
             }
         },
+        "/wallets/swap/execute": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Broadcasts a swap transaction from the caller's WaaS wallet using a previously quoted route.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "wallets"
+                ],
+                "summary": "Execute a WaaS token swap",
+                "parameters": [
+                    {
+                        "description": "Swap details",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ExecuteSwapRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/payments.ExecuteSwapResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/wallets/swap/history": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns the caller's paginated swap transaction history.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "wallets"
+                ],
+                "summary": "Get WaaS swap history",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Page number (default 1)",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Results per page (default 20)",
+                        "name": "limit",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/payments.GetSwapHistoryResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/wallets/swap/quote": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns a rate quote for swapping tokens across chains using WaaS swap.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "wallets"
+                ],
+                "summary": "Get a WaaS token swap quote",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Source chain",
+                        "name": "from_chain",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Destination chain",
+                        "name": "to_chain",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Source token",
+                        "name": "from_token",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Destination token",
+                        "name": "to_token",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Amount in base units",
+                        "name": "amount_in",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/payments.SwapQuoteResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/wallets/withdraw": {
             "post": {
                 "security": [
@@ -4370,7 +4998,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Initiates a Mobile Money disbursement (withdrawal) via HUB2, debiting the user's fiat account. Returns the HUB2 reference for tracking.",
+                "description": "Initiates a Mobile Money disbursement (withdrawal) via HUB2, debiting the user's fiat balance.",
                 "consumes": [
                     "application/json"
                 ],
@@ -4427,7 +5055,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Returns the deposit address for the specified wallet ID.",
+                "description": "Returns the deposit address details for the specified wallet ID.",
                 "produces": [
                     "application/json"
                 ],
@@ -4448,7 +5076,13 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/handlers.WalletResponse"
+                            "$ref": "#/definitions/db.WaasWallet"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
                         }
                     },
                     "401": {
@@ -4538,6 +5172,53 @@ const docTemplate = `{
                     "webhooks"
                 ],
                 "summary": "MetaMap verification webhook",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.MessageResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/webhooks/payments": {
+            "post": {
+                "description": "Handles transaction updates (detected/confirmed deposits) pushed by the Payments WaaS microservice.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "webhooks"
+                ],
+                "summary": "Rach WaaS Webhook",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "HMAC-SHA256 signature: hex",
+                        "name": "X-Webhook-Signature",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "description": "Webhook payload",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.PaymentsWebhookPayload"
+                        }
+                    }
+                ],
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -4850,6 +5531,125 @@ const docTemplate = `{
         }
     },
     "definitions": {
+        "db.CaasWithdrawal": {
+            "type": "object",
+            "properties": {
+                "amount": {
+                    "type": "string"
+                },
+                "caas_withdrawal_id": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "idempotency_key": {
+                    "type": "string"
+                },
+                "payout_mobile": {
+                    "type": "string"
+                },
+                "payout_network": {
+                    "type": "string"
+                },
+                "phone": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "token": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "user_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "db.MerchantStaff": {
+            "type": "object",
+            "properties": {
+                "business_user_id": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "email": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "invite_token": {
+                    "type": "string"
+                },
+                "role": {
+                    "type": "string"
+                },
+                "staff_user_id": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                }
+            }
+        },
+        "db.PointsLedger": {
+            "type": "object",
+            "properties": {
+                "amount": {
+                    "type": "integer"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "user_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "db.WaasWallet": {
+            "type": "object",
+            "properties": {
+                "address": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "is_default": {
+                    "type": "boolean"
+                },
+                "network": {
+                    "type": "string"
+                },
+                "user_id": {
+                    "type": "string"
+                },
+                "waas_wallet_id": {
+                    "type": "string"
+                }
+            }
+        },
         "handlers.AcceptInviteRequest": {
             "type": "object",
             "properties": {
@@ -5311,6 +6111,29 @@ const docTemplate = `{
                 }
             }
         },
+        "handlers.ExecuteSwapRequest": {
+            "type": "object",
+            "properties": {
+                "amount_in": {
+                    "type": "string"
+                },
+                "amount_out_min": {
+                    "type": "string"
+                },
+                "from_chain": {
+                    "type": "string"
+                },
+                "from_token": {
+                    "type": "string"
+                },
+                "to_chain": {
+                    "type": "string"
+                },
+                "to_token": {
+                    "type": "string"
+                }
+            }
+        },
         "handlers.FiatWithdrawalResponse": {
             "type": "object"
         },
@@ -5605,6 +6428,24 @@ const docTemplate = `{
                 }
             }
         },
+        "handlers.InviteTeamMemberRequest": {
+            "type": "object",
+            "properties": {
+                "email": {
+                    "type": "string",
+                    "example": "staff@acme.example.com"
+                },
+                "role": {
+                    "type": "string",
+                    "enum": [
+                        "manager",
+                        "developer",
+                        "viewer"
+                    ],
+                    "example": "manager"
+                }
+            }
+        },
         "handlers.KYCDocumentData": {
             "type": "object",
             "properties": {
@@ -5787,6 +6628,46 @@ const docTemplate = `{
                 }
             }
         },
+        "handlers.PaymentsWebhookData": {
+            "type": "object",
+            "properties": {
+                "address": {
+                    "type": "string"
+                },
+                "amount": {
+                    "type": "string"
+                },
+                "currency": {
+                    "type": "string"
+                },
+                "customer_id": {
+                    "type": "string"
+                },
+                "network": {
+                    "type": "string"
+                },
+                "safe_to_credit": {
+                    "type": "boolean"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "tx_hash": {
+                    "type": "string"
+                }
+            }
+        },
+        "handlers.PaymentsWebhookPayload": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "$ref": "#/definitions/handlers.PaymentsWebhookData"
+                },
+                "event": {
+                    "type": "string"
+                }
+            }
+        },
         "handlers.ProfileData": {
             "type": "object",
             "properties": {
@@ -5858,6 +6739,37 @@ const docTemplate = `{
         "handlers.RegisterRequest": {
             "type": "object",
             "properties": {
+                "account_type": {
+                    "description": "\"individual\" (default) | \"business\"",
+                    "type": "string",
+                    "example": "individual"
+                },
+                "annual_revenue": {
+                    "type": "string",
+                    "example": "$50k-$500k"
+                },
+                "business_website": {
+                    "type": "string",
+                    "example": "https://acme.example.com"
+                },
+                "company_legal_name": {
+                    "description": "Business accounts only — company-level KYB fields collected at signup.",
+                    "type": "string",
+                    "example": "Acme SARL"
+                },
+                "company_registration_no": {
+                    "type": "string",
+                    "example": "RC/DLA/2020/B/1234"
+                },
+                "country": {
+                    "description": "ISO 3166-1 alpha-2",
+                    "type": "string",
+                    "example": "CM"
+                },
+                "country_of_incorporation": {
+                    "type": "string",
+                    "example": "CM"
+                },
                 "email": {
                     "type": "string",
                     "example": "alice@example.com"
@@ -5865,6 +6777,10 @@ const docTemplate = `{
                 "first_name": {
                     "type": "string",
                     "example": "Alice"
+                },
+                "industry": {
+                    "type": "string",
+                    "example": "fintech"
                 },
                 "last_name": {
                     "type": "string",
@@ -5894,6 +6810,48 @@ const docTemplate = `{
                 "new_pin": {
                     "type": "string",
                     "example": "654321"
+                }
+            }
+        },
+        "handlers.RolePermissionsEntry": {
+            "type": "object",
+            "properties": {
+                "permissions": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "example": [
+                        "team:view",
+                        "team:invite"
+                    ]
+                },
+                "role": {
+                    "type": "string",
+                    "example": "manager"
+                }
+            }
+        },
+        "handlers.RolesPermissionsData": {
+            "type": "object",
+            "properties": {
+                "roles": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/handlers.RolePermissionsEntry"
+                    }
+                }
+            }
+        },
+        "handlers.RolesPermissionsResponse": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "$ref": "#/definitions/handlers.RolesPermissionsData"
+                },
+                "success": {
+                    "type": "boolean",
+                    "example": true
                 }
             }
         },
@@ -5979,6 +6937,45 @@ const docTemplate = `{
                 "ref": {
                     "type": "string",
                     "example": "a1b2c3d4-totp-pending-ref"
+                }
+            }
+        },
+        "handlers.TeamInviteData": {
+            "type": "object",
+            "properties": {
+                "invite_token": {
+                    "type": "string",
+                    "example": "inv_8f3a2b..."
+                },
+                "staff": {
+                    "$ref": "#/definitions/db.MerchantStaff"
+                }
+            }
+        },
+        "handlers.TeamInviteResponse": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "$ref": "#/definitions/handlers.TeamInviteData"
+                },
+                "success": {
+                    "type": "boolean",
+                    "example": true
+                }
+            }
+        },
+        "handlers.TeamMemberResponse": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/db.MerchantStaff"
+                    }
+                },
+                "success": {
+                    "type": "boolean",
+                    "example": true
                 }
             }
         },
@@ -6148,6 +7145,20 @@ const docTemplate = `{
                 }
             }
         },
+        "handlers.UpdateRoleRequest": {
+            "type": "object",
+            "properties": {
+                "role": {
+                    "type": "string",
+                    "enum": [
+                        "manager",
+                        "developer",
+                        "viewer"
+                    ],
+                    "example": "developer"
+                }
+            }
+        },
         "handlers.UpdateStaffRequest": {
             "type": "object",
             "properties": {
@@ -6261,6 +7272,42 @@ const docTemplate = `{
                 }
             }
         },
+        "handlers.WithdrawCryptoRequest": {
+            "type": "object",
+            "properties": {
+                "amount": {
+                    "description": "Amount is the stablecoin amount to withdraw (decimal string)",
+                    "type": "string",
+                    "example": "50.00"
+                },
+                "payout_mobile": {
+                    "description": "PayoutMobile is the Mobile Money number to disburse fiat to (E.164)",
+                    "type": "string",
+                    "example": "+22507000000"
+                },
+                "payout_network": {
+                    "description": "PayoutNetwork is the MNO operator",
+                    "type": "string",
+                    "enum": [
+                        "Orange",
+                        "MTN",
+                        "Wave",
+                        "Moov",
+                        "Airtel"
+                    ],
+                    "example": "MTN"
+                },
+                "token": {
+                    "description": "Token must be USDT or USDC",
+                    "type": "string",
+                    "enum": [
+                        "USDC",
+                        "USDT"
+                    ],
+                    "example": "USDC"
+                }
+            }
+        },
         "handlers.WithdrawalListResponse": {
             "type": "object"
         },
@@ -6302,6 +7349,193 @@ const docTemplate = `{
                 "phone": {
                     "type": "string",
                     "example": "+237612345678"
+                }
+            }
+        },
+        "payments.ExecuteSwapResponse": {
+            "type": "object",
+            "properties": {
+                "status": {
+                    "type": "string"
+                },
+                "tx_hash": {
+                    "type": "string"
+                }
+            }
+        },
+        "payments.GetSwapHistoryResponse": {
+            "type": "object",
+            "properties": {
+                "limit": {
+                    "type": "integer"
+                },
+                "page": {
+                    "type": "integer"
+                },
+                "swaps": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/payments.SwapRecord"
+                    }
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "payments.SwapQuoteResponse": {
+            "type": "object",
+            "properties": {
+                "estimated_seconds": {
+                    "type": "number"
+                },
+                "expires_at": {
+                    "type": "integer"
+                },
+                "from_amount": {
+                    "type": "string"
+                },
+                "from_chain": {
+                    "type": "string"
+                },
+                "from_token": {
+                    "type": "string"
+                },
+                "platform_fee": {
+                    "type": "string"
+                },
+                "to_amount_expected": {
+                    "type": "string"
+                },
+                "to_amount_min": {
+                    "type": "string"
+                },
+                "to_chain": {
+                    "type": "string"
+                },
+                "to_token": {
+                    "type": "string"
+                }
+            }
+        },
+        "payments.SwapRecord": {
+            "type": "object",
+            "properties": {
+                "amount_in": {
+                    "type": "string"
+                },
+                "amount_out": {
+                    "type": "string"
+                },
+                "approve_tx_hash": {
+                    "type": "string"
+                },
+                "confirmed_at": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "customer_id": {
+                    "type": "string"
+                },
+                "dex": {
+                    "type": "string"
+                },
+                "error_msg": {
+                    "type": "string"
+                },
+                "from_chain": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "platform_fee": {
+                    "type": "string"
+                },
+                "router_address": {
+                    "type": "string"
+                },
+                "status": {
+                    "description": "pending | confirmed | failed",
+                    "type": "string"
+                },
+                "swap_tx_hash": {
+                    "type": "string"
+                },
+                "to_chain": {
+                    "type": "string"
+                },
+                "token_in": {
+                    "type": "string"
+                },
+                "token_out": {
+                    "type": "string"
+                },
+                "type": {
+                    "description": "\"dex\" | \"bridge\"",
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                }
+            }
+        },
+        "services.PointsHistoryResponse": {
+            "type": "object",
+            "properties": {
+                "history": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/db.PointsLedger"
+                    }
+                },
+                "limit": {
+                    "type": "integer"
+                },
+                "page": {
+                    "type": "integer"
+                }
+            }
+        },
+        "services.ReferralData": {
+            "type": "object",
+            "properties": {
+                "count": {
+                    "type": "integer"
+                },
+                "points": {
+                    "type": "integer"
+                },
+                "referral_code": {
+                    "type": "string"
+                },
+                "referrals": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/services.ReferralItem"
+                    }
+                }
+            }
+        },
+        "services.ReferralItem": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "email": {
+                    "type": "string"
+                },
+                "first_name": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "last_name": {
+                    "type": "string"
                 }
             }
         }

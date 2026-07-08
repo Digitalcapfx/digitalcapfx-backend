@@ -118,14 +118,13 @@ func (s *StaffService) InviteStaff(ctx context.Context, in InviteStaffInput) (*S
 
 	inviterID := in.InviterStaffID
 	member, err := q.CreateStaffMember(ctx, db.CreateStaffMemberParams{
-		ID:                 uuid.New(),
 		Email:              in.Email,
 		Name:               in.Name,
 		Role:               in.Role,
-		CustomPermissions:  in.CustomPerms,
-		RevokedPermissions: in.RevokedPerms,
+		CustomPermissions:  permsJSON(in.CustomPerms),
+		RevokedPermissions: permsJSON(in.RevokedPerms),
 		InvitedBy:          &inviterID,
-		InviteToken:        token,
+		InviteToken:        &token,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("create staff: %w", err)
@@ -142,14 +141,14 @@ func (s *StaffService) InviteStaff(ctx context.Context, in InviteStaffInput) (*S
 		zap.String("invited_by", in.InviterStaffID.String()),
 	)
 
-	return staffToView(member), nil
+	return staffToView(db.FromAdminStaff(member)), nil
 }
 
 // AcceptInvite links a user account to the pending staff_member record.
 // Called after the invitee has registered/logged in and clicked the invite link.
 func (s *StaffService) AcceptInvite(ctx context.Context, token string, userID uuid.UUID) error {
 	q := db.New(s.pool)
-	if err := q.AcceptStaffInvite(ctx, token, userID); err != nil {
+	if err := q.AcceptStaffInvite(ctx, db.AcceptStaffInviteParams{UserID: &userID, InviteToken: &token}); err != nil {
 		return ErrInvalidInviteToken
 	}
 	return nil
@@ -162,17 +161,17 @@ func (s *StaffService) GetByID(ctx context.Context, id uuid.UUID) (*StaffMemberV
 	if err != nil {
 		return nil, ErrStaffNotFound
 	}
-	return staffToView(m), nil
+	return staffToView(db.FromAdminStaff(m)), nil
 }
 
 // GetByUserID looks up a staff member by their linked user_id (used in auth flow).
 func (s *StaffService) GetByUserID(ctx context.Context, userID uuid.UUID) (*StaffMemberView, error) {
 	q := db.New(s.pool)
-	m, err := q.GetStaffMemberByUserID(ctx, userID)
+	m, err := q.GetStaffMemberByUserID(ctx, &userID)
 	if err != nil {
 		return nil, ErrStaffNotFound
 	}
-	return staffToView(m), nil
+	return staffToView(db.FromAdminStaff(m)), nil
 }
 
 // List returns paginated staff members.
@@ -195,7 +194,7 @@ func (s *StaffService) List(ctx context.Context, includeInactive bool, page, lim
 
 	views := make([]StaffMemberView, 0, len(members))
 	for _, m := range members {
-		views = append(views, *staffToView(m))
+		views = append(views, *staffToView(db.FromAdminStaff(m)))
 	}
 	return &StaffListResult{Staff: views, Total: total, Page: page, Limit: limit}, nil
 }
@@ -221,13 +220,14 @@ func (s *StaffService) Update(ctx context.Context, id uuid.UUID, in UpdateStaffI
 	if in.Role != "" {
 		role = in.Role
 	}
+	existingView := db.FromAdminStaff(existing)
 	customPerms := in.CustomPerms
 	if customPerms == nil {
-		customPerms = existing.CustomPermissions
+		customPerms = existingView.CustomPermissions
 	}
 	revokedPerms := in.RevokedPerms
 	if revokedPerms == nil {
-		revokedPerms = existing.RevokedPermissions
+		revokedPerms = existingView.RevokedPermissions
 	}
 
 	for _, p := range append(customPerms, revokedPerms...) {
@@ -238,14 +238,14 @@ func (s *StaffService) Update(ctx context.Context, id uuid.UUID, in UpdateStaffI
 
 	updated, err := q.UpdateStaffMember(ctx, db.UpdateStaffMemberParams{
 		ID:                 id,
-		Role:               role,
-		CustomPermissions:  customPerms,
-		RevokedPermissions: revokedPerms,
+		Role:               &role,
+		CustomPermissions:  permsJSON(customPerms),
+		RevokedPermissions: permsJSON(revokedPerms),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("update staff: %w", err)
 	}
-	return staffToView(updated), nil
+	return staffToView(db.FromAdminStaff(updated)), nil
 }
 
 // Disable deactivates a staff member.
@@ -297,15 +297,14 @@ func (s *StaffService) LogAction(
 	raw, _ := json.Marshal(details)
 	q := db.New(s.pool)
 	_, err := q.CreateAdminAuditLog(ctx, db.CreateAdminAuditLogParams{
-		ID:         uuid.New(),
 		StaffID:    mustParseUUID(set.StaffID),
 		StaffName:  set.StaffName,
 		StaffEmail: set.StaffEmail,
 		Action:     action,
 		Resource:   resource,
-		ResourceID: resourceID,
+		ResourceID: ptrString(resourceID),
 		Details:    raw,
-		IPAddress:  ipAddress,
+		IPAddress:  ptrString(ipAddress),
 	})
 	if err != nil {
 		s.logger.Warn("audit log write failed", zap.Error(err))
@@ -336,11 +335,25 @@ func (s *StaffService) ListAuditLogs(
 		Offset:     offset,
 	}
 	logs, _ := q.ListAdminAuditLogs(ctx, params)
-	total, _ := q.CountAdminAuditLogs(ctx, params)
+	total, _ := q.CountAdminAuditLogs(ctx, db.CountAdminAuditLogsParams{
+		StaffID:    staffID,
+		Resource:   resource,
+		ResourceID: resourceID,
+	})
 	return logs, total, nil
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
+
+// permsJSON encodes a permission list as JSONB for the admin_staff columns.
+// nil becomes an empty JSON array rather than SQL NULL.
+func permsJSON(perms []string) []byte {
+	if perms == nil {
+		perms = []string{}
+	}
+	b, _ := json.Marshal(perms)
+	return b
+}
 
 func staffToView(m db.StaffMember) *StaffMemberView {
 	set := StaffPermissionSet{

@@ -42,3 +42,12 @@ RETURNING *;
 UPDATE accounts
 SET status = 'frozen', updated_at = NOW()
 WHERE id = $1;
+
+-- name: UpdateNilosAccountDetails :exec
+UPDATE accounts
+SET nilos_account_id = $2,
+    iban = $3,
+    bic = $4,
+    updated_at = NOW()
+WHERE id = $1;
+

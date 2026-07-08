@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"go.uber.org/zap"
 
@@ -91,10 +92,10 @@ func (s *WalletService) ListWallets(ctx context.Context, userID uuid.UUID) ([]db
 
 type DepositInput struct {
 	UserID   uuid.UUID
-	Currency string  // XAF | XOF
+	Currency string // XAF | XOF
 	Amount   float64
-	Phone    string  // user's Mobile Money number (E.164)
-	Operator string  // Orange | MTN | Wave | Moov | Airtel
+	Phone    string // user's Mobile Money number (E.164)
+	Operator string // Orange | MTN | Wave | Moov | Airtel
 }
 
 // InitiateDeposit triggers a HUB2 Mobile Money collection request.
@@ -129,12 +130,111 @@ func (s *WalletService) InitiateDeposit(ctx context.Context, in DepositInput) (s
 	return resp.Reference, nil
 }
 
+// GetSwapQuote requests a rate quote for swapping between tokens on WaaS.
+func (s *WalletService) GetSwapQuote(ctx context.Context, fromChain, toChain, fromToken, toToken, amountIn string) (*payments.SwapQuoteResponse, error) {
+	return s.paymentsClient.GetSwapQuote(ctx, payments.GetSwapQuoteParams{
+		FromChain: fromChain,
+		ToChain:   toChain,
+		FromToken: fromToken,
+		ToToken:   toToken,
+		AmountIn:  amountIn,
+	})
+}
+
+// ExecuteSwap triggers a swap transaction from the customer WaaS wallet.
+func (s *WalletService) ExecuteSwap(ctx context.Context, userID uuid.UUID, fromChain, toChain, fromToken, toToken, amountIn, amountOutMin string) (*payments.ExecuteSwapResponse, error) {
+	customerID := userID.String()
+	return s.paymentsClient.ExecuteSwap(ctx, customerID, payments.ExecuteSwapRequest{
+		FromChain:    fromChain,
+		ToChain:      toChain,
+		FromToken:    fromToken,
+		ToToken:      toToken,
+		AmountIn:     amountIn,
+		AmountOutMin: amountOutMin,
+	})
+}
+
+// GetSwapHistory returns a customer's swap transaction history logs.
+func (s *WalletService) GetSwapHistory(ctx context.Context, userID uuid.UUID, page, limit int) (*payments.GetSwapHistoryResponse, error) {
+	customerID := userID.String()
+	return s.paymentsClient.GetSwapHistory(ctx, customerID, payments.GetSwapHistoryParams{
+		Page:  page,
+		Limit: limit,
+	})
+}
+
+// GetWaasWallet retrieves a user's derived wallet details from the local DB.
+func (s *WalletService) GetWaasWallet(ctx context.Context, id, userID uuid.UUID) (db.WaasWallet, error) {
+	q := db.New(s.pool)
+	return q.GetWaasWalletByIDAndUser(ctx, db.GetWaasWalletByIDAndUserParams{
+		ID:     id,
+		UserID: userID,
+	})
+}
+
+// ExportPrivateKey exports the private key for a WaaS derived address.
+func (s *WalletService) ExportPrivateKey(ctx context.Context, userID uuid.UUID, network string, index uint32) (*payments.ExportPrivateKeyResponse, error) {
+	customerID := userID.String()
+	return s.paymentsClient.ExportPrivateKey(ctx, customerID, payments.ExportPrivateKeyRequest{
+		Network: payments.Network(network),
+		Index:   index,
+	})
+}
+
+// GetSeedPhrase reveals the mnemonic seed phrase of a user WaaS wallet.
+func (s *WalletService) GetSeedPhrase(ctx context.Context, userID uuid.UUID) (*payments.GetSeedPhraseResponse, error) {
+	customerID := userID.String()
+	return s.paymentsClient.GetSeedPhrase(ctx, customerID)
+}
+
+// ListCustomerAddresses lists all derived addresses and their live balances.
+func (s *WalletService) ListCustomerAddresses(ctx context.Context, userID uuid.UUID, refresh bool) (*payments.ListCustomerAddressesResponse, error) {
+	customerID := userID.String()
+	return s.paymentsClient.ListCustomerAddresses(ctx, customerID, refresh)
+}
+
+// EstimateGas calculates gas requirements for unauthenticated/public EVM transactions.
+func (s *WalletService) EstimateGas(ctx context.Context, network, currency, fromAddress, toAddress, amount string) (*payments.GasEstimate, error) {
+	return s.paymentsClient.EstimateGas(ctx, payments.EstimateGasRequest{
+		Network:     payments.Network(network),
+		Currency:    currency,
+		FromAddress: fromAddress,
+		ToAddress:   toAddress,
+		Amount:      amount,
+	})
+}
+
+// TransferCrypto sends crypto from the user's WaaS derived wallet to an
+// external address. Amount is in the smallest on-chain unit (e.g. wei).
+func (s *WalletService) TransferCrypto(ctx context.Context, userID uuid.UUID, network, currency, toAddress, amount string, index uint32) (*payments.TransferResponse, error) {
+	customerID := userID.String()
+	return s.paymentsClient.Transfer(ctx, customerID, payments.TransferRequest{
+		Network:   payments.Network(network),
+		Currency:  currency,
+		ToAddress: toAddress,
+		Amount:    amount,
+		Index:     index,
+	})
+}
+
+// GetWaasTransactions fetches the user's on-chain WaaS transaction history.
+func (s *WalletService) GetWaasTransactions(ctx context.Context, userID uuid.UUID, page, limit int, network, currency, status string) (*payments.GetTransactionsResponse, error) {
+	customerID := userID.String()
+	return s.paymentsClient.GetTransactions(ctx, customerID, payments.GetTransactionsParams{
+		Page:     page,
+		Limit:    limit,
+		Network:  payments.Network(network),
+		Currency: currency,
+		Status:   status,
+	})
+}
+
 type WithdrawInput struct {
 	UserID   uuid.UUID
-	Currency string  // XAF | XOF
+	Currency string // XAF | XOF
 	Amount   float64
-	Phone    string  // destination Mobile Money number (E.164)
-	Operator string  // Orange | MTN | Wave | Moov | Airtel
+	Phone    string // destination Mobile Money number (E.164)
+	Operator string // Orange | MTN | Wave | Moov | Airtel
 }
 
 // InitiateWithdrawal triggers a HUB2 Mobile Money disbursement to the user's phone.
@@ -164,4 +264,45 @@ func (s *WalletService) InitiateWithdrawal(ctx context.Context, in WithdrawInput
 	}
 
 	return resp.Reference, nil
+}
+
+// GetWalletByAddress looks up a WaaS derived wallet by its on-chain address.
+// Used by the payments deposit webhook to resolve the owning user.
+func (s *WalletService) GetWalletByAddress(ctx context.Context, address string) (db.WaasWallet, error) {
+	q := db.New(s.pool)
+	return q.GetWaasWalletByAddress(ctx, address)
+}
+
+// CreditWaasDeposit credits a confirmed on-chain deposit to the user's fiat
+// account for the given currency. amountCents is the amount in hundredths.
+func (s *WalletService) CreditWaasDeposit(ctx context.Context, userID uuid.UUID, currency string, amountCents int64, txHash string) error {
+	q := db.New(s.pool)
+
+	account, err := q.GetAccountByUserAndCurrency(ctx, db.GetAccountByUserAndCurrencyParams{
+		UserID:   userID,
+		Currency: currency,
+	})
+	if err != nil {
+		return fmt.Errorf("account not found for %s/%s: %w", userID, currency, err)
+	}
+
+	var amount pgtype.Numeric
+	if err := amount.Scan(fmt.Sprintf("%d.%02d", amountCents/100, amountCents%100)); err != nil {
+		return fmt.Errorf("encode amount: %w", err)
+	}
+
+	if _, err := q.CreditAccount(ctx, db.CreditAccountParams{
+		ID:      account.ID,
+		Balance: amount,
+	}); err != nil {
+		return fmt.Errorf("credit account %s: %w", account.ID, err)
+	}
+
+	s.logger.Info("waas deposit credited",
+		zap.String("user_id", userID.String()),
+		zap.String("currency", currency),
+		zap.Int64("amount_cents", amountCents),
+		zap.String("tx_hash", txHash),
+	)
+	return nil
 }

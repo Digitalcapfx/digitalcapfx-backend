@@ -14,18 +14,19 @@ import (
 
 // Notification type constants — used by all callers to fire events.
 const (
-	NotifLoginDetected   = "login_detected"
-	NotifWelcome         = "welcome"
-	NotifKYCSubmitted    = "kyc_submitted"
-	NotifKYCApproved     = "kyc_approved"
-	NotifKYCRejected     = "kyc_rejected"
-	NotifTransferSent    = "transfer_sent"
-	NotifTransferRecvd   = "transfer_received"
-	NotifDepositRecvd    = "deposit_received"
-	NotifWithdrawal      = "withdrawal_processed"
-	NotifCryptoSent      = "crypto_sent"
-	NotifCryptoRecvd     = "crypto_received"
-	NotifExchange        = "exchange_completed"
+	NotifLoginDetected    = "login_detected"
+	NotifWelcome          = "welcome"
+	NotifKYCSubmitted     = "kyc_submitted"
+	NotifKYCApproved      = "kyc_approved"
+	NotifKYCRejected      = "kyc_rejected"
+	NotifTransferSent     = "transfer_sent"
+	NotifTransferRecvd    = "transfer_received"
+	NotifDepositRecvd     = "deposit_received"
+	NotifDepositConfirmed = "deposit_confirmed"
+	NotifWithdrawal       = "withdrawal_processed"
+	NotifCryptoSent       = "crypto_sent"
+	NotifCryptoRecvd      = "crypto_received"
+	NotifExchange         = "exchange_completed"
 )
 
 type NotificationService struct {
@@ -99,7 +100,7 @@ func (s *NotificationService) List(ctx context.Context, userID uuid.UUID, page, 
 		return nil, fmt.Errorf("list notifications: %w", err)
 	}
 
-	total, _ := q.CountNotifications(ctx, userID, unreadOnly)
+	total, _ := q.CountNotifications(ctx, db.CountNotificationsParams{UserID: userID, UnreadOnly: unreadOnly})
 	unread, _ := q.GetUnreadNotificationCount(ctx, userID)
 
 	return &NotificationListResult{

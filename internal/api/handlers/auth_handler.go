@@ -86,7 +86,7 @@ func (h *AuthHandler) VerifyOTP(w http.ResponseWriter, r *http.Request) {
 // Register godoc
 //
 //	@Summary      Register
-//	@Description  Creates a new user account, provisions fiat accounts, and returns a JWT pair. A welcome email and email verification OTP are sent asynchronously.
+//	@Description  Creates a new user account (individual or business), provisions fiat accounts, and returns a JWT pair. Set account_type to "individual" or "business". Business accounts require company-level fields; director info and documents are submitted post-signup via /business/* endpoints.
 //	@Tags         auth
 //	@Accept       json
 //	@Produce      json
@@ -97,26 +97,47 @@ func (h *AuthHandler) VerifyOTP(w http.ResponseWriter, r *http.Request) {
 //	@Failure      500   {object}  ErrorResponse
 //	@Router       /auth/register [post]
 func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
-	var body struct {
-		Phone     string `json:"phone"`
-		Email     string `json:"email"`
-		FirstName string `json:"first_name"`
-		LastName  string `json:"last_name"`
-		PIN       string `json:"pin"`
-	}
+	var body RegisterRequest
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		response.BadRequest(w, "VALIDATION_ERROR", "invalid request body")
 		return
 	}
-	pair, err := h.svc.Auth.Register(r.Context(), services.RegisterInput{
-		Phone:     body.Phone,
-		Email:     body.Email,
-		FirstName: body.FirstName,
-		LastName:  body.LastName,
-		PIN:       body.PIN,
-		DeviceIP:  realIP(r),
-		DeviceUA:  r.UserAgent(),
-	})
+
+	// Validate required shared fields.
+	if body.Phone == "" || body.FirstName == "" || body.LastName == "" || body.PIN == "" {
+		response.BadRequest(w, "VALIDATION_ERROR", "phone, first_name, last_name, and pin are required")
+		return
+	}
+
+	in := services.RegisterInput{
+		AccountType: body.AccountType,
+		Phone:       body.Phone,
+		Email:       body.Email,
+		FirstName:   body.FirstName,
+		LastName:    body.LastName,
+		PIN:         body.PIN,
+		Country:     body.Country,
+		DeviceIP:    realIP(r),
+		DeviceUA:    r.UserAgent(),
+	}
+
+	// For business accounts, validate and attach company fields.
+	if body.AccountType == "business" {
+		if body.CompanyLegalName == "" || body.CompanyRegistrationNo == "" ||
+			body.Industry == "" || body.CountryOfIncorporation == "" || body.AnnualRevenue == "" {
+			response.BadRequest(w, "VALIDATION_ERROR",
+				"business accounts require: company_legal_name, company_registration_no, industry, country_of_incorporation, annual_revenue")
+			return
+		}
+		in.CompanyLegalName = body.CompanyLegalName
+		in.CompanyRegistrationNo = body.CompanyRegistrationNo
+		in.Industry = body.Industry
+		in.CountryOfIncorporation = body.CountryOfIncorporation
+		in.AnnualRevenue = body.AnnualRevenue
+		in.BusinessWebsite = body.BusinessWebsite
+	}
+
+	pair, err := h.svc.Auth.Register(r.Context(), in)
 	if errors.Is(err, services.ErrUserExists) {
 		response.Conflict(w, "USER_EXISTS", "a user with this phone number already exists")
 		return
@@ -178,9 +199,9 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		})
 	default:
 		notifyFromPair(r, result.Pair.AccessToken, h.cfg.JWT.Secret, h.svc, services.CreateNotificationInput{
-			Type:  services.NotifLoginDetected,
-			Title: "New Login Detected",
-			Body:  fmt.Sprintf("A sign-in was detected from %s. Not you? Change your PIN immediately.", realIP(r)),
+			Type:     services.NotifLoginDetected,
+			Title:    "New Login Detected",
+			Body:     fmt.Sprintf("A sign-in was detected from %s. Not you? Change your PIN immediately.", realIP(r)),
 			Metadata: map[string]string{"ip": realIP(r), "device": r.UserAgent()},
 		})
 		response.OK(w, result.Pair)
@@ -601,4 +622,3 @@ func notifyFromPair(r *http.Request, accessToken, jwtSecret string, svc *service
 	in.UserID = uid
 	svc.Notifications.Create(r.Context(), in)
 }
-

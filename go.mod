@@ -32,6 +32,7 @@ require (
 	github.com/mailru/easyjson v0.7.6 // indirect
 	github.com/pquerna/otp v1.5.0 // indirect
 	github.com/rogpeppe/go-internal v1.15.0 // indirect
+	github.com/sqlc-dev/pqtype v0.3.0 // indirect
 	github.com/stretchr/testify v1.8.3 // indirect
 	github.com/swaggo/files v1.0.1 // indirect
 	go.uber.org/multierr v1.10.0 // indirect

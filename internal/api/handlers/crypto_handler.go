@@ -263,3 +263,58 @@ func (h *CryptoHandler) GetTransaction(w http.ResponseWriter, r *http.Request) {
 	_ = id
 	response.OK(w, map[string]string{"message": "not implemented"})
 }
+
+// Withdraw godoc
+//
+//	@Summary      Initiate stablecoin off-ramp withdrawal
+//	@Description  Initiates a stablecoin (USDC/USDT) off-ramp withdrawal from the user's ERC-4337 Smart Contract Wallet to their Mobile Money number.
+//	@Tags         crypto
+//	@Accept       json
+//	@Produce      json
+//	@Security     BearerAuth
+//	@Param        body  body      WithdrawCryptoRequest  true  "Withdrawal details"
+//	@Success      201   {object}  db.CaasWithdrawal
+//	@Failure      400   {object}  ErrorResponse
+//	@Failure      401   {object}  ErrorResponse
+//	@Failure      500   {object}  ErrorResponse
+//	@Router       /crypto/withdraw [post]
+func (h *CryptoHandler) Withdraw(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	phone, _ := middleware.UserPhoneFromContext(r.Context())
+	if !ok {
+		response.Unauthorized(w, "unauthorized")
+		return
+	}
+
+	var body WithdrawCryptoRequest
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		response.BadRequest(w, "VALIDATION_ERROR", "invalid request body")
+		return
+	}
+	if body.Amount == "" || body.Token == "" || body.PayoutMobile == "" || body.PayoutNetwork == "" {
+		response.BadRequest(w, "VALIDATION_ERROR", "amount, token, payout_mobile, and payout_network are required")
+		return
+	}
+	if body.Token != "USDT" && body.Token != "USDC" {
+		response.BadRequest(w, "INVALID_TOKEN", "token must be USDT or USDC")
+		return
+	}
+
+	idempotencyKey := fmt.Sprintf("WTH-%s", uuid.New().String())
+
+	withdrawal, err := h.svc.Crypto.Withdraw(r.Context(), services.WithdrawCryptoInput{
+		UserID:         userID,
+		Phone:          phone,
+		Amount:         body.Amount,
+		Token:          caas.Token(body.Token),
+		PayoutMobile:   body.PayoutMobile,
+		PayoutNetwork:  body.PayoutNetwork,
+		IdempotencyKey: idempotencyKey,
+	})
+	if err != nil {
+		response.InternalError(w)
+		return
+	}
+
+	response.Created(w, withdrawal)
+}

@@ -50,6 +50,7 @@ var (
 	ErrInsufficientFiatFunds = errors.New("withdrawal: insufficient fiat balance")
 	ErrWithdrawalNotFound    = errors.New("withdrawal: not found")
 	ErrBeneficiaryNotFound   = errors.New("withdrawal: beneficiary not found")
+	ErrLimitExceeded         = errors.New("withdrawal: daily limit of $10,000 USD exceeded")
 )
 
 type WithdrawalService struct {
@@ -159,12 +160,12 @@ func (s *WithdrawalService) Quote(ctx context.Context, req WithdrawalQuoteReques
 // ─── Initiate ─────────────────────────────────────────────────────────────────
 
 type InitiateWithdrawalRequest struct {
-	SourceCurrency      string     `json:"source_currency"`
-	SourceAmount        float64    `json:"source_amount"`
-	DestinationType     string     `json:"destination_type"`
-	DestinationCurrency string     `json:"destination_currency"`
-	DestinationCountry  string     `json:"destination_country"`
-	RecipientName       string     `json:"recipient_name"`
+	SourceCurrency      string  `json:"source_currency"`
+	SourceAmount        float64 `json:"source_amount"`
+	DestinationType     string  `json:"destination_type"`
+	DestinationCurrency string  `json:"destination_currency"`
+	DestinationCountry  string  `json:"destination_country"`
+	RecipientName       string  `json:"recipient_name"`
 	// Mobile money
 	PhoneNumber string `json:"phone_number"`
 	Operator    string `json:"operator"`
@@ -192,6 +193,18 @@ func (s *WithdrawalService) Initiate(ctx context.Context, userID uuid.UUID, req 
 	avail, err := strconv.ParseFloat(acct.AvailableBalance, 64)
 	if err != nil || avail < req.SourceAmount {
 		return nil, ErrInsufficientFiatFunds
+	}
+
+	// Enforce the $10,000 rolling 24h withdrawal limit across fiat and crypto.
+	incomingUSD := req.SourceAmount
+	switch req.SourceCurrency {
+	case "EUR":
+		incomingUSD *= 1.08
+	case "GBP":
+		incomingUSD *= 1.27
+	}
+	if err := s.checkDailyLimit(ctx, userID, incomingUSD); err != nil {
+		return nil, err
 	}
 
 	// Calculate fee and destination amount.
@@ -678,4 +691,71 @@ func deref(s *string) string {
 		return ""
 	}
 	return *s
+}
+
+// checkDailyLimit aggregates the user's total fiat and crypto withdrawals in the last 24 hours.
+// Returns an error if the daily limit of $10,000 USD is exceeded.
+func (s *WithdrawalService) checkDailyLimit(ctx context.Context, userID uuid.UUID, incomingUSD float64) error {
+	// Query fiat_withdrawals in last 24 hours
+	rows, err := s.pool.Query(ctx,
+		`SELECT source_currency, source_amount FROM fiat_withdrawals 
+		 WHERE user_id = $1 AND status != 'failed' AND created_at >= NOW() - INTERVAL '24 hours'`,
+		userID,
+	)
+	if err != nil {
+		return fmt.Errorf("query daily fiat withdrawals: %w", err)
+	}
+	defer rows.Close()
+
+	var totalUSD float64
+	for rows.Next() {
+		var currency string
+		var amount pgtype.Numeric
+		if err := rows.Scan(&currency, &amount); err != nil {
+			return fmt.Errorf("scan daily fiat withdrawal: %w", err)
+		}
+		val, _ := amount.Float64Value()
+		if !val.Valid {
+			continue
+		}
+
+		switch currency {
+		case "EUR":
+			totalUSD += val.Float64 * 1.08
+		case "GBP":
+			totalUSD += val.Float64 * 1.27
+		default:
+			totalUSD += val.Float64
+		}
+	}
+
+	// Query caas_withdrawals in last 24 hours
+	cRows, err := s.pool.Query(ctx,
+		`SELECT token, amount FROM caas_withdrawals 
+		 WHERE user_id = $1 AND status != 'failed' AND created_at >= NOW() - INTERVAL '24 hours'`,
+		userID,
+	)
+	if err != nil {
+		return fmt.Errorf("query daily caas withdrawals: %w", err)
+	}
+	defer cRows.Close()
+
+	for cRows.Next() {
+		var token string
+		var amount pgtype.Numeric
+		if err := cRows.Scan(&token, &amount); err != nil {
+			return fmt.Errorf("scan daily caas withdrawal: %w", err)
+		}
+		val, _ := amount.Float64Value()
+		if !val.Valid {
+			continue
+		}
+		totalUSD += val.Float64
+	}
+
+	if totalUSD+incomingUSD > 10000.0 {
+		return fmt.Errorf("%w: you would exceed the $10,000 daily withdrawal limit (used $%.2f in the last 24 hours)", ErrLimitExceeded, totalUSD)
+	}
+
+	return nil
 }

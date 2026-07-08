@@ -45,18 +45,11 @@ func (h *DashboardHandler) GetDashboard(w http.ResponseWriter, r *http.Request) 
 	response.OK(w, data)
 }
 
-// GetActivityFeed godoc
-//
-//	@Summary      Unified activity feed
-//	@Description  Paginated list of all transactions across fiat (Nilos), crypto (Rach Payments WaaS), and stablecoin (Rach CaaS). Each item carries type (credit/debit/exchange), asset symbol, formatted amount, status, and counterparty name where available.
-//	@Tags         dashboard
-//	@Produce      json
-//	@Security     BearerAuth
-//	@Param        page      query  int  false  "Page number (default 1)"
-//	@Param        per_page  query  int  false  "Items per page (default 20, max 50)"
-//	@Success      200  {object}  object
-//	@Failure      401  {object}  ErrorResponse
-//	@Router       /activity [get]
+// GetActivityFeed returns a flat, paginated list of all transactions across
+// fiat (Nilos), crypto (Rach Payments WaaS), and stablecoin (Rach CaaS).
+// Not currently routed — GET /activity serves the grouped feed from
+// ActivityHandler.GetFeed instead; no swagger annotations to avoid a
+// duplicate-route entry.
 func (h *DashboardHandler) GetActivityFeed(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {

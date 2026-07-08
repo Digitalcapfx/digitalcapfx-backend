@@ -188,11 +188,15 @@ func (s *DashboardService) GetDashboard(ctx context.Context, userID uuid.UUID) (
 	}
 
 	// ── Recent activity ───────────────────────────────────────────────────────
-	activity, _ := q.ListRecentActivity(ctx, db.ListRecentActivityParams{
+	activityRows, _ := q.ListRecentActivity(ctx, db.ListRecentActivityParams{
 		UserID: userID,
 		Limit:  10,
 		Offset: 0,
 	})
+	activity := make([]db.ActivityItem, 0, len(activityRows))
+	for _, r := range activityRows {
+		activity = append(activity, activityRowToItem(r.ID, r.Source, r.Type, r.Description, r.Asset, r.Currency, r.Amount, r.AmountSign, r.Status, r.CounterName, r.CreatedAt))
+	}
 
 	return &DashboardData{
 		AssetAllocation: AssetAllocation{
@@ -229,13 +233,18 @@ func (s *DashboardService) GetActivityFeed(ctx context.Context, userID uuid.UUID
 		page = 1
 	}
 
-	items, err := q.ListRecentActivity(ctx, db.ListRecentActivityParams{
+	rows, err := q.ListRecentActivity(ctx, db.ListRecentActivityParams{
 		UserID: userID,
 		Limit:  perPage,
 		Offset: (page - 1) * perPage,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("list activity: %w", err)
+	}
+
+	items := make([]db.ActivityItem, 0, len(rows))
+	for _, r := range rows {
+		items = append(items, activityRowToItem(r.ID, r.Source, r.Type, r.Description, r.Asset, r.Currency, r.Amount, r.AmountSign, r.Status, r.CounterName, r.CreatedAt))
 	}
 
 	return &ActivityFeedResult{

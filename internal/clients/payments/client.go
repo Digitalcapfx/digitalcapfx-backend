@@ -120,13 +120,13 @@ type DeriveAddressRequest struct {
 
 // DeriveAddressResponse is returned after a successful address derivation.
 type DeriveAddressResponse struct {
-	CustomerID     string  `json:"customer_id"`
-	Network        string  `json:"network"`
-	Address        string  `json:"address"`
-	Index          uint32  `json:"index"`
-	DerivationPath string  `json:"derivation_path"`
-	IsTestnet      bool    `json:"is_testnet"`
-	Monitored      bool    `json:"monitored"`
+	CustomerID     string `json:"customer_id"`
+	Network        string `json:"network"`
+	Address        string `json:"address"`
+	Index          uint32 `json:"index"`
+	DerivationPath string `json:"derivation_path"`
+	IsTestnet      bool   `json:"is_testnet"`
+	Monitored      bool   `json:"monitored"`
 }
 
 // ── ExportPrivateKey ─────────────────────────────────────────────────────────
@@ -533,4 +533,130 @@ func (c *Client) do(req *http.Request, out any) error {
 		}
 	}
 	return nil
+}
+
+// ── Swap (unified: on-chain DEX + cross-chain bridge, routing is internal) ────
+
+// GetSwapQuoteParams identify the pair and amount to quote.
+type GetSwapQuoteParams struct {
+	FromChain string // e.g. "POL", "BSC"
+	ToChain   string
+	FromToken string // token contract address or "native"
+	ToToken   string
+	AmountIn  string // amount in base units as a decimal string
+}
+
+// SwapQuoteResponse mirrors the payments service TokenSwapQuoteResponse.
+type SwapQuoteResponse struct {
+	FromChain        string  `json:"from_chain"`
+	ToChain          string  `json:"to_chain"`
+	FromToken        string  `json:"from_token"`
+	ToToken          string  `json:"to_token"`
+	FromAmount       string  `json:"from_amount"`
+	ToAmountExpected string  `json:"to_amount_expected"`
+	ToAmountMin      string  `json:"to_amount_min"`
+	PlatformFee      string  `json:"platform_fee"`
+	EstimatedSeconds float64 `json:"estimated_seconds"`
+	ExpiresAt        int64   `json:"expires_at"`
+}
+
+// GetSwapQuote returns a price quote for any supported swap pair.
+// The quote endpoint is public on the payments service — no API key required.
+// GET /api/v1/swap/quote
+func (c *Client) GetSwapQuote(ctx context.Context, p GetSwapQuoteParams) (*SwapQuoteResponse, error) {
+	q := url.Values{}
+	q.Set("from_chain", p.FromChain)
+	q.Set("to_chain", p.ToChain)
+	q.Set("from_token", p.FromToken)
+	q.Set("to_token", p.ToToken)
+	q.Set("amount_in", p.AmountIn)
+	var out SwapQuoteResponse
+	if err := c.get(ctx, "/api/v1/swap/quote", q, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// ExecuteSwapRequest is the payload for ExecuteSwap. Amounts are base units.
+type ExecuteSwapRequest struct {
+	FromChain    string `json:"from_chain"`
+	ToChain      string `json:"to_chain"`
+	FromToken    string `json:"from_token"`
+	ToToken      string `json:"to_token"`
+	AmountIn     string `json:"amount_in"`
+	AmountOutMin string `json:"amount_out_min,omitempty"`
+}
+
+// ExecuteSwapResponse mirrors the payments service TokenSwapExecuteResponse.
+type ExecuteSwapResponse struct {
+	TxHash string `json:"tx_hash"`
+	Status string `json:"status"`
+}
+
+// ExecuteSwap executes a swap from a customer's WaaS wallet. Same-chain swaps
+// are routed to the DEX contract, cross-chain to a bridge; callers only see a
+// tx hash. Requires the wallet:transfer permission on the API key.
+// POST /api/v1/swap/customer/:customerID
+func (c *Client) ExecuteSwap(ctx context.Context, customerID string, req ExecuteSwapRequest) (*ExecuteSwapResponse, error) {
+	var out ExecuteSwapResponse
+	path := fmt.Sprintf("/api/v1/swap/customer/%s", url.PathEscape(customerID))
+	if err := c.post(ctx, path, req, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// GetSwapHistoryParams paginate swap history.
+type GetSwapHistoryParams struct {
+	Page  int
+	Limit int
+}
+
+// SwapRecord is one swap history row, mirroring the payments service model.
+type SwapRecord struct {
+	ID            uint   `json:"id"`
+	CustomerID    string `json:"customer_id"`
+	Type          string `json:"type"` // "dex" | "bridge"
+	FromChain     string `json:"from_chain"`
+	ToChain       string `json:"to_chain"`
+	DEX           string `json:"dex"`
+	RouterAddress string `json:"router_address"`
+	TokenIn       string `json:"token_in"`
+	TokenOut      string `json:"token_out"`
+	AmountIn      string `json:"amount_in"`
+	AmountOut     string `json:"amount_out"`
+	PlatformFee   string `json:"platform_fee"`
+	ApproveTxHash string `json:"approve_tx_hash,omitempty"`
+	SwapTxHash    string `json:"swap_tx_hash"`
+	Status        string `json:"status"` // pending | confirmed | failed
+	ErrorMsg      string `json:"error_msg,omitempty"`
+	ConfirmedAt   string `json:"confirmed_at,omitempty"`
+	CreatedAt     string `json:"created_at"`
+	UpdatedAt     string `json:"updated_at"`
+}
+
+// GetSwapHistoryResponse wraps the paginated swap history list.
+type GetSwapHistoryResponse struct {
+	Swaps []SwapRecord `json:"swaps"`
+	Total int64        `json:"total"`
+	Page  int          `json:"page"`
+	Limit int          `json:"limit"`
+}
+
+// GetSwapHistory returns paginated swap history for a customer wallet.
+// GET /api/v1/swap/customer/:customerID/history
+func (c *Client) GetSwapHistory(ctx context.Context, customerID string, p GetSwapHistoryParams) (*GetSwapHistoryResponse, error) {
+	q := url.Values{}
+	if p.Page > 0 {
+		q.Set("page", strconv.Itoa(p.Page))
+	}
+	if p.Limit > 0 {
+		q.Set("limit", strconv.Itoa(p.Limit))
+	}
+	var out GetSwapHistoryResponse
+	path := fmt.Sprintf("/api/v1/swap/customer/%s/history", url.PathEscape(customerID))
+	if err := c.get(ctx, path, q, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
 }

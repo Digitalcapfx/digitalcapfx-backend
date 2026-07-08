@@ -33,27 +33,32 @@ func newRouter(cfg *config.Config, svc *services.Services, pool *pgxpool.Pool, l
 	}))
 
 	// Handlers
-	authH         := handlers.NewAuthHandler(svc, cfg)
-	profileH      := handlers.NewProfileHandler(svc)
-	accountH      := handlers.NewAccountHandler(svc)
-	walletH       := handlers.NewWalletHandler(svc)
-	cryptoH       := handlers.NewCryptoHandler(svc)
-	transferH     := handlers.NewTransferHandler(svc)
-	kycH          := handlers.NewKYCHandler(svc)
-	adminH        := handlers.NewAdminHandler(svc)
-	dashboardH    := handlers.NewDashboardHandler(svc)
+	authH := handlers.NewAuthHandler(svc, cfg)
+	profileH := handlers.NewProfileHandler(svc)
+	accountH := handlers.NewAccountHandler(svc)
+	walletH := handlers.NewWalletHandler(svc)
+	cryptoH := handlers.NewCryptoHandler(svc)
+	transferH := handlers.NewTransferHandler(svc)
+	kycH := handlers.NewKYCHandler(svc)
+	adminH := handlers.NewAdminHandler(svc)
+	dashboardH := handlers.NewDashboardHandler(svc)
 	notificationH := handlers.NewNotificationHandler(svc)
-	withdrawalH   := handlers.NewWithdrawalHandler(svc)
-	securityH      := handlers.NewSecurityHandler(svc)
-	prefsH         := handlers.NewPreferencesHandler(svc)
-	supportH       := handlers.NewSupportHandler(svc)
+	withdrawalH := handlers.NewWithdrawalHandler(svc)
+	securityH := handlers.NewSecurityHandler(svc)
+	prefsH := handlers.NewPreferencesHandler(svc)
+	supportH := handlers.NewSupportHandler(svc)
 	walletOverviewH := handlers.NewWalletOverviewHandler(svc)
-	exchangeH       := handlers.NewExchangeHandler(svc)
-	activityH       := handlers.NewActivityHandler(svc)
-	insightsH       := handlers.NewInsightsHandler(svc)
-	adminStaffH     := handlers.NewAdminStaffHandler(svc)
-	adminUsersH     := handlers.NewAdminUsersHandler(svc)
-	webhookH        := handlers.NewWebhookHandler(svc, cfg.HUB2.SecretKey, logger)
+	exchangeH := handlers.NewExchangeHandler(svc)
+	activityH := handlers.NewActivityHandler(svc)
+	insightsH := handlers.NewInsightsHandler(svc)
+	adminStaffH := handlers.NewAdminStaffHandler(svc)
+	adminUsersH := handlers.NewAdminUsersHandler(svc)
+	webhookH := handlers.NewWebhookHandler(svc, cfg.HUB2.SecretKey, logger)
+	businessH := handlers.NewBusinessHandler(svc)
+	teamH := handlers.NewTeamHandler(svc)
+	referralH := handlers.NewReferralHandler(svc)
+	marketH := handlers.NewMarketHandler(cfg, logger)
+	paymentsWebhookH := handlers.NewPaymentsWebhookHandler(svc, cfg.PaymentsAPI.WebhookSecret, logger)
 
 	kycRequired := middleware.KYCRequired(pool)
 
@@ -66,6 +71,7 @@ func newRouter(cfg *config.Config, svc *services.Services, pool *pgxpool.Pool, l
 	// Public webhooks — no JWT required
 	r.Post("/webhooks/hub2", webhookH.HUB2)
 	r.Post("/webhooks/metamap", kycH.MetaMapWebhook)
+	r.Post("/webhooks/payments", paymentsWebhookH.Receive)
 
 	// Swagger UI
 	r.Get("/swagger/*", httpSwagger.Handler(
@@ -90,6 +96,10 @@ func newRouter(cfg *config.Config, svc *services.Services, pool *pgxpool.Pool, l
 
 		// Support links — public (no auth needed for privacy policy / help center URLs)
 		r.Get("/support/links", supportH.GetAppLinks)
+
+		// Market data WebSocket — public; authenticates via ?key= mapped to the
+		// internal Payments API key by the proxy (mirrors the market-data service).
+		r.Get("/market/ws", marketH.ProxyWS)
 
 		// ── Protected routes (JWT required) ─────────────────────────────────
 		r.Group(func(r chi.Router) {
@@ -133,6 +143,38 @@ func newRouter(cfg *config.Config, svc *services.Services, pool *pgxpool.Pool, l
 				r.Post("/metamap/init", kycH.InitiateMetaMap)
 			})
 
+			// Business profile + KYB (available pre-approval — directors and
+			// documents are completed after signup)
+			r.Route("/business", func(r chi.Router) {
+				r.Get("/profile", businessH.GetProfile)
+				r.Put("/profile", businessH.SaveProfile)
+				r.Get("/kyc-status", businessH.GetKYCStatus)
+				r.Get("/directors", businessH.ListDirectors)
+				r.Post("/directors", businessH.AddDirector)
+				r.Delete("/directors/{id}", businessH.DeleteDirector)
+			})
+
+			// Team management (merchant staff)
+			r.Route("/team", func(r chi.Router) {
+				r.Use(middleware.LoadMerchantContext(pool))
+				r.Get("/", teamH.ListMembers)
+				r.Get("/roles-permissions", teamH.GetRolesPermissions)
+				r.Post("/accept-invite", teamH.AcceptInvite)
+				r.With(middleware.RequireMerchantRole("admin")).
+					Post("/invite", teamH.InviteMember)
+				r.With(middleware.RequireMerchantRole("admin")).
+					Put("/{id}/role", teamH.UpdateMemberRole)
+				r.With(middleware.RequireMerchantRole("admin")).
+					Delete("/{id}", teamH.RemoveMember)
+			})
+
+			// Referrals & points
+			r.Get("/referrals", referralH.GetReferralData)
+			r.Get("/referrals/points/ledger", referralH.GetPointsHistory)
+
+			// Market data REST proxy (rates, tickers, charts)
+			r.Get("/market/*", marketH.ProxyREST)
+
 			// ── KYC-gated financial routes ───────────────────────────────────
 			r.Group(func(r chi.Router) {
 				r.Use(kycRequired)
@@ -152,6 +194,9 @@ func newRouter(cfg *config.Config, svc *services.Services, pool *pgxpool.Pool, l
 					r.Get("/{walletId}/address", walletH.GetDepositAddress)
 					r.Post("/deposit", walletH.InitiateDeposit)
 					r.Post("/withdraw", walletH.InitiateWithdrawal)
+					r.Get("/swap/quote", walletH.GetSwapQuote)
+					r.Post("/swap/execute", walletH.ExecuteSwap)
+					r.Get("/swap/history", walletH.GetSwapHistory)
 				})
 
 				// CaaS — Instant USD Account (ERC-4337 SCW)
@@ -160,6 +205,7 @@ func newRouter(cfg *config.Config, svc *services.Services, pool *pgxpool.Pool, l
 					r.Post("/fund", cryptoH.FundAccount)
 					r.Get("/balances", cryptoH.GetBalances)
 					r.Post("/send", cryptoH.Send)
+					r.Post("/withdraw", cryptoH.Withdraw)
 					r.Get("/transactions", cryptoH.ListTransactions)
 					r.Get("/transactions/{id}", cryptoH.GetTransaction)
 				})

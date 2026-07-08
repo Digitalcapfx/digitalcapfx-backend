@@ -10,22 +10,25 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/rachfinance/digitalfx/internal/clients/metamap"
+	"github.com/rachfinance/digitalfx/internal/clients/nilos"
 	"github.com/rachfinance/digitalfx/internal/config"
 	db "github.com/rachfinance/digitalfx/internal/db/sqlc"
+	"github.com/rachfinance/digitalfx/internal/kyc"
 	"github.com/rachfinance/digitalfx/internal/pkg/email"
 )
 
 type KYCService struct {
-	pool          *pgxpool.Pool
-	cfg           *config.Config
-	logger        *zap.Logger
-	metamapClient *metamap.Client
-	emailClient   *email.Client
-	notif         *NotificationService
+	pool        *pgxpool.Pool
+	cfg         *config.Config
+	logger      *zap.Logger
+	provider    kyc.KYCProvider
+	emailClient *email.Client
+	notif       *NotificationService
+	nilosClient *nilos.Client
 }
 
-func NewKYCService(pool *pgxpool.Pool, cfg *config.Config, logger *zap.Logger, metamapClient *metamap.Client, emailClient *email.Client, notif *NotificationService) *KYCService {
-	return &KYCService{pool: pool, cfg: cfg, logger: logger, metamapClient: metamapClient, emailClient: emailClient, notif: notif}
+func NewKYCService(pool *pgxpool.Pool, cfg *config.Config, logger *zap.Logger, provider kyc.KYCProvider, emailClient *email.Client, notif *NotificationService, nilosClient *nilos.Client) *KYCService {
+	return &KYCService{pool: pool, cfg: cfg, logger: logger, provider: provider, emailClient: emailClient, notif: notif, nilosClient: nilosClient}
 }
 
 func (s *KYCService) GetStatus(ctx context.Context, userID uuid.UUID) (string, error) {
@@ -106,22 +109,16 @@ func (s *KYCService) InitiateMetaMapVerification(ctx context.Context, userID uui
 		emailStr = *user.Email
 	}
 
-	resp, err := s.metamapClient.CreateApplicant(ctx, metamap.CreateApplicantRequest{
-		Metadata: metamap.ApplicantMetadata{
-			UserID: userID.String(),
-			Phone:  user.PhoneNumber,
-			Email:  emailStr,
-		},
-	})
+	session, err := s.provider.Initiate(ctx, userID.String(), user.PhoneNumber, emailStr)
 	if err != nil {
-		return nil, fmt.Errorf("metamap create applicant: %w", err)
+		return nil, fmt.Errorf("kyc %s initiate: %w", s.provider.Name(), err)
 	}
 
 	record, err := q.CreateMetamapVerification(ctx, db.CreateMetamapVerificationParams{
 		UserID:         userID,
-		ApplicantID:    resp.ID,
-		FlowID:         s.cfg.MetaMap.FlowID,
-		IdentityAccess: resp.IdentityAccess,
+		ApplicantID:    session.ExternalID,
+		FlowID:         session.FlowID,
+		IdentityAccess: session.AccessToken,
 	})
 	if err != nil {
 		s.logger.Error("store metamap verification", zap.Error(err))

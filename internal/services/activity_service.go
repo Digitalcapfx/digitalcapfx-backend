@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -87,7 +88,7 @@ func (s *ActivityService) GetFeed(
 		rawItems = nil
 	}
 
-	total, _ := q.CountActivity(ctx, db.ListActivityParams{
+	total, _ := q.CountActivity(ctx, db.CountActivityParams{
 		UserID:     userID,
 		TypeFilter: typeFilter,
 		Search:     search,
@@ -95,7 +96,7 @@ func (s *ActivityService) GetFeed(
 
 	entries := make([]ActivityEntry, 0, len(rawItems))
 	for _, item := range rawItems {
-		entries = append(entries, enrichActivity(item))
+		entries = append(entries, enrichActivity(activityRowToItem(item.ID, item.Source, item.Type, item.Description, item.Asset, item.Currency, item.Amount, item.AmountSign, item.Status, item.CounterName, item.CreatedAt)))
 	}
 
 	groups := groupByCalendarDay(entries)
@@ -109,6 +110,39 @@ func (s *ActivityService) GetFeed(
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
+
+// activityRowToItem adapts a generated activity row (ListActivityRow /
+// ListRecentActivityRow share this field set) to the db.ActivityItem consumed
+// by the display helpers. Asset falls back to the fiat currency when the row
+// comes from the transactions table.
+func activityRowToItem(id, source, typ, description, asset, currency string, amount float64, amountSign, status, counterName string, createdAt time.Time) db.ActivityItem {
+	if asset == "" {
+		asset = currency
+	}
+	if source == "" {
+		source = "fiat"
+	}
+	if amountSign == "" {
+		if typ == "credit" || typ == "deposit" || typ == "received" {
+			amountSign = "+"
+		} else {
+			amountSign = "-"
+		}
+	}
+	return db.ActivityItem{
+		ID:          id,
+		Source:      source,
+		Type:        typ,
+		Description: description,
+		Asset:       asset,
+		Amount:      strconv.FormatFloat(amount, 'f', -1, 64),
+		AmountSign:  amountSign,
+		Status:      status,
+		CounterName: counterName,
+		DaysAgo:     int(time.Since(createdAt).Hours() / 24),
+		CreatedAt:   createdAt,
+	}
+}
 
 // enrichActivity converts a raw db.ActivityItem into a display-ready ActivityEntry.
 func enrichActivity(item db.ActivityItem) ActivityEntry {

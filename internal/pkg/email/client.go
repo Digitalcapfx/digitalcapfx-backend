@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net"
 	"net/smtp"
+	"strconv"
 	"strings"
 )
 
@@ -14,8 +15,8 @@ type Client struct {
 	port     int
 	fromName string
 	from     string
-	user     string   // Brevo SMTP login (your Brevo account email)
-	password string   // Brevo SMTP key (not the master API key)
+	user     string // Brevo SMTP login (your Brevo account email)
+	password string // Brevo SMTP key (not the master API key)
 }
 
 func New(host string, port int, fromName, from, user, password string) *Client {
@@ -31,7 +32,7 @@ func New(host string, port int, fromName, from, user, password string) *Client {
 
 // Send delivers an HTML email. Runs synchronously; call via goroutine for fire-and-forget.
 func (c *Client) Send(to, subject, htmlBody string) error {
-	addr := fmt.Sprintf("%s:%d", c.host, c.port)
+	addr := net.JoinHostPort(c.host, strconv.Itoa(c.port))
 
 	conn, err := net.Dial("tcp", addr)
 	if err != nil {

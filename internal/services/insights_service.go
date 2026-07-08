@@ -163,7 +163,13 @@ func (s *InsightsService) GetInsights(ctx context.Context, userID uuid.UUID, per
 	netFlow := roundUSD(incomeMonth - spendingMonth)
 
 	// ── Balance trends ────────────────────────────────────────────────────────
-	trendRows, _ := q.GetBalanceTrend(ctx, userID, since)
+	trendRows, _ := q.GetBalanceTrend(ctx, db.GetBalanceTrendParams{UserID: userID, CreatedAt: since})
+	// The query returns daily net flows; accumulate them into a running balance.
+	var runningFiat float64
+	for i := range trendRows {
+		runningFiat += trendRows[i].FiatUSD
+		trendRows[i].FiatUSD = runningFiat
+	}
 	trendPoints := buildTrendPoints(trendRows, since, fiatUSD, cryptoUSD)
 
 	trendChange, trendFmt := computeTrendChange(trendPoints, totalUSD)
@@ -176,11 +182,11 @@ func (s *InsightsService) GetInsights(ctx context.Context, userID uuid.UUID, per
 	}
 
 	// ── Monthly cash flow (last 6 months) ─────────────────────────────────────
-	flowRows, _ := q.GetMonthlyFlow(ctx, userID, 6)
+	flowRows, _ := q.GetMonthlyFlow(ctx, db.GetMonthlyFlowParams{UserID: userID, Months: 6})
 	monthlyFlow := buildMonthlyFlow(flowRows)
 
 	// ── Spending by type ──────────────────────────────────────────────────────
-	typeRows, _ := q.GetSpendingByType(ctx, userID, since)
+	typeRows, _ := q.GetSpendingByType(ctx, db.GetSpendingByTypeParams{UserID: userID, CreatedAt: since})
 	spendingByType, totalActivity := buildSpendingByType(typeRows)
 
 	netFmt := formatNet(netFlow)

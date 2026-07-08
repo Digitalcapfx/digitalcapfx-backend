@@ -18,4 +18,10 @@ SELECT * FROM waas_wallets
 WHERE user_id = $1 AND is_default = true
 LIMIT 1;
 
--- CaaS wallet queries moved to caas.sql
+-- name: GetWaasWalletByIDAndUser :one
+SELECT * FROM waas_wallets WHERE id = $1 AND user_id = $2 LIMIT 1;
+
+-- name: GetWaasWalletByAddress :one
+SELECT * FROM waas_wallets WHERE address = $1 LIMIT 1;
+
+

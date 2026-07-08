@@ -1,6 +1,10 @@
 package handlers
 
-import "time"
+import (
+	"time"
+
+	db "github.com/rachfinance/digitalfx/internal/db/sqlc"
+)
 
 // ─── Common ───────────────────────────────────────────────────────────────────
 
@@ -31,11 +35,20 @@ type VerifyOTPRequest struct {
 }
 
 type RegisterRequest struct {
-	Phone     string `json:"phone" example:"+237612345678"`
-	Email     string `json:"email" example:"alice@example.com"`
-	FirstName string `json:"first_name" example:"Alice"`
-	LastName  string `json:"last_name" example:"Dupont"`
-	PIN       string `json:"pin" example:"123456"`
+	AccountType string `json:"account_type" example:"individual"` // "individual" (default) | "business"
+	Phone       string `json:"phone" example:"+237612345678"`
+	Email       string `json:"email" example:"alice@example.com"`
+	FirstName   string `json:"first_name" example:"Alice"`
+	LastName    string `json:"last_name" example:"Dupont"`
+	PIN         string `json:"pin" example:"123456"`
+	Country     string `json:"country" example:"CM"` // ISO 3166-1 alpha-2
+	// Business accounts only — company-level KYB fields collected at signup.
+	CompanyLegalName       string `json:"company_legal_name,omitempty" example:"Acme SARL"`
+	CompanyRegistrationNo  string `json:"company_registration_no,omitempty" example:"RC/DLA/2020/B/1234"`
+	Industry               string `json:"industry,omitempty" example:"fintech"`
+	CountryOfIncorporation string `json:"country_of_incorporation,omitempty" example:"CM"`
+	AnnualRevenue          string `json:"annual_revenue,omitempty" example:"$50k-$500k"`
+	BusinessWebsite        string `json:"business_website,omitempty" example:"https://acme.example.com"`
 }
 
 type LoginRequest struct {
@@ -194,15 +207,28 @@ type CryptoBalanceResponse struct {
 // and which stablecoin they want in their Instant USD Account.
 type FundAccountRequest struct {
 	// Currency of the Mobile Money deposit: XOF or XAF
-	Currency string  `json:"currency" example:"XOF" enums:"XOF,XAF"`
+	Currency string `json:"currency" example:"XOF" enums:"XOF,XAF"`
 	// Amount in local fiat (minimum 100)
-	Amount   float64 `json:"amount" example:"20000" minimum:"100"`
+	Amount float64 `json:"amount" example:"20000" minimum:"100"`
 	// Phone is the Mobile Money number to pull from (E.164)
-	Phone    string  `json:"phone" example:"+22507000000"`
+	Phone string `json:"phone" example:"+22507000000"`
 	// Operator is the Mobile Money provider
-	Operator string  `json:"operator" example:"MTN" enums:"Orange,MTN,Wave,Moov,Airtel"`
+	Operator string `json:"operator" example:"MTN" enums:"Orange,MTN,Wave,Moov,Airtel"`
 	// Token is the target stablecoin — defaults to USDC
-	Token    string  `json:"token" example:"USDC" enums:"USDC,USDT"`
+	Token string `json:"token" example:"USDC" enums:"USDC,USDT"`
+}
+
+// WithdrawCryptoRequest initiates a stablecoin off-ramp from the user's
+// Smart Contract Wallet to a Mobile Money number.
+type WithdrawCryptoRequest struct {
+	// Amount is the stablecoin amount to withdraw (decimal string)
+	Amount string `json:"amount" example:"50.00"`
+	// Token must be USDT or USDC
+	Token string `json:"token" example:"USDC" enums:"USDC,USDT"`
+	// PayoutMobile is the Mobile Money number to disburse fiat to (E.164)
+	PayoutMobile string `json:"payout_mobile" example:"+22507000000"`
+	// PayoutNetwork is the MNO operator
+	PayoutNetwork string `json:"payout_network" example:"MTN" enums:"Orange,MTN,Wave,Moov,Airtel"`
 }
 
 type SendCryptoRequest struct {
@@ -244,10 +270,10 @@ type InternalTransferRequest struct {
 }
 
 type Hub2PaymentRequest struct {
-	Currency  string  `json:"currency" example:"XAF"`
-	Amount    float64 `json:"amount" example:"5000"`
-	Phone     string  `json:"phone" example:"+237612345678"`
-	Operator  string  `json:"operator" example:"MTN"`
+	Currency string  `json:"currency" example:"XAF"`
+	Amount   float64 `json:"amount" example:"5000"`
+	Phone    string  `json:"phone" example:"+237612345678"`
+	Operator string  `json:"operator" example:"MTN"`
 	// PaymentMethod e.g. mobile_money
 	PaymentMethod string `json:"payment_method" example:"mobile_money"`
 	// Direction: collection (deposit) or disbursement (withdrawal)
@@ -349,10 +375,10 @@ type ExchangeQuoteRequest struct {
 
 // ExchangeExecuteRequest is the body for POST /exchange/execute.
 type ExchangeExecuteRequest struct {
-	From    string  `json:"from" example:"USD" enums:"USD,EUR,GBP,XAF,XOF"`
-	To      string  `json:"to" example:"EUR" enums:"USD,EUR,GBP,XAF,XOF"`
-	Amount  float64 `json:"amount" example:"500.00"`
-	Side    string  `json:"side,omitempty" example:"SELL" enums:"SELL,BUY"`
+	From   string  `json:"from" example:"USD" enums:"USD,EUR,GBP,XAF,XOF"`
+	To     string  `json:"to" example:"EUR" enums:"USD,EUR,GBP,XAF,XOF"`
+	Amount float64 `json:"amount" example:"500.00"`
+	Side   string  `json:"side,omitempty" example:"SELL" enums:"SELL,BUY"`
 	// QuoteID is optional. Pass the quote_id from POST /exchange/quote to lock the rate.
 	QuoteID string `json:"quote_id,omitempty" example:"quo_abc123"`
 }
@@ -361,7 +387,7 @@ type ExchangeExecuteRequest struct {
 
 // CreateTicketRequest is the body for POST /support/tickets.
 type CreateTicketRequest struct {
-	Subject  string `json:"subject" example:"My transfer is stuck"`
+	Subject string `json:"subject" example:"My transfer is stuck"`
 	// Category one of: general account payment kyc technical card
 	Category string `json:"category" example:"payment" enums:"general,account,payment,kyc,technical,card"`
 	Body     string `json:"body" example:"I sent $50 two days ago and it hasn't arrived."`
@@ -451,11 +477,11 @@ type KYCDocumentListResponse struct {
 // ─── Admin Staff ──────────────────────────────────────────────────────────────
 
 type InviteStaffRequest struct {
-	Email               string   `json:"email"                example:"alice@example.com"`
-	Name                string   `json:"name"                 example:"Alice Dupont"`
-	Role                string   `json:"role"                 example:"compliance"        enums:"admin,compliance,support,finance,readonly"`
-	CustomPermissions   []string `json:"custom_permissions"   example:"[]"`
-	RevokedPermissions  []string `json:"revoked_permissions"  example:"[]"`
+	Email              string   `json:"email"                example:"alice@example.com"`
+	Name               string   `json:"name"                 example:"Alice Dupont"`
+	Role               string   `json:"role"                 example:"compliance"        enums:"admin,compliance,support,finance,readonly"`
+	CustomPermissions  []string `json:"custom_permissions"   example:"[]"`
+	RevokedPermissions []string `json:"revoked_permissions"  example:"[]"`
 }
 
 type UpdateStaffRequest struct {
@@ -472,4 +498,50 @@ type AcceptInviteRequest struct {
 
 type DisableUserRequest struct {
 	Reason string `json:"reason" example:"Suspicious activity — pending investigation"`
+}
+
+// ─── Team (merchant staff) ────────────────────────────────────────────────────
+
+// RolePermissionsEntry is one merchant role with its permission grants.
+type RolePermissionsEntry struct {
+	Role        string   `json:"role" example:"manager"`
+	Permissions []string `json:"permissions" example:"team:view,team:invite"`
+}
+
+type RolesPermissionsData struct {
+	Roles []RolePermissionsEntry `json:"roles"`
+}
+
+// RolesPermissionsResponse wraps the available merchant team roles.
+type RolesPermissionsResponse struct {
+	Success bool                 `json:"success" example:"true"`
+	Data    RolesPermissionsData `json:"data"`
+}
+
+// TeamMemberResponse wraps the list of merchant staff members.
+type TeamMemberResponse struct {
+	Success bool               `json:"success" example:"true"`
+	Data    []db.MerchantStaff `json:"data"`
+}
+
+type TeamInviteData struct {
+	Staff       db.MerchantStaff `json:"staff"`
+	InviteToken string           `json:"invite_token" example:"inv_8f3a2b..."`
+}
+
+// TeamInviteResponse is returned after a staff invite is created.
+type TeamInviteResponse struct {
+	Success bool           `json:"success" example:"true"`
+	Data    TeamInviteData `json:"data"`
+}
+
+// InviteTeamMemberRequest invites a new staff member to the business.
+type InviteTeamMemberRequest struct {
+	Email string `json:"email" example:"staff@acme.example.com"`
+	Role  string `json:"role" example:"manager" enums:"manager,developer,viewer"`
+}
+
+// UpdateRoleRequest changes an existing team member's role.
+type UpdateRoleRequest struct {
+	Role string `json:"role" example:"developer" enums:"manager,developer,viewer"`
 }

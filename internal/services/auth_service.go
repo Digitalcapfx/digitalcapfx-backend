@@ -95,13 +95,22 @@ func (s *AuthService) VerifyOTP(ctx context.Context, phone, code string) error {
 // ─── Register ─────────────────────────────────────────────────────────────────
 
 type RegisterInput struct {
-	Phone     string
-	Email     string
-	FirstName string
-	LastName  string
-	PIN       string
-	DeviceIP  string
-	DeviceUA  string
+	AccountType string // "individual" (default) | "business"
+	Phone       string
+	Email       string
+	FirstName   string
+	LastName    string
+	PIN         string
+	Country     string // ISO 3166-1 alpha-2
+	DeviceIP    string
+	DeviceUA    string
+	// Business accounts only — company-level KYB fields collected at signup.
+	CompanyLegalName       string
+	CompanyRegistrationNo  string
+	Industry               string
+	CountryOfIncorporation string
+	AnnualRevenue          string
+	BusinessWebsite        string
 }
 
 func (s *AuthService) Register(ctx context.Context, in RegisterInput) (*token.Pair, error) {
@@ -120,18 +129,55 @@ func (s *AuthService) Register(ctx context.Context, in RegisterInput) (*token.Pa
 	if in.Email != "" {
 		emailPtr = &in.Email
 	}
+	var countryPtr *string
+	if in.Country != "" {
+		countryPtr = &in.Country
+	}
 
-	user, err := q.CreateUser(ctx, db.CreateUserParams{
-		PhoneNumber:  in.Phone,
-		Email:        emailPtr,
-		FirstName:    in.FirstName,
-		LastName:     in.LastName,
-		PinHash:      &pinHash,
-		Role:         "user",
-		AuthProvider: "phone",
-	})
+	var user db.User
+	if in.AccountType == "business" {
+		user, err = q.CreateBusinessUser(ctx, db.CreateBusinessUserParams{
+			PhoneNumber:  in.Phone,
+			Email:        emailPtr,
+			FirstName:    in.FirstName,
+			LastName:     in.LastName,
+			PinHash:      &pinHash,
+			Country:      countryPtr,
+			Role:         "user",
+			AuthProvider: "phone",
+		})
+	} else {
+		user, err = q.CreateIndividualUser(ctx, db.CreateIndividualUserParams{
+			PhoneNumber:  in.Phone,
+			Email:        emailPtr,
+			FirstName:    in.FirstName,
+			LastName:     in.LastName,
+			PinHash:      &pinHash,
+			Country:      countryPtr,
+			Role:         "user",
+			AuthProvider: "phone",
+		})
+	}
 	if err != nil {
 		return nil, fmt.Errorf("create user: %w", err)
+	}
+
+	if in.AccountType == "business" {
+		var websitePtr *string
+		if in.BusinessWebsite != "" {
+			websitePtr = &in.BusinessWebsite
+		}
+		if _, err := q.CreateBusinessProfile(ctx, db.CreateBusinessProfileParams{
+			UserID:                 user.ID,
+			CompanyLegalName:       in.CompanyLegalName,
+			CompanyRegistrationNo:  in.CompanyRegistrationNo,
+			Industry:               in.Industry,
+			CountryOfIncorporation: in.CountryOfIncorporation,
+			AnnualRevenue:          in.AnnualRevenue,
+			BusinessWebsite:        websitePtr,
+		}); err != nil {
+			return nil, fmt.Errorf("create business profile: %w", err)
+		}
 	}
 
 	// Provision default fiat accounts.
@@ -274,7 +320,7 @@ func (s *AuthService) GoogleSignIn(ctx context.Context, in GoogleSignInInput) (*
 	}
 
 	// Existing user by Google sub.
-	if user, err := q.GetUserByGoogleSub(ctx, info.Sub); err == nil {
+	if user, err := q.GetUserByGoogleSub(ctx, &info.Sub); err == nil {
 		pair, newDevice, err := s.createSession(ctx, q, user.ID, user.PhoneNumber, user.Role, in.DeviceIP, in.DeviceUA)
 		if err != nil {
 			return nil, err
@@ -288,7 +334,7 @@ func (s *AuthService) GoogleSignIn(ctx context.Context, in GoogleSignInInput) (*
 
 	// Existing user by email — link the Google sub.
 	if info.Email != "" {
-		if user, err := q.GetUserByEmail(ctx, info.Email); err == nil {
+		if user, err := q.GetUserByEmail(ctx, &info.Email); err == nil {
 			// Link Google sub to existing account going forward.
 			sub := info.Sub
 			user.GoogleSub = &sub
@@ -306,10 +352,10 @@ func (s *AuthService) GoogleSignIn(ctx context.Context, in GoogleSignInInput) (*
 
 	// New user — create account with Google as provider.
 	googleUser, err := q.CreateGoogleUser(ctx, db.CreateGoogleUserParams{
-		Email:        info.Email,
+		Email:        &info.Email,
 		FirstName:    info.GivenName,
 		LastName:     info.FamilyName,
-		GoogleSub:    info.Sub,
+		GoogleSub:    &info.Sub,
 		Role:         "user",
 		AuthProvider: "google",
 	})
@@ -350,7 +396,7 @@ func (s *AuthService) Logout(ctx context.Context, userID uuid.UUID, sessionID st
 
 	session, _ := q.GetUserSessionByID(ctx, sid)
 
-	if err := q.RevokeUserSessionByID(ctx, sid, userID); err != nil {
+	if err := q.RevokeUserSessionByID(ctx, db.RevokeUserSessionByIDParams{ID: sid, UserID: userID}); err != nil {
 		return fmt.Errorf("revoke session: %w", err)
 	}
 
@@ -421,7 +467,7 @@ func (s *AuthService) ForgotPIN(ctx context.Context, emailOrPhone string) error 
 	var userEmail, firstName string
 
 	if strings.Contains(emailOrPhone, "@") {
-		u, err := q.GetUserByEmail(ctx, emailOrPhone)
+		u, err := q.GetUserByEmail(ctx, &emailOrPhone)
 		if err != nil || u.Email == nil {
 			return nil // silent — don't leak account existence
 		}
@@ -472,7 +518,7 @@ func (s *AuthService) ResetPIN(ctx context.Context, in ResetPINInput) error {
 	var user db.User
 
 	if strings.Contains(in.EmailOrPhone, "@") {
-		u, err := q.GetUserByEmail(ctx, in.EmailOrPhone)
+		u, err := q.GetUserByEmail(ctx, &in.EmailOrPhone)
 		if err != nil {
 			return ErrUserNotFound
 		}
@@ -507,7 +553,7 @@ func (s *AuthService) ResetPIN(ctx context.Context, in ResetPINInput) error {
 		return fmt.Errorf("hash pin: %w", err)
 	}
 
-	if err := q.UpdateUserPinHash(ctx, user.ID, pinHash); err != nil {
+	if err := q.UpdateUserPinHash(ctx, db.UpdateUserPinHashParams{ID: user.ID, PinHash: &pinHash}); err != nil {
 		return fmt.Errorf("update pin: %w", err)
 	}
 
@@ -578,7 +624,7 @@ func (s *AuthService) DisconnectDevice(ctx context.Context, userID uuid.UUID, se
 	if err != nil {
 		return ErrSessionNotFound
 	}
-	return q.RevokeUserSessionByID(ctx, sid, userID)
+	return q.RevokeUserSessionByID(ctx, db.RevokeUserSessionByIDParams{ID: sid, UserID: userID})
 }
 
 func (s *AuthService) DisconnectAllDevices(ctx context.Context, userID uuid.UUID, currentSessionID string) error {
@@ -606,7 +652,7 @@ type UpdateProfileInput struct {
 	Nationality *string
 }
 
-func (s *AuthService) GetProfile(ctx context.Context, userID uuid.UUID) (*db.UserFull, error) {
+func (s *AuthService) GetProfile(ctx context.Context, userID uuid.UUID) (*db.User, error) {
 	q := db.New(s.pool)
 	user, err := q.GetUserFullByID(ctx, userID)
 	if err != nil {
@@ -619,8 +665,8 @@ func (s *AuthService) UpdateProfile(ctx context.Context, in UpdateProfileInput) 
 	q := db.New(s.pool)
 	user, err := q.UpdateUserProfile(ctx, db.UpdateUserProfileParams{
 		ID:          in.UserID,
-		FirstName:   in.FirstName,
-		LastName:    in.LastName,
+		FirstName:   ptrString(in.FirstName),
+		LastName:    ptrString(in.LastName),
 		Bio:         in.Bio,
 		AvatarURL:   in.AvatarURL,
 		DateOfBirth: in.DateOfBirth,
@@ -779,4 +825,61 @@ func fallback(s, def string) string {
 
 func generateAccountNumber() string {
 	return fmt.Sprintf("DFX%010d", mrand.Int63n(10000000000))
+}
+
+func (s *AuthService) Pool() *pgxpool.Pool {
+	return s.pool
+}
+
+func (s *AuthService) RegisterMerchantStaff(ctx context.Context, token string, phone string, firstName string, lastName string, pin string, deviceIP, deviceUA string) (*token.Pair, error) {
+	q := db.New(s.pool)
+
+	staff, err := q.GetMerchantStaffByInviteToken(ctx, &token)
+	if err != nil {
+		return nil, ErrInvalidInviteToken
+	}
+
+	pinHash, err := hash.PIN(pin)
+	if err != nil {
+		return nil, fmt.Errorf("hash pin: %w", err)
+	}
+
+	emailPtr := &staff.Email
+	user, err := q.CreateIndividualUser(ctx, db.CreateIndividualUserParams{
+		PhoneNumber:  phone,
+		Email:        emailPtr,
+		FirstName:    firstName,
+		LastName:     lastName,
+		PinHash:      &pinHash,
+		Role:         "user",
+		AuthProvider: "phone",
+	})
+	if err != nil {
+		return nil, fmt.Errorf("create user: %w", err)
+	}
+
+	for _, currency := range []string{"XAF", "XOF", "USD", "GBP", "EUR"} {
+		if _, err := q.CreateAccount(ctx, db.CreateAccountParams{
+			UserID:        user.ID,
+			Currency:      currency,
+			AccountNumber: generateAccountNumber(),
+		}); err != nil {
+			s.logger.Error("create account for merchant staff", zap.String("currency", currency), zap.Error(err))
+		}
+	}
+
+	err = q.AcceptMerchantStaffInvite(ctx, db.AcceptMerchantStaffInviteParams{
+		StaffUserID: &user.ID,
+		InviteToken: &token,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("link staff user: %w", err)
+	}
+
+	pair, _, err := s.createSession(ctx, q, user.ID, user.PhoneNumber, user.Role, deviceIP, deviceUA)
+	if err != nil {
+		return nil, err
+	}
+
+	return pair, nil
 }

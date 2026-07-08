@@ -144,3 +144,70 @@ func RoleFromContext(ctx context.Context) string {
 	}
 	return role
 }
+
+const (
+	ContextKeyBusinessUserID contextKey = "business_user_id"
+	ContextKeyMerchantRole   contextKey = "merchant_role"
+)
+
+func LoadMerchantContext(pool *pgxpool.Pool) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			userID, ok := UserIDFromContext(r.Context())
+			if !ok {
+				next.ServeHTTP(w, r)
+				return
+			}
+
+			var businessUserID uuid.UUID
+			var role string
+			err := pool.QueryRow(r.Context(),
+				`SELECT business_user_id, role FROM merchant_staff WHERE staff_user_id = $1 AND status = 'active' LIMIT 1`,
+				userID,
+			).Scan(&businessUserID, &role)
+
+			ctx := r.Context()
+			if err == nil {
+				ctx = context.WithValue(ctx, ContextKeyBusinessUserID, businessUserID)
+				ctx = context.WithValue(ctx, ContextKeyMerchantRole, role)
+			} else {
+				ctx = context.WithValue(ctx, ContextKeyBusinessUserID, userID)
+				ctx = context.WithValue(ctx, ContextKeyMerchantRole, "owner")
+			}
+
+			next.ServeHTTP(w, r.WithContext(ctx))
+		})
+	}
+}
+
+func BusinessUserIDFromContext(ctx context.Context) (uuid.UUID, bool) {
+	id, ok := ctx.Value(ContextKeyBusinessUserID).(uuid.UUID)
+	return id, ok
+}
+
+func MerchantRoleFromContext(ctx context.Context) string {
+	role, _ := ctx.Value(ContextKeyMerchantRole).(string)
+	if role == "" {
+		return "owner"
+	}
+	return role
+}
+
+func RequireMerchantRole(allowedRoles ...string) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			role := MerchantRoleFromContext(r.Context())
+			if role == "owner" {
+				next.ServeHTTP(w, r)
+				return
+			}
+			for _, allowed := range allowedRoles {
+				if role == allowed {
+					next.ServeHTTP(w, r)
+					return
+				}
+			}
+			response.Forbidden(w, "insufficient merchant role")
+		})
+	}
+}

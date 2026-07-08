@@ -93,3 +93,14 @@ func InternalError(w http.ResponseWriter) {
 		Error:   &Error{Code: "INTERNAL_ERROR", Message: "an unexpected error occurred"},
 	})
 }
+
+func NoContent(w http.ResponseWriter) {
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func ServiceUnavailable(w http.ResponseWriter, message string) {
+	JSON(w, http.StatusServiceUnavailable, Envelope{
+		Success: false,
+		Error:   &Error{Code: "SERVICE_UNAVAILABLE", Message: message},
+	})
+}

@@ -24,7 +24,7 @@ UPDATE user_sessions SET is_active = false WHERE id = $1 AND user_id = $2;
 UPDATE user_sessions SET is_active = false WHERE user_id = $1;
 
 -- name: RevokeAllOtherSessions :exec
-UPDATE user_sessions SET is_active = false WHERE user_id = $1 AND id != $2;
+UPDATE user_sessions SET is_active = false WHERE user_id = $1 AND id != sqlc.arg(exclude_id);
 
 -- name: UpdateSessionLastUsed :exec
 UPDATE user_sessions SET last_used_at = NOW() WHERE id = $1;
