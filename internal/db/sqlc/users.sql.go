@@ -14,7 +14,7 @@ import (
 const createUser = `-- name: CreateUser :one
 INSERT INTO users (phone_number, email, first_name, last_name, pin_hash)
 VALUES ($1, $2, $3, $4, $5)
-RETURNING id, phone_number, email, first_name, last_name, pin_hash, kyc_status, is_active, created_at, updated_at, bio, avatar_url, date_of_birth, nationality, is_email_verified, role, auth_provider, google_sub, totp_secret, totp_enabled, account_type, country, kyc_provider, referral_code, referred_by
+RETURNING id, phone_number, email, first_name, last_name, pin_hash, kyc_status, is_active, created_at, updated_at, bio, avatar_url, date_of_birth, nationality, is_email_verified, role, auth_provider, google_sub, totp_secret, totp_enabled, account_type, country, kyc_provider, referral_code, referred_by, kyc_provider_status, kyc_manual_override, bvn
 `
 
 type CreateUserParams struct {
@@ -60,6 +60,9 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 		&i.KycProvider,
 		&i.ReferralCode,
 		&i.ReferredBy,
+		&i.KycProviderStatus,
+		&i.KycManualOverride,
+		&i.Bvn,
 	)
 	return i, err
 }
@@ -76,7 +79,7 @@ func (q *Queries) DeactivateUser(ctx context.Context, id uuid.UUID) error {
 }
 
 const getUserByEmail = `-- name: GetUserByEmail :one
-SELECT id, phone_number, email, first_name, last_name, pin_hash, kyc_status, is_active, created_at, updated_at, bio, avatar_url, date_of_birth, nationality, is_email_verified, role, auth_provider, google_sub, totp_secret, totp_enabled, account_type, country, kyc_provider, referral_code, referred_by FROM users WHERE email = $1 LIMIT 1
+SELECT id, phone_number, email, first_name, last_name, pin_hash, kyc_status, is_active, created_at, updated_at, bio, avatar_url, date_of_birth, nationality, is_email_verified, role, auth_provider, google_sub, totp_secret, totp_enabled, account_type, country, kyc_provider, referral_code, referred_by, kyc_provider_status, kyc_manual_override, bvn FROM users WHERE email = $1 LIMIT 1
 `
 
 func (q *Queries) GetUserByEmail(ctx context.Context, email *string) (User, error) {
@@ -108,12 +111,15 @@ func (q *Queries) GetUserByEmail(ctx context.Context, email *string) (User, erro
 		&i.KycProvider,
 		&i.ReferralCode,
 		&i.ReferredBy,
+		&i.KycProviderStatus,
+		&i.KycManualOverride,
+		&i.Bvn,
 	)
 	return i, err
 }
 
 const getUserByID = `-- name: GetUserByID :one
-SELECT id, phone_number, email, first_name, last_name, pin_hash, kyc_status, is_active, created_at, updated_at, bio, avatar_url, date_of_birth, nationality, is_email_verified, role, auth_provider, google_sub, totp_secret, totp_enabled, account_type, country, kyc_provider, referral_code, referred_by FROM users WHERE id = $1 LIMIT 1
+SELECT id, phone_number, email, first_name, last_name, pin_hash, kyc_status, is_active, created_at, updated_at, bio, avatar_url, date_of_birth, nationality, is_email_verified, role, auth_provider, google_sub, totp_secret, totp_enabled, account_type, country, kyc_provider, referral_code, referred_by, kyc_provider_status, kyc_manual_override, bvn FROM users WHERE id = $1 LIMIT 1
 `
 
 func (q *Queries) GetUserByID(ctx context.Context, id uuid.UUID) (User, error) {
@@ -145,12 +151,15 @@ func (q *Queries) GetUserByID(ctx context.Context, id uuid.UUID) (User, error) {
 		&i.KycProvider,
 		&i.ReferralCode,
 		&i.ReferredBy,
+		&i.KycProviderStatus,
+		&i.KycManualOverride,
+		&i.Bvn,
 	)
 	return i, err
 }
 
 const getUserByPhone = `-- name: GetUserByPhone :one
-SELECT id, phone_number, email, first_name, last_name, pin_hash, kyc_status, is_active, created_at, updated_at, bio, avatar_url, date_of_birth, nationality, is_email_verified, role, auth_provider, google_sub, totp_secret, totp_enabled, account_type, country, kyc_provider, referral_code, referred_by FROM users WHERE phone_number = $1 LIMIT 1
+SELECT id, phone_number, email, first_name, last_name, pin_hash, kyc_status, is_active, created_at, updated_at, bio, avatar_url, date_of_birth, nationality, is_email_verified, role, auth_provider, google_sub, totp_secret, totp_enabled, account_type, country, kyc_provider, referral_code, referred_by, kyc_provider_status, kyc_manual_override, bvn FROM users WHERE phone_number = $1 LIMIT 1
 `
 
 func (q *Queries) GetUserByPhone(ctx context.Context, phoneNumber string) (User, error) {
@@ -182,6 +191,9 @@ func (q *Queries) GetUserByPhone(ctx context.Context, phoneNumber string) (User,
 		&i.KycProvider,
 		&i.ReferralCode,
 		&i.ReferredBy,
+		&i.KycProviderStatus,
+		&i.KycManualOverride,
+		&i.Bvn,
 	)
 	return i, err
 }
@@ -190,7 +202,7 @@ const updateUserKYCStatus = `-- name: UpdateUserKYCStatus :one
 UPDATE users
 SET kyc_status = $2, updated_at = NOW()
 WHERE id = $1
-RETURNING id, phone_number, email, first_name, last_name, pin_hash, kyc_status, is_active, created_at, updated_at, bio, avatar_url, date_of_birth, nationality, is_email_verified, role, auth_provider, google_sub, totp_secret, totp_enabled, account_type, country, kyc_provider, referral_code, referred_by
+RETURNING id, phone_number, email, first_name, last_name, pin_hash, kyc_status, is_active, created_at, updated_at, bio, avatar_url, date_of_birth, nationality, is_email_verified, role, auth_provider, google_sub, totp_secret, totp_enabled, account_type, country, kyc_provider, referral_code, referred_by, kyc_provider_status, kyc_manual_override, bvn
 `
 
 type UpdateUserKYCStatusParams struct {
@@ -227,6 +239,9 @@ func (q *Queries) UpdateUserKYCStatus(ctx context.Context, arg UpdateUserKYCStat
 		&i.KycProvider,
 		&i.ReferralCode,
 		&i.ReferredBy,
+		&i.KycProviderStatus,
+		&i.KycManualOverride,
+		&i.Bvn,
 	)
 	return i, err
 }

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"time"
 
 	"github.com/rachfinance/digitalfx/internal/api/middleware"
 	"github.com/rachfinance/digitalfx/internal/pkg/response"
@@ -56,6 +57,7 @@ func (h *ProfileHandler) GetProfile(w http.ResponseWriter, r *http.Request) {
 		AvatarURL:       user.AvatarURL,
 		DateOfBirth:     user.DateOfBirth,
 		Nationality:     user.Nationality,
+		BVN:             user.Bvn,
 		KycStatus:       user.KycStatus,
 		IsEmailVerified: user.IsEmailVerified,
 	})
@@ -87,8 +89,14 @@ func (h *ProfileHandler) UpdateProfile(w http.ResponseWriter, r *http.Request) {
 		response.BadRequest(w, "VALIDATION_ERROR", "invalid request body")
 		return
 	}
-	if body.FirstName == "" || body.LastName == "" {
-		response.BadRequest(w, "VALIDATION_ERROR", "first_name and last_name are required")
+	// PATCH is a partial update: any omitted field keeps its current value, so
+	// only the fields actually provided are validated.
+	if body.DateOfBirth != nil && *body.DateOfBirth != "" && !isISODate(*body.DateOfBirth) {
+		response.BadRequest(w, "VALIDATION_ERROR", "date_of_birth must be in YYYY-MM-DD format")
+		return
+	}
+	if body.BVN != nil && *body.BVN != "" && !isValidBVN(*body.BVN) {
+		response.BadRequest(w, "VALIDATION_ERROR", "bvn must be exactly 11 digits")
 		return
 	}
 
@@ -100,6 +108,7 @@ func (h *ProfileHandler) UpdateProfile(w http.ResponseWriter, r *http.Request) {
 		AvatarURL:   body.AvatarURL,
 		DateOfBirth: body.DateOfBirth,
 		Nationality: body.Nationality,
+		BVN:         body.BVN,
 	})
 	if err != nil {
 		response.InternalError(w)
@@ -107,11 +116,36 @@ func (h *ProfileHandler) UpdateProfile(w http.ResponseWriter, r *http.Request) {
 	}
 
 	response.OK(w, ProfileData{
-		ID:          user.ID.String(),
-		PhoneNumber: user.PhoneNumber,
-		Email:       user.Email,
-		FirstName:   user.FirstName,
-		LastName:    user.LastName,
-		KycStatus:   user.KycStatus,
+		ID:              user.ID.String(),
+		PhoneNumber:     user.PhoneNumber,
+		Email:           user.Email,
+		FirstName:       user.FirstName,
+		LastName:        user.LastName,
+		Bio:             user.Bio,
+		AvatarURL:       user.AvatarURL,
+		DateOfBirth:     user.DateOfBirth,
+		Nationality:     user.Nationality,
+		BVN:             user.Bvn,
+		KycStatus:       user.KycStatus,
+		IsEmailVerified: user.IsEmailVerified,
 	})
+}
+
+// isISODate reports whether s is a valid YYYY-MM-DD date.
+func isISODate(s string) bool {
+	_, err := time.Parse("2006-01-02", s)
+	return err == nil
+}
+
+// isValidBVN reports whether s is a well-formed Nigerian BVN: exactly 11 digits.
+func isValidBVN(s string) bool {
+	if len(s) != 11 {
+		return false
+	}
+	for _, c := range s {
+		if c < '0' || c > '9' {
+			return false
+		}
+	}
+	return true
 }

@@ -37,7 +37,10 @@ type Services struct {
 	Staff          *StaffService
 	Business       *BusinessService
 	Referral       *ReferralService
+	Swap           *SwapService
+	Upload         *UploadService
 	UserManagement *UserManagementService
+	Limits         *LimitsService
 }
 
 func New(
@@ -54,7 +57,8 @@ func New(
 ) *Services {
 	notif := NewNotificationService(pool, logger)
 	hub2Svc := NewHUB2Service(pool, hub2Client, caasClient, logger)
-	withdrawalSvc := NewWithdrawalService(pool, hub2Client, nilosClient, notif, logger)
+	limitsSvc := NewLimitsService(pool, DefaultLimitsResolver(), logger)
+	withdrawalSvc := NewWithdrawalService(pool, hub2Client, nilosClient, notif, limitsSvc, logger)
 	hub2Svc.SetWithdrawalService(withdrawalSvc)
 
 	// KYC provider is selected via KYC_PROVIDER ("metamap" default | "sumsub").
@@ -84,6 +88,9 @@ func New(
 		Staff:          NewStaffService(pool, emailClient, cfg.App.BaseURL, logger),
 		Business:       NewBusinessService(pool, logger),
 		Referral:       NewReferralService(pool, logger),
+		Swap:           NewSwapService(paymentsClient, logger),
+		Upload:         NewUploadService(cfg, logger),
+		Limits:         limitsSvc,
 		UserManagement: NewUserManagementService(pool, logger),
 	}
 }

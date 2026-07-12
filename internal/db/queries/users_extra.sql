@@ -23,11 +23,15 @@ SET first_name = COALESCE(sqlc.narg('first_name'), first_name),
     last_name = COALESCE(sqlc.narg('last_name'), last_name),
     bio = COALESCE(sqlc.narg('bio'), bio),
     avatar_url = COALESCE(sqlc.narg('avatar_url'), avatar_url),
-    date_of_birth = COALESCE(sqlc.narg('date_of_birth')::date, date_of_birth),
+    date_of_birth = COALESCE(sqlc.narg('date_of_birth'), date_of_birth),
     nationality = COALESCE(sqlc.narg('nationality'), nationality),
+    bvn = COALESCE(sqlc.narg('bvn'), bvn),
     updated_at = now()
 WHERE id = $1
 RETURNING *;
+
+-- name: SetUserBVN :one
+UPDATE users SET bvn = $2, updated_at = now() WHERE id = $1 RETURNING *;
 
 -- name: CreateIndividualUser :one
 INSERT INTO users (

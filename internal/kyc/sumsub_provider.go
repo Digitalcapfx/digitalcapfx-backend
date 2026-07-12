@@ -42,8 +42,9 @@ func (p *SumsubProvider) HandleWebhook(ctx context.Context, body []byte, headers
 	if signature == "" {
 		signature = headers.Get("X-App-Access-Sig") // Fallback if they use the standard signing header on webhooks
 	}
+	alg := headers.Get("X-Payload-Digest-Alg")
 
-	if !p.client.VerifyWebhookSignature(signature, body) {
+	if !p.client.VerifyWebhookSignature(signature, alg, body) {
 		return nil, fmt.Errorf("sumsub provider: invalid webhook signature")
 	}
 

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -25,7 +26,7 @@ func NewBusinessHandler(svc *services.Services) *BusinessHandler {
 type BusinessProfileData struct {
 	UserID                 uuid.UUID `json:"user_id"`
 	CompanyLegalName       string    `json:"company_legal_name"`
-	CompanyRegistrationNo string    `json:"company_registration_no"`
+	CompanyRegistrationNo  string    `json:"company_registration_no"`
 	Industry               string    `json:"industry"`
 	CountryOfIncorporation string    `json:"country_of_incorporation"`
 	AnnualRevenue          string    `json:"annual_revenue"`
@@ -36,7 +37,7 @@ type BusinessProfileData struct {
 
 type SaveProfileInput struct {
 	CompanyLegalName       string `json:"company_legal_name"`
-	CompanyRegistrationNo string `json:"company_registration_no"`
+	CompanyRegistrationNo  string `json:"company_registration_no"`
 	Industry               string `json:"industry"`
 	CountryOfIncorporation string `json:"country_of_incorporation"`
 	AnnualRevenue          string `json:"annual_revenue"`
@@ -50,6 +51,63 @@ type DirectorInput struct {
 	DateOfBirth string `json:"date_of_birth"` // YYYY-MM-DD
 	Nationality string `json:"nationality"`
 	PhoneNumber string `json:"phone_number"`
+}
+
+// BusinessAnalyticsResponse is the payload for GET /business/analytics: the
+// enriched analytics plus the account's limits and current usage.
+type BusinessAnalyticsResponse struct {
+	Analytics   *services.BusinessAnalyticsData `json:"analytics"`
+	Limits      services.AccountLimits          `json:"limits"`
+	LimitsUsage LimitsUsage                     `json:"limits_usage"`
+}
+
+// GetAnalytics godoc
+//
+//	@Summary      Business analytics dashboard
+//	@Description  Rich analytics reserved for business accounts: insights plus transaction stats, per-currency volume/balance breakdowns, and limits usage. Returns 403 for individual accounts.
+//	@Tags         business
+//	@Produce      json
+//	@Security     BearerAuth
+//	@Param        period  query     string  false  "Period" Enums(1w,1m,3m,6m)
+//	@Success      200     {object}  BusinessAnalyticsResponse
+//	@Failure      401     {object}  ErrorResponse
+//	@Failure      403     {object}  ErrorResponse
+//	@Router       /business/analytics [get]
+func (h *BusinessHandler) GetAnalytics(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		response.Unauthorized(w, "unauthorized")
+		return
+	}
+
+	// Business-tier gate: enriched analytics are a business benefit.
+	limits := h.svc.Withdrawal.Limits(r.Context(), userID)
+	if !strings.EqualFold(limits.Tier, "business") {
+		response.Forbidden(w, "detailed analytics are available on business accounts only")
+		return
+	}
+
+	period := r.URL.Query().Get("period")
+	data, err := h.svc.Insights.GetBusinessAnalytics(r.Context(), userID, period)
+	if err != nil {
+		response.InternalError(w)
+		return
+	}
+
+	used := h.svc.Withdrawal.DailyWithdrawalUsedUSD(r.Context(), userID)
+	remaining := limits.DailyWithdrawalUSD - used
+	if remaining < 0 {
+		remaining = 0
+	}
+
+	response.OK(w, BusinessAnalyticsResponse{
+		Analytics: data,
+		Limits:    limits,
+		LimitsUsage: LimitsUsage{
+			DailyWithdrawalUsedUSD:      used,
+			DailyWithdrawalRemainingUSD: remaining,
+		},
+	})
 }
 
 func (h *BusinessHandler) GetProfile(w http.ResponseWriter, r *http.Request) {

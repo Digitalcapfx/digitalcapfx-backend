@@ -344,6 +344,25 @@ func (h *AdminStaffHandler) GetRolePermissions(w http.ResponseWriter, r *http.Re
 	})
 }
 
+// ListPermissions godoc
+//
+//	@Summary      Permission catalogue
+//	@Description  Returns the full grouped catalogue of every permission the platform understands, plus the two wildcard forms ("*" for full control and "resource:*" per group). Use this to build a granular permission-assignment matrix. Grant "*" to give a staff member complete control of every function, feature and setting.
+//	@Tags         admin-staff
+//	@Produce      json
+//	@Security     BearerAuth
+//	@Success      200  {object}  map[string]any
+//	@Router       /admin/permissions [get]
+func (h *AdminStaffHandler) ListPermissions(w http.ResponseWriter, r *http.Request) {
+	response.OK(w, map[string]any{
+		"groups": services.PermissionCatalogue(),
+		"wildcards": []map[string]string{
+			{"key": "*", "label": "Full control", "description": "Every permission on the platform — complete control of every function, feature, data and setting."},
+			{"key": "resource:*", "label": "Whole-resource control", "description": "Every action on one resource, e.g. \"users:*\" or \"limits:*\"."},
+		},
+	})
+}
+
 // GetAuditLog godoc
 //
 //	@Summary      Admin audit trail

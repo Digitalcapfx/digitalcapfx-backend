@@ -58,6 +58,7 @@ type WithdrawalService struct {
 	hub2Client  *hub2.Client
 	nilosClient *nilos.Client
 	notif       *NotificationService
+	limits      LimitsProvider
 	logger      *zap.Logger
 }
 
@@ -66,6 +67,7 @@ func NewWithdrawalService(
 	hub2Client *hub2.Client,
 	nilosClient *nilos.Client,
 	notif *NotificationService,
+	limits LimitsProvider,
 	logger *zap.Logger,
 ) *WithdrawalService {
 	return &WithdrawalService{
@@ -73,8 +75,19 @@ func NewWithdrawalService(
 		hub2Client:  hub2Client,
 		nilosClient: nilosClient,
 		notif:       notif,
+		limits:      limits,
 		logger:      logger,
 	}
+}
+
+// accountType returns the user's account tier ("individual"|"business"),
+// defaulting to individual when the user can't be read.
+func (s *WithdrawalService) accountType(ctx context.Context, userID uuid.UUID) string {
+	q := db.New(s.pool)
+	if u, err := q.GetUserByID(ctx, userID); err == nil {
+		return u.AccountType
+	}
+	return "individual"
 }
 
 // ─── Quote ────────────────────────────────────────────────────────────────────
@@ -195,7 +208,7 @@ func (s *WithdrawalService) Initiate(ctx context.Context, userID uuid.UUID, req 
 		return nil, ErrInsufficientFiatFunds
 	}
 
-	// Enforce the $10,000 rolling 24h withdrawal limit across fiat and crypto.
+	// Enforce tier limits (business accounts get higher caps than individuals).
 	incomingUSD := req.SourceAmount
 	switch req.SourceCurrency {
 	case "EUR":
@@ -203,7 +216,11 @@ func (s *WithdrawalService) Initiate(ctx context.Context, userID uuid.UUID, req 
 	case "GBP":
 		incomingUSD *= 1.27
 	}
-	if err := s.checkDailyLimit(ctx, userID, incomingUSD); err != nil {
+	limits := s.limits.Resolve(ctx, userID, s.accountType(ctx, userID))
+	if limits.PerTransactionUSD > 0 && incomingUSD > limits.PerTransactionUSD {
+		return nil, fmt.Errorf("%w: this withdrawal ($%.2f) exceeds your per-transaction limit of $%.2f", ErrLimitExceeded, incomingUSD, limits.PerTransactionUSD)
+	}
+	if err := s.checkDailyLimit(ctx, userID, incomingUSD, limits.DailyWithdrawalUSD); err != nil {
 		return nil, err
 	}
 
@@ -693,9 +710,10 @@ func deref(s *string) string {
 	return *s
 }
 
-// checkDailyLimit aggregates the user's total fiat and crypto withdrawals in the last 24 hours.
-// Returns an error if the daily limit of $10,000 USD is exceeded.
-func (s *WithdrawalService) checkDailyLimit(ctx context.Context, userID uuid.UUID, incomingUSD float64) error {
+// checkDailyLimit aggregates the user's total fiat and crypto withdrawals in the
+// last 24 hours and rejects the request if it would exceed dailyLimitUSD (the
+// user's tier cap).
+func (s *WithdrawalService) checkDailyLimit(ctx context.Context, userID uuid.UUID, incomingUSD, dailyLimitUSD float64) error {
 	// Query fiat_withdrawals in last 24 hours
 	rows, err := s.pool.Query(ctx,
 		`SELECT source_currency, source_amount FROM fiat_withdrawals 
@@ -753,9 +771,60 @@ func (s *WithdrawalService) checkDailyLimit(ctx context.Context, userID uuid.UUI
 		totalUSD += val.Float64
 	}
 
-	if totalUSD+incomingUSD > 10000.0 {
-		return fmt.Errorf("%w: you would exceed the $10,000 daily withdrawal limit (used $%.2f in the last 24 hours)", ErrLimitExceeded, totalUSD)
+	if dailyLimitUSD > 0 && totalUSD+incomingUSD > dailyLimitUSD {
+		return fmt.Errorf("%w: you would exceed your $%.0f daily withdrawal limit (used $%.2f in the last 24 hours)", ErrLimitExceeded, dailyLimitUSD, totalUSD)
 	}
 
 	return nil
+}
+
+// DailyWithdrawalUsedUSD returns how much (USD-equiv) the user has withdrawn in
+// the last 24 hours, for showing remaining allowance in the limits endpoint.
+func (s *WithdrawalService) DailyWithdrawalUsedUSD(ctx context.Context, userID uuid.UUID) float64 {
+	var totalUSD float64
+	rows, err := s.pool.Query(ctx,
+		`SELECT source_currency, source_amount FROM fiat_withdrawals
+		 WHERE user_id = $1 AND status != 'failed' AND created_at >= NOW() - INTERVAL '24 hours'`,
+		userID)
+	if err == nil {
+		defer rows.Close()
+		for rows.Next() {
+			var cur string
+			var amt pgtype.Numeric
+			if rows.Scan(&cur, &amt) == nil {
+				if v, _ := amt.Float64Value(); v.Valid {
+					switch cur {
+					case "EUR":
+						totalUSD += v.Float64 * 1.08
+					case "GBP":
+						totalUSD += v.Float64 * 1.27
+					default:
+						totalUSD += v.Float64
+					}
+				}
+			}
+		}
+	}
+	cRows, err := s.pool.Query(ctx,
+		`SELECT amount FROM caas_withdrawals
+		 WHERE user_id = $1 AND status != 'failed' AND created_at >= NOW() - INTERVAL '24 hours'`,
+		userID)
+	if err == nil {
+		defer cRows.Close()
+		for cRows.Next() {
+			var amt pgtype.Numeric
+			if cRows.Scan(&amt) == nil {
+				if v, _ := amt.Float64Value(); v.Valid {
+					totalUSD += v.Float64
+				}
+			}
+		}
+	}
+	return totalUSD
+}
+
+// Limits returns the effective limits for a user (tier limits with any per-user
+// override applied).
+func (s *WithdrawalService) Limits(ctx context.Context, userID uuid.UUID) AccountLimits {
+	return s.limits.Resolve(ctx, userID, s.accountType(ctx, userID))
 }

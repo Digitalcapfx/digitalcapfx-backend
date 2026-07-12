@@ -20,6 +20,10 @@ type Pair struct {
 	RefreshToken string `json:"refresh_token"`
 	ExpiresIn    int64  `json:"expires_in"` // seconds
 	SessionID    string `json:"session_id"`
+	// AccountType ("individual"|"business") is surfaced on auth responses so the
+	// frontend can branch on tier without a separate profile fetch. Omitted when
+	// not populated (e.g. refresh where it isn't looked up).
+	AccountType string `json:"account_type,omitempty"`
 }
 
 func NewPair(userID uuid.UUID, phone, sessionID, role, secret string, accessExp, refreshExp time.Duration) (*Pair, error) {

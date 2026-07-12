@@ -87,6 +87,30 @@ func (h *AdminHandler) ApproveKYC(w http.ResponseWriter, r *http.Request) {
 	response.OKWithMessage(w, "KYC approved — user account is now fully active", nil)
 }
 
+// ReleaseKYCToProvider godoc
+//
+//	@Summary      Release KYC control back to the provider
+//	@Description  Clears the admin manual-override flag so the automated provider (Sumsub) can once again set the user's KYC status via webhook. Use this to undo a manual approve/reject and return to hybrid auto mode.
+//	@Tags         admin
+//	@Produce      json
+//	@Security     BearerAuth
+//	@Param        id   path      string  true  "User ID"
+//	@Success      200  {object}  MessageResponse
+//	@Failure      400  {object}  ErrorResponse
+//	@Failure      403  {object}  ErrorResponse
+//	@Router       /admin/kyc/{id}/release [post]
+func (h *AdminHandler) ReleaseKYCToProvider(w http.ResponseWriter, r *http.Request) {
+	userID, adminID, ok := parseAdminKYCParams(w, r)
+	if !ok {
+		return
+	}
+	if err := h.svc.KYC.AdminReleaseKYCToProvider(r.Context(), userID, adminID); err != nil {
+		response.InternalError(w)
+		return
+	}
+	response.OKWithMessage(w, "KYC control released — provider decisions will apply again", nil)
+}
+
 // RejectKYC godoc
 //
 //	@Summary      Reject user KYC

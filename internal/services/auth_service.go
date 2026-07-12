@@ -102,6 +102,7 @@ type RegisterInput struct {
 	LastName    string
 	PIN         string
 	Country     string // ISO 3166-1 alpha-2
+	BVN         string // Nigerian Bank Verification Number (11 digits), optional
 	DeviceIP    string
 	DeviceUA    string
 	// Business accounts only — company-level KYB fields collected at signup.
@@ -115,6 +116,10 @@ type RegisterInput struct {
 
 func (s *AuthService) Register(ctx context.Context, in RegisterInput) (*token.Pair, error) {
 	q := db.New(s.pool)
+
+	// Normalize the phone so signup and login always match regardless of how
+	// the client formats it (spaces, dashes, missing "+").
+	in.Phone = normalizePhone(in.Phone)
 
 	if _, err := q.GetUserByPhone(ctx, in.Phone); err == nil {
 		return nil, ErrUserExists
@@ -191,7 +196,14 @@ func (s *AuthService) Register(ctx context.Context, in RegisterInput) (*token.Pa
 		}
 	}
 
-	pair, _, err := s.createSession(ctx, q, user.ID, user.PhoneNumber, user.Role, in.DeviceIP, in.DeviceUA)
+	// Persist BVN if supplied at signup (Nigerian bank-account provisioning).
+	if bvn := strings.TrimSpace(in.BVN); bvn != "" {
+		if _, err := q.SetUserBVN(ctx, db.SetUserBVNParams{ID: user.ID, Bvn: &bvn}); err != nil {
+			s.logger.Error("set bvn on register", zap.Error(err))
+		}
+	}
+
+	pair, _, err := s.createSession(ctx, q, user.ID, user.PhoneNumber, user.Role, user.AccountType, in.DeviceIP, in.DeviceUA)
 	if err != nil {
 		return nil, err
 	}
@@ -220,6 +232,7 @@ type LoginInput struct {
 func (s *AuthService) Login(ctx context.Context, in LoginInput) (*LoginResult, error) {
 	q := db.New(s.pool)
 
+	in.Phone = normalizePhone(in.Phone)
 	user, err := q.GetUserByPhone(ctx, in.Phone)
 	if err != nil {
 		return nil, ErrUserNotFound
@@ -242,7 +255,7 @@ func (s *AuthService) Login(ctx context.Context, in LoginInput) (*LoginResult, e
 		return &LoginResult{Requires2FA: true, TOTPRef: ref}, nil
 	}
 
-	pair, newDevice, err := s.createSession(ctx, q, user.ID, user.PhoneNumber, user.Role, in.DeviceIP, in.DeviceUA)
+	pair, newDevice, err := s.createSession(ctx, q, user.ID, user.PhoneNumber, user.Role, user.AccountType, in.DeviceIP, in.DeviceUA)
 	if err != nil {
 		return nil, err
 	}
@@ -284,7 +297,7 @@ func (s *AuthService) CompleteTOTPLogin(ctx context.Context, ref, code, deviceIP
 
 	s.rdb.Del(ctx, redisKey)
 
-	pair, newDevice, err := s.createSession(ctx, q, user.ID, user.PhoneNumber, user.Role, deviceIP, deviceUA)
+	pair, newDevice, err := s.createSession(ctx, q, user.ID, user.PhoneNumber, user.Role, user.AccountType, deviceIP, deviceUA)
 	if err != nil {
 		return nil, err
 	}
@@ -321,7 +334,7 @@ func (s *AuthService) GoogleSignIn(ctx context.Context, in GoogleSignInInput) (*
 
 	// Existing user by Google sub.
 	if user, err := q.GetUserByGoogleSub(ctx, &info.Sub); err == nil {
-		pair, newDevice, err := s.createSession(ctx, q, user.ID, user.PhoneNumber, user.Role, in.DeviceIP, in.DeviceUA)
+		pair, newDevice, err := s.createSession(ctx, q, user.ID, user.PhoneNumber, user.Role, user.AccountType, in.DeviceIP, in.DeviceUA)
 		if err != nil {
 			return nil, err
 		}
@@ -338,7 +351,7 @@ func (s *AuthService) GoogleSignIn(ctx context.Context, in GoogleSignInInput) (*
 			// Link Google sub to existing account going forward.
 			sub := info.Sub
 			user.GoogleSub = &sub
-			pair, newDevice, err := s.createSession(ctx, q, user.ID, user.PhoneNumber, user.Role, in.DeviceIP, in.DeviceUA)
+			pair, newDevice, err := s.createSession(ctx, q, user.ID, user.PhoneNumber, user.Role, user.AccountType, in.DeviceIP, in.DeviceUA)
 			if err != nil {
 				return nil, err
 			}
@@ -374,7 +387,7 @@ func (s *AuthService) GoogleSignIn(ctx context.Context, in GoogleSignInInput) (*
 		}
 	}
 
-	pair, _, err := s.createSession(ctx, q, googleUser.ID, googleUser.PhoneNumber, googleUser.Role, in.DeviceIP, in.DeviceUA)
+	pair, _, err := s.createSession(ctx, q, googleUser.ID, googleUser.PhoneNumber, googleUser.Role, googleUser.AccountType, in.DeviceIP, in.DeviceUA)
 	if err != nil {
 		return nil, err
 	}
@@ -456,6 +469,7 @@ func (s *AuthService) RefreshToken(ctx context.Context, refreshToken string) (*t
 		RefreshTokenHash: sha256Hex(pair.RefreshToken),
 	})
 
+	pair.AccountType = user.AccountType
 	return pair, nil
 }
 
@@ -650,6 +664,7 @@ type UpdateProfileInput struct {
 	AvatarURL   *string
 	DateOfBirth *string
 	Nationality *string
+	BVN         *string
 }
 
 func (s *AuthService) GetProfile(ctx context.Context, userID uuid.UUID) (*db.User, error) {
@@ -671,6 +686,7 @@ func (s *AuthService) UpdateProfile(ctx context.Context, in UpdateProfileInput) 
 		AvatarURL:   in.AvatarURL,
 		DateOfBirth: in.DateOfBirth,
 		Nationality: in.Nationality,
+		Bvn:         in.BVN,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("update profile: %w", err)
@@ -685,7 +701,7 @@ func (s *AuthService) UpdateProfile(ctx context.Context, in UpdateProfileInput) 
 // once to populate the row (any unique RT hash), then again with the real session.ID.
 // Returns the token pair and whether the user already had other active sessions
 // (used by callers to decide between LoginNotification and NewDeviceAlert).
-func (s *AuthService) createSession(ctx context.Context, q *db.Queries, userID uuid.UUID, phone, role, deviceIP, deviceUA string) (*token.Pair, bool, error) {
+func (s *AuthService) createSession(ctx context.Context, q *db.Queries, userID uuid.UUID, phone, role, accountType, deviceIP, deviceUA string) (*token.Pair, bool, error) {
 	deviceName := parseDeviceName(deviceUA)
 
 	// Check existing sessions before creating — determines which email alert to send.
@@ -725,6 +741,7 @@ func (s *AuthService) createSession(ctx context.Context, q *db.Queries, userID u
 		RefreshTokenHash: sha256Hex(pair.RefreshToken),
 	})
 
+	pair.AccountType = accountType
 	return pair, hasOtherSessions, nil
 }
 
@@ -816,6 +833,23 @@ func ptrString(s string) *string {
 	return &s
 }
 
+// normalizePhone strips formatting (spaces, dashes, parentheses, dots) so the
+// same number entered at signup and at login always matches. A leading "+" is
+// preserved; all other non-digits are dropped.
+func normalizePhone(p string) string {
+	p = strings.TrimSpace(p)
+	var b strings.Builder
+	for i, r := range p {
+		switch {
+		case r >= '0' && r <= '9':
+			b.WriteRune(r)
+		case r == '+' && i == 0:
+			b.WriteRune(r)
+		}
+	}
+	return b.String()
+}
+
 func fallback(s, def string) string {
 	if s == "" {
 		return def
@@ -876,7 +910,7 @@ func (s *AuthService) RegisterMerchantStaff(ctx context.Context, token string, p
 		return nil, fmt.Errorf("link staff user: %w", err)
 	}
 
-	pair, _, err := s.createSession(ctx, q, user.ID, user.PhoneNumber, user.Role, deviceIP, deviceUA)
+	pair, _, err := s.createSession(ctx, q, user.ID, user.PhoneNumber, user.Role, user.AccountType, deviceIP, deviceUA)
 	if err != nil {
 		return nil, err
 	}

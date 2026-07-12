@@ -79,6 +79,11 @@ type HUB2Config struct {
 type GCPConfig struct {
 	ProjectID string
 	KYCBucket string
+	// UploadsBucket is the GCS bucket for user uploads (KYC docs, avatars, …).
+	UploadsBucket string
+	// SignerSA is the service-account email used to sign V4 URLs via the IAM
+	// SignBlob API (no key file needed). On Cloud Run this is the runtime SA.
+	SignerSA string
 }
 
 // BrevoConfig holds Brevo SMTP credentials for transactional email.
@@ -167,6 +172,8 @@ func Load() (*Config, error) {
 
 	cfg.GCP.ProjectID = getEnv("GCP_PROJECT_ID", "")
 	cfg.GCP.KYCBucket = getEnv("KYC_BUCKET", "")
+	cfg.GCP.UploadsBucket = getEnv("UPLOADS_BUCKET", cfg.GCP.KYCBucket)
+	cfg.GCP.SignerSA = getEnv("GCP_SIGNER_SA", "")
 
 	cfg.Brevo.SMTPHost = getEnv("BREVO_SMTP_HOST", "smtp-relay.brevo.com")
 	cfg.Brevo.SMTPPort = getEnvInt("BREVO_SMTP_PORT", 587)

@@ -141,7 +141,7 @@ func (q *Queries) GetReferralsList(ctx context.Context, referredBy *uuid.UUID) (
 }
 
 const getUserByReferralCode = `-- name: GetUserByReferralCode :one
-SELECT id, phone_number, email, first_name, last_name, pin_hash, kyc_status, is_active, created_at, updated_at, bio, avatar_url, date_of_birth, nationality, is_email_verified, role, auth_provider, google_sub, totp_secret, totp_enabled, account_type, country, kyc_provider, referral_code, referred_by FROM users WHERE referral_code = $1 LIMIT 1
+SELECT id, phone_number, email, first_name, last_name, pin_hash, kyc_status, is_active, created_at, updated_at, bio, avatar_url, date_of_birth, nationality, is_email_verified, role, auth_provider, google_sub, totp_secret, totp_enabled, account_type, country, kyc_provider, referral_code, referred_by, kyc_provider_status, kyc_manual_override, bvn FROM users WHERE referral_code = $1 LIMIT 1
 `
 
 func (q *Queries) GetUserByReferralCode(ctx context.Context, referralCode *string) (User, error) {
@@ -173,6 +173,9 @@ func (q *Queries) GetUserByReferralCode(ctx context.Context, referralCode *strin
 		&i.KycProvider,
 		&i.ReferralCode,
 		&i.ReferredBy,
+		&i.KycProviderStatus,
+		&i.KycManualOverride,
+		&i.Bvn,
 	)
 	return i, err
 }

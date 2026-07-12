@@ -41,7 +41,8 @@ type RegisterRequest struct {
 	FirstName   string `json:"first_name" example:"Alice"`
 	LastName    string `json:"last_name" example:"Dupont"`
 	PIN         string `json:"pin" example:"123456"`
-	Country     string `json:"country" example:"CM"` // ISO 3166-1 alpha-2
+	Country     string `json:"country" example:"CM"`                // ISO 3166-1 alpha-2
+	BVN         string `json:"bvn,omitempty" example:"12345678901"` // Nigerian Bank Verification Number (11 digits)
 	// Business accounts only — company-level KYB fields collected at signup.
 	CompanyLegalName       string `json:"company_legal_name,omitempty" example:"Acme SARL"`
 	CompanyRegistrationNo  string `json:"company_registration_no,omitempty" example:"RC/DLA/2020/B/1234"`
@@ -344,6 +345,7 @@ type ProfileData struct {
 	AvatarURL       *string `json:"avatar_url,omitempty"`
 	DateOfBirth     *string `json:"date_of_birth,omitempty" example:"1995-06-15"`
 	Nationality     *string `json:"nationality,omitempty" example:"Cameroonian"`
+	BVN             *string `json:"bvn,omitempty" example:"12345678901"`
 	KycStatus       string  `json:"kyc_status" example:"pending"`
 	IsEmailVerified bool    `json:"is_email_verified" example:"false"`
 }
@@ -360,6 +362,7 @@ type UpdateProfileRequest struct {
 	AvatarURL   *string `json:"avatar_url,omitempty"`
 	DateOfBirth *string `json:"date_of_birth,omitempty" example:"1995-06-15"`
 	Nationality *string `json:"nationality,omitempty" example:"Cameroonian"`
+	BVN         *string `json:"bvn,omitempty" example:"12345678901"`
 }
 
 // ─── Exchange ─────────────────────────────────────────────────────────────────

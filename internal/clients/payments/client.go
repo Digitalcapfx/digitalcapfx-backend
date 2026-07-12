@@ -537,13 +537,46 @@ func (c *Client) do(req *http.Request, out any) error {
 
 // ── Swap (unified: on-chain DEX + cross-chain bridge, routing is internal) ────
 
-// GetSwapQuoteParams identify the pair and amount to quote.
+// TokenInfo is one supported token on a chain (from GET /swap/tokens).
+type TokenInfo struct {
+	Symbol   string `json:"symbol"`
+	Address  string `json:"address"` // "native" for the chain coin
+	Decimals int    `json:"decimals"`
+	Name     string `json:"name"`
+}
+
+// SupportedTokensResponse is the payments /swap/tokens response. When a chain
+// is requested, Chain+Tokens are set; without a chain, Chains holds all of them.
+type SupportedTokensResponse struct {
+	Chain  string                 `json:"chain,omitempty"`
+	Tokens []TokenInfo            `json:"tokens,omitempty"`
+	Chains map[string][]TokenInfo `json:"chains,omitempty"`
+}
+
+// GetSupportedTokens lists the symbols merchants can pass instead of addresses.
+// GET /api/v1/swap/tokens (public on payments).
+func (c *Client) GetSupportedTokens(ctx context.Context, chain string) (*SupportedTokensResponse, error) {
+	q := url.Values{}
+	if chain != "" {
+		q.Set("chain", chain)
+	}
+	var out SupportedTokensResponse
+	if err := c.get(ctx, "/api/v1/swap/tokens", q, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// GetSwapQuoteParams identify the pair and amount to quote. Tokens may be
+// symbols ("USDC"), "native", or 0x addresses. Provide Amount (human units,
+// e.g. "5" or "1.5") or AmountIn (raw base units) — Amount is preferred.
 type GetSwapQuoteParams struct {
-	FromChain string // e.g. "POL", "BSC"
+	FromChain string // e.g. "POL", "BSC", "polygon", "137"
 	ToChain   string
-	FromToken string // token contract address or "native"
+	FromToken string
 	ToToken   string
-	AmountIn  string // amount in base units as a decimal string
+	Amount    string // human units (preferred)
+	AmountIn  string // base units (fallback)
 }
 
 // SwapQuoteResponse mirrors the payments service TokenSwapQuoteResponse.
@@ -569,7 +602,11 @@ func (c *Client) GetSwapQuote(ctx context.Context, p GetSwapQuoteParams) (*SwapQ
 	q.Set("to_chain", p.ToChain)
 	q.Set("from_token", p.FromToken)
 	q.Set("to_token", p.ToToken)
-	q.Set("amount_in", p.AmountIn)
+	if p.Amount != "" {
+		q.Set("amount", p.Amount)
+	} else {
+		q.Set("amount_in", p.AmountIn)
+	}
 	var out SwapQuoteResponse
 	if err := c.get(ctx, "/api/v1/swap/quote", q, &out); err != nil {
 		return nil, err
@@ -577,13 +614,16 @@ func (c *Client) GetSwapQuote(ctx context.Context, p GetSwapQuoteParams) (*SwapQ
 	return &out, nil
 }
 
-// ExecuteSwapRequest is the payload for ExecuteSwap. Amounts are base units.
+// ExecuteSwapRequest is the payload for ExecuteSwap. Tokens may be symbols,
+// "native", or 0x addresses. Provide Amount (human units) or AmountIn (base
+// units); AmountOutMin follows the same convention as whichever was used.
 type ExecuteSwapRequest struct {
 	FromChain    string `json:"from_chain"`
 	ToChain      string `json:"to_chain"`
 	FromToken    string `json:"from_token"`
 	ToToken      string `json:"to_token"`
-	AmountIn     string `json:"amount_in"`
+	Amount       string `json:"amount,omitempty"`
+	AmountIn     string `json:"amount_in,omitempty"`
 	AmountOutMin string `json:"amount_out_min,omitempty"`
 }
 

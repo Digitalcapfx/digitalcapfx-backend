@@ -110,6 +110,13 @@ definitions:
         example: 550e8400-e29b-41d4-a716-446655440001
         type: string
     type: object
+  handlers.AccountLimitsResponse:
+    properties:
+      limits:
+        $ref: '#/definitions/services.AccountLimits'
+      usage:
+        $ref: '#/definitions/handlers.LimitsUsage'
+    type: object
   handlers.AccountListResponse:
     properties:
       data:
@@ -162,6 +169,15 @@ definitions:
         type: string
     type: object
   handlers.BeneficiaryResponse:
+    type: object
+  handlers.BusinessAnalyticsResponse:
+    properties:
+      analytics:
+        $ref: '#/definitions/services.BusinessAnalyticsData'
+      limits:
+        $ref: '#/definitions/services.AccountLimits'
+      limits_usage:
+        $ref: '#/definitions/handlers.LimitsUsage'
     type: object
   handlers.CaasWalletData:
     properties:
@@ -722,6 +738,13 @@ definitions:
         example: true
         type: boolean
     type: object
+  handlers.LimitsUsage:
+    properties:
+      daily_withdrawal_remaining_usd:
+        type: number
+      daily_withdrawal_used_usd:
+        type: number
+    type: object
   handlers.LoginRequest:
     properties:
       phone:
@@ -811,6 +834,9 @@ definitions:
       bio:
         example: Digital finance enthusiast from Cameroon
         type: string
+      bvn:
+        example: "12345678901"
+        type: string
       date_of_birth:
         example: "1995-06-15"
         type: string
@@ -863,6 +889,10 @@ definitions:
         type: string
       business_website:
         example: https://acme.example.com
+        type: string
+      bvn:
+        description: Nigerian Bank Verification Number (11 digits)
+        example: "12345678901"
         type: string
       company_legal_name:
         description: Business accounts only — company-level KYB fields collected at
@@ -985,6 +1015,44 @@ definitions:
     properties:
       phone:
         example: "+237612345678"
+        type: string
+    type: object
+  handlers.SetAccountTypeInput:
+    properties:
+      account_type:
+        description: individual | business
+        type: string
+    type: object
+  handlers.SetUserLimitsInput:
+    properties:
+      daily_transaction_count:
+        type: integer
+      daily_withdrawal_usd:
+        type: number
+      max_holding_balance_usd:
+        type: number
+      monthly_volume_usd:
+        type: number
+      note:
+        type: string
+      per_transaction_usd:
+        type: number
+    type: object
+  handlers.SwapExecuteRequest:
+    properties:
+      amount:
+        type: string
+      amount_in:
+        type: string
+      amount_out_min:
+        type: string
+      from_chain:
+        type: string
+      from_token:
+        type: string
+      to_chain:
+        type: string
+      to_token:
         type: string
     type: object
   handlers.TOTPLoginRequest:
@@ -1128,6 +1196,9 @@ definitions:
       bio:
         example: Digital finance enthusiast
         type: string
+      bvn:
+        example: "12345678901"
+        type: string
       date_of_birth:
         example: "1995-06-15"
         type: string
@@ -1174,6 +1245,19 @@ definitions:
         - readonly
         example: support
         type: string
+    type: object
+  handlers.UpdateTierLimitsInput:
+    properties:
+      daily_transaction_count:
+        type: integer
+      daily_withdrawal_usd:
+        type: number
+      max_holding_balance_usd:
+        type: number
+      monthly_volume_usd:
+        type: number
+      per_transaction_usd:
+        type: number
     type: object
   handlers.VerifyEmailRequest:
     properties:
@@ -1307,6 +1391,21 @@ definitions:
       total:
         type: integer
     type: object
+  payments.SupportedTokensResponse:
+    properties:
+      chain:
+        type: string
+      chains:
+        additionalProperties:
+          items:
+            $ref: '#/definitions/payments.TokenInfo'
+          type: array
+        type: object
+      tokens:
+        items:
+          $ref: '#/definitions/payments.TokenInfo'
+        type: array
+    type: object
   payments.SwapQuoteResponse:
     properties:
       estimated_seconds:
@@ -1373,6 +1472,202 @@ definitions:
       updated_at:
         type: string
     type: object
+  payments.TokenInfo:
+    properties:
+      address:
+        description: '"native" for the chain coin'
+        type: string
+      decimals:
+        type: integer
+      name:
+        type: string
+      symbol:
+        type: string
+    type: object
+  services.AccountLimits:
+    properties:
+      daily_transaction_count:
+        type: integer
+      daily_withdrawal_usd:
+        type: number
+      max_holding_balance_usd:
+        type: number
+      monthly_volume_usd:
+        type: number
+      per_transaction_usd:
+        type: number
+      tier:
+        description: '"individual" | "business"'
+        type: string
+    type: object
+  services.AccountLimitsOverride:
+    properties:
+      daily_transaction_count:
+        type: integer
+      daily_withdrawal_usd:
+        type: number
+      max_holding_balance_usd:
+        type: number
+      monthly_volume_usd:
+        type: number
+      note:
+        type: string
+      per_transaction_usd:
+        type: number
+    type: object
+  services.AssetAllocationInsight:
+    properties:
+      crypto_formatted:
+        description: '"$83,693"'
+        type: string
+      crypto_pct:
+        type: number
+      crypto_usd:
+        type: number
+      fiat_formatted:
+        description: '"$35,783"'
+        type: string
+      fiat_pct:
+        type: number
+      fiat_usd:
+        type: number
+      total_formatted:
+        type: string
+      total_usd:
+        type: number
+    type: object
+  services.BalanceTrendPoint:
+    properties:
+      crypto_usd:
+        type: number
+      date:
+        description: '"May 27", "Jun 2", ...'
+        type: string
+      fiat_usd:
+        type: number
+      total_usd:
+        type: number
+    type: object
+  services.BusinessAnalyticsData:
+    properties:
+      account_balances:
+        items:
+          $ref: '#/definitions/services.CurrencyBalance'
+        type: array
+      insights:
+        $ref: '#/definitions/services.InsightsData'
+      period:
+        type: string
+      transaction_stats:
+        $ref: '#/definitions/services.BusinessTxStats'
+      volume_by_currency:
+        items:
+          $ref: '#/definitions/services.CurrencyVolume'
+        type: array
+    type: object
+  services.BusinessTxStats:
+    properties:
+      avg_transaction_usd:
+        type: number
+      count:
+        type: integer
+      total_volume_usd:
+        type: number
+    type: object
+  services.CurrencyBalance:
+    properties:
+      balance:
+        description: native currency
+        type: number
+      balance_usd:
+        description: USD-normalised
+        type: number
+      currency:
+        type: string
+    type: object
+  services.CurrencyVolume:
+    properties:
+      count:
+        type: integer
+      currency:
+        type: string
+      volume:
+        description: native currency
+        type: number
+      volume_usd:
+        description: USD-normalised
+        type: number
+    type: object
+  services.InsightsData:
+    properties:
+      asset_allocation:
+        $ref: '#/definitions/services.AssetAllocationInsight'
+      balance_trends:
+        items:
+          $ref: '#/definitions/services.BalanceTrendPoint'
+        type: array
+      crypto_balance:
+        type: number
+      fiat_balance:
+        type: number
+      monthly_flow:
+        items:
+          $ref: '#/definitions/services.MonthlyFlowPoint'
+        type: array
+      net_flow:
+        type: number
+      net_formatted:
+        type: string
+      period:
+        description: '"1w" | "1m" | "3m" | "6m"'
+        type: string
+      spending_by_type:
+        items:
+          $ref: '#/definitions/services.SpendingByTypePoint'
+        type: array
+      summary:
+        $ref: '#/definitions/services.InsightsSummary'
+      total_activity:
+        type: number
+      total_activity_formatted:
+        type: string
+      trend_change:
+        description: "10.7"
+        type: number
+      trend_formatted:
+        description: '"+10.7%"'
+        type: string
+    type: object
+  services.InsightsSummary:
+    properties:
+      income_formatted:
+        type: string
+      income_month:
+        type: number
+      net_flow:
+        type: number
+      net_formatted:
+        description: '"+$13,480" | "-$2,000"'
+        type: string
+      spending_formatted:
+        type: string
+      spending_month:
+        type: number
+      total_balance:
+        type: number
+      total_formatted:
+        type: string
+    type: object
+  services.MonthlyFlowPoint:
+    properties:
+      income:
+        type: number
+      month:
+        description: '"Jan", "Feb", ...'
+        type: string
+      spending:
+        type: number
+    type: object
   services.PointsHistoryResponse:
     properties:
       history:
@@ -1410,6 +1705,52 @@ definitions:
       last_name:
         type: string
     type: object
+  services.SpendingByTypePoint:
+    properties:
+      crypto_amount:
+        type: number
+      fiat_amount:
+        type: number
+      label:
+        description: '"Send", "Exchange", ...'
+        type: string
+      total_amount:
+        type: number
+      type:
+        description: '"send" | "exchange" | "withdraw" | "deposit"'
+        type: string
+    type: object
+  services.UploadResult:
+    properties:
+      bucket:
+        type: string
+      mime_type:
+        type: string
+      object:
+        description: path within the bucket
+        type: string
+      purpose:
+        type: string
+      read_url:
+        description: signed HTTPS URL, time-limited
+        type: string
+      uri:
+        description: gs://bucket/object (stable reference)
+        type: string
+    type: object
+  services.UserLimitsView:
+    properties:
+      account_type:
+        type: string
+      effective:
+        $ref: '#/definitions/services.AccountLimits'
+      override:
+        $ref: '#/definitions/services.AccountLimitsOverride'
+      tier_default:
+        $ref: '#/definitions/services.AccountLimits'
+      user_id:
+        type: string
+    type: object
 host: localhost:8080
 info:
   contact:
@@ -1423,6 +1764,26 @@ info:
   title: DigitalFX API
   version: "1.0"
 paths:
+  /account/limits:
+    get:
+      description: Returns the caller's tier limits (individual vs business) and current
+        24h withdrawal usage.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.AccountLimitsResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get account limits and usage
+      tags:
+      - account
   /accounts:
     get:
       description: Returns all fiat accounts (XAF, XOF, USD, GBP, EUR) for the authenticated
@@ -1760,6 +2121,37 @@ paths:
       summary: Reject user KYC
       tags:
       - admin
+  /admin/kyc/{id}/release:
+    post:
+      description: Clears the admin manual-override flag so the automated provider
+        (Sumsub) can once again set the user's KYC status via webhook. Use this to
+        undo a manual approve/reject and return to hybrid auto mode.
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.MessageResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Release KYC control back to the provider
+      tags:
+      - admin
   /admin/kyc/pending:
     get:
       description: Returns all users whose identity verification status is "under_review"
@@ -1784,6 +2176,80 @@ paths:
       summary: List users awaiting KYC review
       tags:
       - admin
+  /admin/limits:
+    get:
+      description: Returns the current (admin-editable) limits for every account tier.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: List account-tier limits
+      tags:
+      - admin-limits
+  /admin/limits/{tier}:
+    patch:
+      consumes:
+      - application/json
+      description: Persists new limits for a tier (individual|business). Takes effect
+        within seconds across the platform.
+      parameters:
+      - description: Tier
+        enum:
+        - individual
+        - business
+        in: path
+        name: tier
+        required: true
+        type: string
+      - description: New limits
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.UpdateTierLimitsInput'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Update an account-tier's limits
+      tags:
+      - admin-limits
+  /admin/permissions:
+    get:
+      description: Returns the full grouped catalogue of every permission the platform
+        understands, plus the two wildcard forms ("*" for full control and "resource:*"
+        per group). Use this to build a granular permission-assignment matrix. Grant
+        "*" to give a staff member complete control of every function, feature and
+        setting.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Permission catalogue
+      tags:
+      - admin-staff
   /admin/roles:
     get:
       description: Returns all role definitions with their default permissions, labels,
@@ -2140,6 +2606,41 @@ paths:
       summary: Get full user detail
       tags:
       - admin-users
+  /admin/users/{id}/account-type:
+    post:
+      consumes:
+      - application/json
+      description: Switches a user between individual and business tiers (changes
+        their default limits and unlocks/locks business features).
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Account type
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.SetAccountTypeInput'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Change a user's account type
+      tags:
+      - admin-limits
   /admin/users/{id}/disable:
     post:
       consumes:
@@ -2231,6 +2732,86 @@ paths:
       summary: Reset a user's KYC status
       tags:
       - admin-users
+  /admin/users/{id}/limits:
+    delete:
+      description: Removes a per-user override so the user falls back to their tier
+        limits.
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/services.UserLimitsView'
+      security:
+      - BearerAuth: []
+      summary: Clear a user's limit override
+      tags:
+      - admin-limits
+    get:
+      description: Returns a user's effective limits, the tier default they derive
+        from, and any per-user override.
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/services.UserLimitsView'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get a user's limits
+      tags:
+      - admin-limits
+    put:
+      consumes:
+      - application/json
+      description: Creates or replaces a per-user limit override. Null fields inherit
+        the tier limit.
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Override
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.SetUserLimitsInput'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/services.UserLimitsView'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Set a user's limit override
+      tags:
+      - admin-limits
   /admin/users/{id}/transactions:
     get:
       description: Returns paginated transaction history across all fiat accounts
@@ -2739,6 +3320,41 @@ paths:
       summary: Refresh token
       tags:
       - auth
+  /business/analytics:
+    get:
+      description: 'Rich analytics reserved for business accounts: insights plus transaction
+        stats, per-currency volume/balance breakdowns, and limits usage. Returns 403
+        for individual accounts.'
+      parameters:
+      - description: Period
+        enum:
+        - 1w
+        - 1m
+        - 3m
+        - 6m
+        in: query
+        name: period
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.BusinessAnalyticsResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Business analytics dashboard
+      tags:
+      - business
   /crypto/balances:
     get:
       description: Returns the USDC balance of the caller's ERC-4337 Smart Contract
@@ -3951,6 +4567,134 @@ paths:
       summary: Reply to a ticket
       tags:
       - support
+  /swap/execute:
+    post:
+      consumes:
+      - application/json
+      description: Swaps tokens from the authenticated user's WaaS wallet. Routing
+        (DEX vs bridge) is internal; you get a tx hash. Slippage is auto-protected
+        at 99.5% of a live quote unless amount_out_min is set.
+      parameters:
+      - description: Swap details
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.SwapExecuteRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/payments.ExecuteSwapResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Execute a swap
+      tags:
+      - swap
+  /swap/history:
+    get:
+      description: The authenticated user's paginated swap history.
+      parameters:
+      - description: Page number (default 1)
+        in: query
+        name: page
+        type: integer
+      - description: Results per page (default 20)
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/payments.GetSwapHistoryResponse'
+      security:
+      - BearerAuth: []
+      summary: Get swap history
+      tags:
+      - swap
+  /swap/quote:
+    get:
+      description: Returns the best available price for a pair. Tokens may be symbols
+        or 0x addresses; amount is human units (e.g. "5") or amount_in for base units.
+      parameters:
+      - description: Source chain (POL, BSC, ETH, …)
+        in: query
+        name: from_chain
+        required: true
+        type: string
+      - description: Destination chain
+        in: query
+        name: to_chain
+        required: true
+        type: string
+      - description: Symbol, native, or 0x address
+        in: query
+        name: from_token
+        required: true
+        type: string
+      - description: Symbol, native, or 0x address
+        in: query
+        name: to_token
+        required: true
+        type: string
+      - description: Human units, e.g. 5 or 1.5
+        in: query
+        name: amount
+        type: string
+      - description: Base units (alternative to amount)
+        in: query
+        name: amount_in
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/payments.SwapQuoteResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get a swap price quote
+      tags:
+      - swap
+  /swap/tokens:
+    get:
+      description: Symbols you can use instead of raw contract addresses, per chain.
+        Omit chain for all chains.
+      parameters:
+      - description: Chain key (POL, BSC, ETH, …)
+        in: query
+        name: chain
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/payments.SupportedTokensResponse'
+      security:
+      - BearerAuth: []
+      summary: List supported swap tokens
+      tags:
+      - swap
   /team:
     get:
       description: Returns all staff members invited or active for this business.
@@ -4223,6 +4967,79 @@ paths:
       summary: Internal fiat transfer
       tags:
       - transfers
+  /uploads:
+    post:
+      consumes:
+      - multipart/form-data
+      description: Multipart upload of a KYC document, avatar, or other file. Returns
+        the stored object path and a time-limited signed URL to read it. Pass the
+        object or read_url to /kyc/documents, PATCH /profile, etc.
+      parameters:
+      - description: The file to upload (max 15 MB)
+        in: formData
+        name: file
+        required: true
+        type: file
+      - description: kyc | avatar | document | business | misc
+        in: formData
+        name: purpose
+        type: string
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/services.UploadResult'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "413":
+          description: Request Entity Too Large
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Upload a file
+      tags:
+      - uploads
+  /uploads/read-url:
+    get:
+      description: Returns a fresh time-limited URL to download a previously uploaded
+        object.
+      parameters:
+      - description: Object path returned by POST /uploads
+        in: query
+        name: object
+        required: true
+        type: string
+      - description: Lifetime in seconds (default 604800)
+        in: query
+        name: ttl
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get a signed read URL
+      tags:
+      - uploads
   /wallets:
     get:
       description: Returns all on-chain HD wallets (BIP-44) provisioned for the authenticated
@@ -4826,6 +5643,24 @@ paths:
           schema:
             $ref: '#/definitions/handlers.ErrorResponse'
       summary: HUB2 payment webhook
+      tags:
+      - webhooks
+  /webhooks/kyc:
+    post:
+      consumes:
+      - application/json
+      description: Receives verification result events from the configured KYC provider
+        (Sumsub). The provider's decision is recorded and, unless an admin has taken
+        manual control, applied to the user's KYC status (hybrid auto-approval). Signature
+        is verified inside the provider.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.MessageResponse'
+      summary: KYC provider webhook (Sumsub)
       tags:
       - webhooks
   /webhooks/metamap:

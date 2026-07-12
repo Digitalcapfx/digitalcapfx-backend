@@ -1,0 +1,27 @@
+# Builds and pushes both the server and migrate images to Artifact Registry.
+# Usage: gcloud builds submit --config cloudbuild.deploy.yaml .
+steps:
+  - name: gcr.io/cloud-builders/docker
+    id: build-server
+    args:
+      - build
+      - -t
+      - europe-west2-docker.pkg.dev/$PROJECT_ID/digitalcapfx/server:latest
+      - -f
+      - Dockerfile
+      - .
+  - name: gcr.io/cloud-builders/docker
+    id: build-migrate
+    args:
+      - build
+      - -t
+      - europe-west2-docker.pkg.dev/$PROJECT_ID/digitalcapfx/migrate:latest
+      - -f
+      - Dockerfile.migrate
+      - .
+images:
+  - europe-west2-docker.pkg.dev/$PROJECT_ID/digitalcapfx/server:latest
+  - europe-west2-docker.pkg.dev/$PROJECT_ID/digitalcapfx/migrate:latest
+options:
+  machineType: E2_HIGHCPU_8
+timeout: 1200s

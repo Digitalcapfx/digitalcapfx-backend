@@ -18,6 +18,37 @@ const docTemplate = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
+        "/account/limits": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns the caller's tier limits (individual vs business) and current 24h withdrawal usage.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "account"
+                ],
+                "summary": "Get account limits and usage",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.AccountLimitsResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/accounts": {
             "get": {
                 "security": [
@@ -559,6 +590,161 @@ const docTemplate = `{
                 }
             }
         },
+        "/admin/kyc/{id}/release": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Clears the admin manual-override flag so the automated provider (Sumsub) can once again set the user's KYC status via webhook. Use this to undo a manual approve/reject and return to hybrid auto mode.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin"
+                ],
+                "summary": "Release KYC control back to the provider",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "User ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.MessageResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/limits": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns the current (admin-editable) limits for every account tier.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin-limits"
+                ],
+                "summary": "List account-tier limits",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/limits/{tier}": {
+            "patch": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Persists new limits for a tier (individual|business). Takes effect within seconds across the platform.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin-limits"
+                ],
+                "summary": "Update an account-tier's limits",
+                "parameters": [
+                    {
+                        "enum": [
+                            "individual",
+                            "business"
+                        ],
+                        "type": "string",
+                        "description": "Tier",
+                        "name": "tier",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "New limits",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.UpdateTierLimitsInput"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/permissions": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns the full grouped catalogue of every permission the platform understands, plus the two wildcard forms (\"*\" for full control and \"resource:*\" per group). Use this to build a granular permission-assignment matrix. Grant \"*\" to give a staff member complete control of every function, feature and setting.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin-staff"
+                ],
+                "summary": "Permission catalogue",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
         "/admin/roles": {
             "get": {
                 "security": [
@@ -1090,6 +1276,59 @@ const docTemplate = `{
                 }
             }
         },
+        "/admin/users/{id}/account-type": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Switches a user between individual and business tiers (changes their default limits and unlocks/locks business features).",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin-limits"
+                ],
+                "summary": "Change a user's account type",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "User ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Account type",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.SetAccountTypeInput"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/admin/users/{id}/disable": {
             "post": {
                 "security": [
@@ -1222,6 +1461,128 @@ const docTemplate = `{
                         "description": "Not Found",
                         "schema": {
                             "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/users/{id}/limits": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns a user's effective limits, the tier default they derive from, and any per-user override.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin-limits"
+                ],
+                "summary": "Get a user's limits",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "User ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/services.UserLimitsView"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Creates or replaces a per-user limit override. Null fields inherit the tier limit.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin-limits"
+                ],
+                "summary": "Set a user's limit override",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "User ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Override",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.SetUserLimitsInput"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/services.UserLimitsView"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Removes a per-user override so the user falls back to their tier limits.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin-limits"
+                ],
+                "summary": "Clear a user's limit override",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "User ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/services.UserLimitsView"
                         }
                     }
                 }
@@ -1983,6 +2344,57 @@ const docTemplate = `{
                     },
                     "401": {
                         "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/business/analytics": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Rich analytics reserved for business accounts: insights plus transaction stats, per-currency volume/balance breakdowns, and limits usage. Returns 403 for individual accounts.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "business"
+                ],
+                "summary": "Business analytics dashboard",
+                "parameters": [
+                    {
+                        "enum": [
+                            "1w",
+                            "1m",
+                            "3m",
+                            "6m"
+                        ],
+                        "type": "string",
+                        "description": "Period",
+                        "name": "period",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.BusinessAnalyticsResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
                         "schema": {
                             "$ref": "#/definitions/handlers.ErrorResponse"
                         }
@@ -3826,6 +4238,202 @@ const docTemplate = `{
                 }
             }
         },
+        "/swap/execute": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Swaps tokens from the authenticated user's WaaS wallet. Routing (DEX vs bridge) is internal; you get a tx hash. Slippage is auto-protected at 99.5% of a live quote unless amount_out_min is set.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "swap"
+                ],
+                "summary": "Execute a swap",
+                "parameters": [
+                    {
+                        "description": "Swap details",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.SwapExecuteRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/payments.ExecuteSwapResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/swap/history": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "The authenticated user's paginated swap history.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "swap"
+                ],
+                "summary": "Get swap history",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Page number (default 1)",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Results per page (default 20)",
+                        "name": "limit",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/payments.GetSwapHistoryResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/swap/quote": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns the best available price for a pair. Tokens may be symbols or 0x addresses; amount is human units (e.g. \"5\") or amount_in for base units.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "swap"
+                ],
+                "summary": "Get a swap price quote",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Source chain (POL, BSC, ETH, …)",
+                        "name": "from_chain",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Destination chain",
+                        "name": "to_chain",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Symbol, native, or 0x address",
+                        "name": "from_token",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Symbol, native, or 0x address",
+                        "name": "to_token",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Human units, e.g. 5 or 1.5",
+                        "name": "amount",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Base units (alternative to amount)",
+                        "name": "amount_in",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/payments.SwapQuoteResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/swap/tokens": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Symbols you can use instead of raw contract addresses, per chain. Omit chain for all chains.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "swap"
+                ],
+                "summary": "List supported swap tokens",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Chain key (POL, BSC, ETH, …)",
+                        "name": "chain",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/payments.SupportedTokensResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/team": {
             "get": {
                 "security": [
@@ -4242,6 +4850,116 @@ const docTemplate = `{
                     },
                     "500": {
                         "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/uploads": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Multipart upload of a KYC document, avatar, or other file. Returns the stored object path and a time-limited signed URL to read it. Pass the object or read_url to /kyc/documents, PATCH /profile, etc.",
+                "consumes": [
+                    "multipart/form-data"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "uploads"
+                ],
+                "summary": "Upload a file",
+                "parameters": [
+                    {
+                        "type": "file",
+                        "description": "The file to upload (max 15 MB)",
+                        "name": "file",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "kyc | avatar | document | business | misc",
+                        "name": "purpose",
+                        "in": "formData"
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/services.UploadResult"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "413": {
+                        "description": "Request Entity Too Large",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/uploads/read-url": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns a fresh time-limited URL to download a previously uploaded object.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "uploads"
+                ],
+                "summary": "Get a signed read URL",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Object path returned by POST /uploads",
+                        "name": "object",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Lifetime in seconds (default 604800)",
+                        "name": "ttl",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
                         "schema": {
                             "$ref": "#/definitions/handlers.ErrorResponse"
                         }
@@ -5159,6 +5877,29 @@ const docTemplate = `{
                 }
             }
         },
+        "/webhooks/kyc": {
+            "post": {
+                "description": "Receives verification result events from the configured KYC provider (Sumsub). The provider's decision is recorded and, unless an admin has taken manual control, applied to the user's KYC status (hybrid auto-approval). Signature is verified inside the provider.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "webhooks"
+                ],
+                "summary": "KYC provider webhook (Sumsub)",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.MessageResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/webhooks/metamap": {
             "post": {
                 "description": "Receives verification result events from MetaMap. Updates KYC status to approved or rejected.",
@@ -5695,6 +6436,17 @@ const docTemplate = `{
                 }
             }
         },
+        "handlers.AccountLimitsResponse": {
+            "type": "object",
+            "properties": {
+                "limits": {
+                    "$ref": "#/definitions/services.AccountLimits"
+                },
+                "usage": {
+                    "$ref": "#/definitions/handlers.LimitsUsage"
+                }
+            }
+        },
         "handlers.AccountListResponse": {
             "type": "object",
             "properties": {
@@ -5771,6 +6523,20 @@ const docTemplate = `{
         },
         "handlers.BeneficiaryResponse": {
             "type": "object"
+        },
+        "handlers.BusinessAnalyticsResponse": {
+            "type": "object",
+            "properties": {
+                "analytics": {
+                    "$ref": "#/definitions/services.BusinessAnalyticsData"
+                },
+                "limits": {
+                    "$ref": "#/definitions/services.AccountLimits"
+                },
+                "limits_usage": {
+                    "$ref": "#/definitions/handlers.LimitsUsage"
+                }
+            }
         },
         "handlers.CaasWalletData": {
             "type": "object",
@@ -6548,6 +7314,17 @@ const docTemplate = `{
                 }
             }
         },
+        "handlers.LimitsUsage": {
+            "type": "object",
+            "properties": {
+                "daily_withdrawal_remaining_usd": {
+                    "type": "number"
+                },
+                "daily_withdrawal_used_usd": {
+                    "type": "number"
+                }
+            }
+        },
         "handlers.LoginRequest": {
             "type": "object",
             "properties": {
@@ -6678,6 +7455,10 @@ const docTemplate = `{
                     "type": "string",
                     "example": "Digital finance enthusiast from Cameroon"
                 },
+                "bvn": {
+                    "type": "string",
+                    "example": "12345678901"
+                },
                 "date_of_birth": {
                     "type": "string",
                     "example": "1995-06-15"
@@ -6751,6 +7532,11 @@ const docTemplate = `{
                 "business_website": {
                     "type": "string",
                     "example": "https://acme.example.com"
+                },
+                "bvn": {
+                    "description": "Nigerian Bank Verification Number (11 digits)",
+                    "type": "string",
+                    "example": "12345678901"
                 },
                 "company_legal_name": {
                     "description": "Business accounts only — company-level KYB fields collected at signup.",
@@ -6924,6 +7710,64 @@ const docTemplate = `{
                 "phone": {
                     "type": "string",
                     "example": "+237612345678"
+                }
+            }
+        },
+        "handlers.SetAccountTypeInput": {
+            "type": "object",
+            "properties": {
+                "account_type": {
+                    "description": "individual | business",
+                    "type": "string"
+                }
+            }
+        },
+        "handlers.SetUserLimitsInput": {
+            "type": "object",
+            "properties": {
+                "daily_transaction_count": {
+                    "type": "integer"
+                },
+                "daily_withdrawal_usd": {
+                    "type": "number"
+                },
+                "max_holding_balance_usd": {
+                    "type": "number"
+                },
+                "monthly_volume_usd": {
+                    "type": "number"
+                },
+                "note": {
+                    "type": "string"
+                },
+                "per_transaction_usd": {
+                    "type": "number"
+                }
+            }
+        },
+        "handlers.SwapExecuteRequest": {
+            "type": "object",
+            "properties": {
+                "amount": {
+                    "type": "string"
+                },
+                "amount_in": {
+                    "type": "string"
+                },
+                "amount_out_min": {
+                    "type": "string"
+                },
+                "from_chain": {
+                    "type": "string"
+                },
+                "from_token": {
+                    "type": "string"
+                },
+                "to_chain": {
+                    "type": "string"
+                },
+                "to_token": {
+                    "type": "string"
                 }
             }
         },
@@ -7127,6 +7971,10 @@ const docTemplate = `{
                     "type": "string",
                     "example": "Digital finance enthusiast"
                 },
+                "bvn": {
+                    "type": "string",
+                    "example": "12345678901"
+                },
                 "date_of_birth": {
                     "type": "string",
                     "example": "1995-06-15"
@@ -7190,6 +8038,26 @@ const docTemplate = `{
                         "readonly"
                     ],
                     "example": "support"
+                }
+            }
+        },
+        "handlers.UpdateTierLimitsInput": {
+            "type": "object",
+            "properties": {
+                "daily_transaction_count": {
+                    "type": "integer"
+                },
+                "daily_withdrawal_usd": {
+                    "type": "number"
+                },
+                "max_holding_balance_usd": {
+                    "type": "number"
+                },
+                "monthly_volume_usd": {
+                    "type": "number"
+                },
+                "per_transaction_usd": {
+                    "type": "number"
                 }
             }
         },
@@ -7383,6 +8251,29 @@ const docTemplate = `{
                 }
             }
         },
+        "payments.SupportedTokensResponse": {
+            "type": "object",
+            "properties": {
+                "chain": {
+                    "type": "string"
+                },
+                "chains": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/definitions/payments.TokenInfo"
+                        }
+                    }
+                },
+                "tokens": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/payments.TokenInfo"
+                    }
+                }
+            }
+        },
         "payments.SwapQuoteResponse": {
             "type": "object",
             "properties": {
@@ -7482,6 +8373,299 @@ const docTemplate = `{
                 }
             }
         },
+        "payments.TokenInfo": {
+            "type": "object",
+            "properties": {
+                "address": {
+                    "description": "\"native\" for the chain coin",
+                    "type": "string"
+                },
+                "decimals": {
+                    "type": "integer"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "symbol": {
+                    "type": "string"
+                }
+            }
+        },
+        "services.AccountLimits": {
+            "type": "object",
+            "properties": {
+                "daily_transaction_count": {
+                    "type": "integer"
+                },
+                "daily_withdrawal_usd": {
+                    "type": "number"
+                },
+                "max_holding_balance_usd": {
+                    "type": "number"
+                },
+                "monthly_volume_usd": {
+                    "type": "number"
+                },
+                "per_transaction_usd": {
+                    "type": "number"
+                },
+                "tier": {
+                    "description": "\"individual\" | \"business\"",
+                    "type": "string"
+                }
+            }
+        },
+        "services.AccountLimitsOverride": {
+            "type": "object",
+            "properties": {
+                "daily_transaction_count": {
+                    "type": "integer"
+                },
+                "daily_withdrawal_usd": {
+                    "type": "number"
+                },
+                "max_holding_balance_usd": {
+                    "type": "number"
+                },
+                "monthly_volume_usd": {
+                    "type": "number"
+                },
+                "note": {
+                    "type": "string"
+                },
+                "per_transaction_usd": {
+                    "type": "number"
+                }
+            }
+        },
+        "services.AssetAllocationInsight": {
+            "type": "object",
+            "properties": {
+                "crypto_formatted": {
+                    "description": "\"$83,693\"",
+                    "type": "string"
+                },
+                "crypto_pct": {
+                    "type": "number"
+                },
+                "crypto_usd": {
+                    "type": "number"
+                },
+                "fiat_formatted": {
+                    "description": "\"$35,783\"",
+                    "type": "string"
+                },
+                "fiat_pct": {
+                    "type": "number"
+                },
+                "fiat_usd": {
+                    "type": "number"
+                },
+                "total_formatted": {
+                    "type": "string"
+                },
+                "total_usd": {
+                    "type": "number"
+                }
+            }
+        },
+        "services.BalanceTrendPoint": {
+            "type": "object",
+            "properties": {
+                "crypto_usd": {
+                    "type": "number"
+                },
+                "date": {
+                    "description": "\"May 27\", \"Jun 2\", ...",
+                    "type": "string"
+                },
+                "fiat_usd": {
+                    "type": "number"
+                },
+                "total_usd": {
+                    "type": "number"
+                }
+            }
+        },
+        "services.BusinessAnalyticsData": {
+            "type": "object",
+            "properties": {
+                "account_balances": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/services.CurrencyBalance"
+                    }
+                },
+                "insights": {
+                    "$ref": "#/definitions/services.InsightsData"
+                },
+                "period": {
+                    "type": "string"
+                },
+                "transaction_stats": {
+                    "$ref": "#/definitions/services.BusinessTxStats"
+                },
+                "volume_by_currency": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/services.CurrencyVolume"
+                    }
+                }
+            }
+        },
+        "services.BusinessTxStats": {
+            "type": "object",
+            "properties": {
+                "avg_transaction_usd": {
+                    "type": "number"
+                },
+                "count": {
+                    "type": "integer"
+                },
+                "total_volume_usd": {
+                    "type": "number"
+                }
+            }
+        },
+        "services.CurrencyBalance": {
+            "type": "object",
+            "properties": {
+                "balance": {
+                    "description": "native currency",
+                    "type": "number"
+                },
+                "balance_usd": {
+                    "description": "USD-normalised",
+                    "type": "number"
+                },
+                "currency": {
+                    "type": "string"
+                }
+            }
+        },
+        "services.CurrencyVolume": {
+            "type": "object",
+            "properties": {
+                "count": {
+                    "type": "integer"
+                },
+                "currency": {
+                    "type": "string"
+                },
+                "volume": {
+                    "description": "native currency",
+                    "type": "number"
+                },
+                "volume_usd": {
+                    "description": "USD-normalised",
+                    "type": "number"
+                }
+            }
+        },
+        "services.InsightsData": {
+            "type": "object",
+            "properties": {
+                "asset_allocation": {
+                    "$ref": "#/definitions/services.AssetAllocationInsight"
+                },
+                "balance_trends": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/services.BalanceTrendPoint"
+                    }
+                },
+                "crypto_balance": {
+                    "type": "number"
+                },
+                "fiat_balance": {
+                    "type": "number"
+                },
+                "monthly_flow": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/services.MonthlyFlowPoint"
+                    }
+                },
+                "net_flow": {
+                    "type": "number"
+                },
+                "net_formatted": {
+                    "type": "string"
+                },
+                "period": {
+                    "description": "\"1w\" | \"1m\" | \"3m\" | \"6m\"",
+                    "type": "string"
+                },
+                "spending_by_type": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/services.SpendingByTypePoint"
+                    }
+                },
+                "summary": {
+                    "$ref": "#/definitions/services.InsightsSummary"
+                },
+                "total_activity": {
+                    "type": "number"
+                },
+                "total_activity_formatted": {
+                    "type": "string"
+                },
+                "trend_change": {
+                    "description": "10.7",
+                    "type": "number"
+                },
+                "trend_formatted": {
+                    "description": "\"+10.7%\"",
+                    "type": "string"
+                }
+            }
+        },
+        "services.InsightsSummary": {
+            "type": "object",
+            "properties": {
+                "income_formatted": {
+                    "type": "string"
+                },
+                "income_month": {
+                    "type": "number"
+                },
+                "net_flow": {
+                    "type": "number"
+                },
+                "net_formatted": {
+                    "description": "\"+$13,480\" | \"-$2,000\"",
+                    "type": "string"
+                },
+                "spending_formatted": {
+                    "type": "string"
+                },
+                "spending_month": {
+                    "type": "number"
+                },
+                "total_balance": {
+                    "type": "number"
+                },
+                "total_formatted": {
+                    "type": "string"
+                }
+            }
+        },
+        "services.MonthlyFlowPoint": {
+            "type": "object",
+            "properties": {
+                "income": {
+                    "type": "number"
+                },
+                "month": {
+                    "description": "\"Jan\", \"Feb\", ...",
+                    "type": "string"
+                },
+                "spending": {
+                    "type": "number"
+                }
+            }
+        },
         "services.PointsHistoryResponse": {
             "type": "object",
             "properties": {
@@ -7535,6 +8719,74 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "last_name": {
+                    "type": "string"
+                }
+            }
+        },
+        "services.SpendingByTypePoint": {
+            "type": "object",
+            "properties": {
+                "crypto_amount": {
+                    "type": "number"
+                },
+                "fiat_amount": {
+                    "type": "number"
+                },
+                "label": {
+                    "description": "\"Send\", \"Exchange\", ...",
+                    "type": "string"
+                },
+                "total_amount": {
+                    "type": "number"
+                },
+                "type": {
+                    "description": "\"send\" | \"exchange\" | \"withdraw\" | \"deposit\"",
+                    "type": "string"
+                }
+            }
+        },
+        "services.UploadResult": {
+            "type": "object",
+            "properties": {
+                "bucket": {
+                    "type": "string"
+                },
+                "mime_type": {
+                    "type": "string"
+                },
+                "object": {
+                    "description": "path within the bucket",
+                    "type": "string"
+                },
+                "purpose": {
+                    "type": "string"
+                },
+                "read_url": {
+                    "description": "signed HTTPS URL, time-limited",
+                    "type": "string"
+                },
+                "uri": {
+                    "description": "gs://bucket/object (stable reference)",
+                    "type": "string"
+                }
+            }
+        },
+        "services.UserLimitsView": {
+            "type": "object",
+            "properties": {
+                "account_type": {
+                    "type": "string"
+                },
+                "effective": {
+                    "$ref": "#/definitions/services.AccountLimits"
+                },
+                "override": {
+                    "$ref": "#/definitions/services.AccountLimitsOverride"
+                },
+                "tier_default": {
+                    "$ref": "#/definitions/services.AccountLimits"
+                },
+                "user_id": {
                     "type": "string"
                 }
             }

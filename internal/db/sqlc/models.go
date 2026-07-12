@@ -313,6 +313,17 @@ type Otp struct {
 	CreatedAt   time.Time `json:"created_at"`
 }
 
+type PlatformLimit struct {
+	Tier                  string     `json:"tier"`
+	DailyWithdrawalUsd    float64    `json:"daily_withdrawal_usd"`
+	PerTransactionUsd     float64    `json:"per_transaction_usd"`
+	MonthlyVolumeUsd      float64    `json:"monthly_volume_usd"`
+	MaxHoldingBalanceUsd  float64    `json:"max_holding_balance_usd"`
+	DailyTransactionCount int32      `json:"daily_transaction_count"`
+	UpdatedAt             time.Time  `json:"updated_at"`
+	UpdatedBy             *uuid.UUID `json:"updated_by"`
+}
+
 type PointsLedger struct {
 	ID          uuid.UUID `json:"id"`
 	UserID      uuid.UUID `json:"user_id"`
@@ -370,31 +381,46 @@ type Transaction struct {
 }
 
 type User struct {
-	ID              uuid.UUID  `json:"id"`
-	PhoneNumber     string     `json:"phone_number"`
-	Email           *string    `json:"email"`
-	FirstName       string     `json:"first_name"`
-	LastName        string     `json:"last_name"`
-	PinHash         *string    `json:"pin_hash"`
-	KycStatus       string     `json:"kyc_status"`
-	IsActive        bool       `json:"is_active"`
-	CreatedAt       time.Time  `json:"created_at"`
-	UpdatedAt       time.Time  `json:"updated_at"`
-	Bio             *string    `json:"bio"`
-	AvatarURL       *string    `json:"avatar_url"`
-	DateOfBirth     *string    `json:"date_of_birth"`
-	Nationality     *string    `json:"nationality"`
-	IsEmailVerified bool       `json:"is_email_verified"`
-	Role            string     `json:"role"`
-	AuthProvider    string     `json:"auth_provider"`
-	GoogleSub       *string    `json:"google_sub"`
-	TOTPSecret      *string    `json:"totp_secret"`
-	TOTPEnabled     bool       `json:"totp_enabled"`
-	AccountType     string     `json:"account_type"`
-	Country         *string    `json:"country"`
-	KycProvider     *string    `json:"kyc_provider"`
-	ReferralCode    *string    `json:"referral_code"`
-	ReferredBy      *uuid.UUID `json:"referred_by"`
+	ID                uuid.UUID  `json:"id"`
+	PhoneNumber       string     `json:"phone_number"`
+	Email             *string    `json:"email"`
+	FirstName         string     `json:"first_name"`
+	LastName          string     `json:"last_name"`
+	PinHash           *string    `json:"pin_hash"`
+	KycStatus         string     `json:"kyc_status"`
+	IsActive          bool       `json:"is_active"`
+	CreatedAt         time.Time  `json:"created_at"`
+	UpdatedAt         time.Time  `json:"updated_at"`
+	Bio               *string    `json:"bio"`
+	AvatarURL         *string    `json:"avatar_url"`
+	DateOfBirth       *string    `json:"date_of_birth"`
+	Nationality       *string    `json:"nationality"`
+	IsEmailVerified   bool       `json:"is_email_verified"`
+	Role              string     `json:"role"`
+	AuthProvider      string     `json:"auth_provider"`
+	GoogleSub         *string    `json:"google_sub"`
+	TOTPSecret        *string    `json:"totp_secret"`
+	TOTPEnabled       bool       `json:"totp_enabled"`
+	AccountType       string     `json:"account_type"`
+	Country           *string    `json:"country"`
+	KycProvider       *string    `json:"kyc_provider"`
+	ReferralCode      *string    `json:"referral_code"`
+	ReferredBy        *uuid.UUID `json:"referred_by"`
+	KycProviderStatus *string    `json:"kyc_provider_status"`
+	KycManualOverride bool       `json:"kyc_manual_override"`
+	Bvn               *string    `json:"bvn"`
+}
+
+type UserLimitOverride struct {
+	UserID                uuid.UUID  `json:"user_id"`
+	DailyWithdrawalUsd    *float64   `json:"daily_withdrawal_usd"`
+	PerTransactionUsd     *float64   `json:"per_transaction_usd"`
+	MonthlyVolumeUsd      *float64   `json:"monthly_volume_usd"`
+	MaxHoldingBalanceUsd  *float64   `json:"max_holding_balance_usd"`
+	DailyTransactionCount *int32     `json:"daily_transaction_count"`
+	Note                  string     `json:"note"`
+	UpdatedAt             time.Time  `json:"updated_at"`
+	UpdatedBy             *uuid.UUID `json:"updated_by"`
 }
 
 type UserPreference struct {

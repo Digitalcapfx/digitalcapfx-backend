@@ -53,11 +53,15 @@ func newRouter(cfg *config.Config, svc *services.Services, pool *pgxpool.Pool, l
 	insightsH := handlers.NewInsightsHandler(svc)
 	adminStaffH := handlers.NewAdminStaffHandler(svc)
 	adminUsersH := handlers.NewAdminUsersHandler(svc)
+	adminLimitsH := handlers.NewAdminLimitsHandler(svc)
 	webhookH := handlers.NewWebhookHandler(svc, cfg.HUB2.SecretKey, logger)
 	businessH := handlers.NewBusinessHandler(svc)
 	teamH := handlers.NewTeamHandler(svc)
 	referralH := handlers.NewReferralHandler(svc)
 	marketH := handlers.NewMarketHandler(cfg, logger)
+	swapH := handlers.NewSwapHandler(svc)
+	uploadH := handlers.NewUploadHandler(svc)
+	limitsH := handlers.NewLimitsHandler(svc)
 	paymentsWebhookH := handlers.NewPaymentsWebhookHandler(svc, cfg.PaymentsAPI.WebhookSecret, logger)
 
 	kycRequired := middleware.KYCRequired(pool)
@@ -71,6 +75,7 @@ func newRouter(cfg *config.Config, svc *services.Services, pool *pgxpool.Pool, l
 	// Public webhooks — no JWT required
 	r.Post("/webhooks/hub2", webhookH.HUB2)
 	r.Post("/webhooks/metamap", kycH.MetaMapWebhook)
+	r.Post("/webhooks/kyc", kycH.ProviderWebhook)
 	r.Post("/webhooks/payments", paymentsWebhookH.Receive)
 
 	// Swagger UI
@@ -152,6 +157,8 @@ func newRouter(cfg *config.Config, svc *services.Services, pool *pgxpool.Pool, l
 				r.Get("/directors", businessH.ListDirectors)
 				r.Post("/directors", businessH.AddDirector)
 				r.Delete("/directors/{id}", businessH.DeleteDirector)
+				// Enriched analytics — business-tier only (403 otherwise).
+				r.Get("/analytics", businessH.GetAnalytics)
 			})
 
 			// Team management (merchant staff)
@@ -174,6 +181,20 @@ func newRouter(cfg *config.Config, svc *services.Services, pool *pgxpool.Pool, l
 
 			// Market data REST proxy (rates, tickers, charts)
 			r.Get("/market/*", marketH.ProxyREST)
+
+			// Swap — token discovery and price quotes are available pre-KYC so
+			// users can browse and preview prices before verifying.
+			r.Get("/swap/tokens", swapH.GetTokens)
+			r.Get("/swap/quote", swapH.GetQuote)
+
+			// Uploads (KYC documents, avatars, …) — available pre-KYC because
+			// users upload their documents in order to complete verification.
+			r.Post("/uploads", uploadH.Upload)
+			r.Get("/uploads/read-url", uploadH.GetReadURL)
+
+			// Account limits + usage (tier-aware: individual vs business).
+			// Available pre-KYC so the frontend can show caps during onboarding.
+			r.Get("/account/limits", limitsH.GetLimits)
 
 			// ── KYC-gated financial routes ───────────────────────────────────
 			r.Group(func(r chi.Router) {
@@ -198,6 +219,11 @@ func newRouter(cfg *config.Config, svc *services.Services, pool *pgxpool.Pool, l
 					r.Post("/swap/execute", walletH.ExecuteSwap)
 					r.Get("/swap/history", walletH.GetSwapHistory)
 				})
+
+				// Rach unified swap (symbols, human amounts, best-price routing).
+				// Execution runs on the user's WaaS wallet; requires KYC.
+				r.Post("/swap/execute", swapH.Execute)
+				r.Get("/swap/history", swapH.GetHistory)
 
 				// CaaS — Instant USD Account (ERC-4337 SCW)
 				r.Route("/crypto", func(r chi.Router) {
@@ -282,11 +308,13 @@ func newRouter(cfg *config.Config, svc *services.Services, pool *pgxpool.Pool, l
 				r.With(middleware.RequirePermission(services.PermStaffDisable)).
 					Post("/admin/staff/{id}/enable", adminStaffH.EnableStaff)
 
-				// Roles catalogue (read-only, any staff can see)
-				r.With(middleware.RequirePermission(services.PermStaffView)).
+				// Roles + permission catalogue (read-only)
+				r.With(middleware.RequirePermission(services.PermRolesView)).
 					Get("/admin/roles", adminStaffH.ListRoles)
-				r.With(middleware.RequirePermission(services.PermStaffView)).
+				r.With(middleware.RequirePermission(services.PermRolesView)).
 					Get("/admin/roles/{name}", adminStaffH.GetRolePermissions)
+				r.With(middleware.RequirePermission(services.PermRolesView)).
+					Get("/admin/permissions", adminStaffH.ListPermissions)
 
 				// User management
 				r.With(middleware.RequirePermission(services.PermUsersView)).
@@ -302,6 +330,16 @@ func newRouter(cfg *config.Config, svc *services.Services, pool *pgxpool.Pool, l
 				r.With(middleware.RequirePermission(services.PermTxView)).
 					Get("/admin/users/{id}/transactions", adminUsersH.ListUserTransactions)
 
+				// Per-user account type + limit overrides (granular control)
+				r.With(middleware.RequirePermission(services.PermUsersManage)).
+					Post("/admin/users/{id}/account-type", adminLimitsH.SetUserAccountType)
+				r.With(middleware.RequirePermission(services.PermLimitsView)).
+					Get("/admin/users/{id}/limits", adminLimitsH.GetUserLimits)
+				r.With(middleware.RequirePermission(services.PermLimitsManage)).
+					Put("/admin/users/{id}/limits", adminLimitsH.SetUserLimits)
+				r.With(middleware.RequirePermission(services.PermLimitsManage)).
+					Delete("/admin/users/{id}/limits", adminLimitsH.ClearUserLimits)
+
 				// KYC review
 				r.With(middleware.RequirePermission(services.PermKYCView)).
 					Get("/admin/kyc/pending", adminH.ListPendingKYC)
@@ -309,12 +347,21 @@ func newRouter(cfg *config.Config, svc *services.Services, pool *pgxpool.Pool, l
 					Post("/admin/kyc/{id}/approve", adminH.ApproveKYC)
 				r.With(middleware.RequirePermission(services.PermKYCReject)).
 					Post("/admin/kyc/{id}/reject", adminH.RejectKYC)
+				// Hybrid KYC: hand automated control back to the provider.
+				r.With(middleware.RequirePermission(services.PermKYCApprove)).
+					Post("/admin/kyc/{id}/release", adminH.ReleaseKYCToProvider)
 
 				// Withdrawal rates
 				r.With(middleware.RequirePermission(services.PermWithdrawalsRates)).
 					Post("/admin/withdrawal-rates", adminH.SetWithdrawalRate)
 				r.With(middleware.RequirePermission(services.PermWithdrawalsView)).
 					Get("/admin/withdrawal-rates", adminH.ListWithdrawalRates)
+
+				// Account-tier limits (platform-wide, admin-editable)
+				r.With(middleware.RequirePermission(services.PermLimitsView)).
+					Get("/admin/limits", adminLimitsH.ListTierLimits)
+				r.With(middleware.RequirePermission(services.PermLimitsManage)).
+					Patch("/admin/limits/{tier}", adminLimitsH.UpdateTierLimits)
 			})
 		})
 	})

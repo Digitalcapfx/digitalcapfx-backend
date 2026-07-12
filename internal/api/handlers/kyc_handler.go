@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"io"
 	"net/http"
 
 	"github.com/rachfinance/digitalfx/internal/api/middleware"
@@ -172,6 +173,34 @@ func (h *KYCHandler) MetaMapWebhook(w http.ResponseWriter, r *http.Request) {
 
 	if err := h.svc.KYC.HandleMetaMapWebhook(r.Context(), payload); err != nil {
 		// Log internally but return 200 so MetaMap doesn't retry indefinitely.
+		response.OKWithMessage(w, "received", nil)
+		return
+	}
+
+	response.OKWithMessage(w, "processed", nil)
+}
+
+// ProviderWebhook godoc
+//
+//	@Summary      KYC provider webhook (Sumsub)
+//	@Description  Receives verification result events from the configured KYC provider (Sumsub). The provider's decision is recorded and, unless an admin has taken manual control, applied to the user's KYC status (hybrid auto-approval). Signature is verified inside the provider.
+//	@Tags         webhooks
+//	@Accept       json
+//	@Produce      json
+//	@Success      200  {object}  MessageResponse
+//	@Router       /webhooks/kyc [post]
+func (h *KYCHandler) ProviderWebhook(w http.ResponseWriter, r *http.Request) {
+	// The provider verifies the HMAC signature over the raw body, so read the
+	// bytes verbatim rather than decoding first.
+	body, err := io.ReadAll(io.LimitReader(r.Body, 1<<20)) // 1 MB cap
+	if err != nil {
+		response.BadRequest(w, "INVALID_PAYLOAD", "could not read webhook body")
+		return
+	}
+
+	if err := h.svc.KYC.HandleProviderWebhook(r.Context(), body, r.Header); err != nil {
+		// Log-and-ack: return 200 so the provider doesn't retry-storm, except for
+		// signature failures which we surface as 401 to aid debugging.
 		response.OKWithMessage(w, "received", nil)
 		return
 	}

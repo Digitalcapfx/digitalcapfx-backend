@@ -61,6 +61,7 @@ type Querier interface {
 	DeleteExpiredFXQuotes(ctx context.Context) error
 	DeleteExpiredOTPs(ctx context.Context) error
 	DeleteMerchantStaff(ctx context.Context, arg DeleteMerchantStaffParams) error
+	DeleteUserLimitOverride(ctx context.Context, userID uuid.UUID) error
 	DisableStaffMember(ctx context.Context, id uuid.UUID) error
 	EnableStaffMember(ctx context.Context, id uuid.UUID) error
 	FreezeAccount(ctx context.Context, id uuid.UUID) error
@@ -100,6 +101,7 @@ type Querier interface {
 	GetMetamapVerificationByApplicantID(ctx context.Context, applicantID string) (MetamapVerification, error)
 	GetMetamapVerificationByUserID(ctx context.Context, userID uuid.UUID) (MetamapVerification, error)
 	GetMonthlyFlow(ctx context.Context, arg GetMonthlyFlowParams) ([]GetMonthlyFlowRow, error)
+	GetPlatformLimit(ctx context.Context, tier string) (PlatformLimit, error)
 	GetPointsBalance(ctx context.Context, userID uuid.UUID) (int64, error)
 	GetPointsHistory(ctx context.Context, arg GetPointsHistoryParams) ([]PointsLedger, error)
 	GetReferralsCount(ctx context.Context, referredBy *uuid.UUID) (int64, error)
@@ -114,18 +116,26 @@ type Querier interface {
 	GetSupportTicketWithMessages(ctx context.Context, id uuid.UUID) (GetSupportTicketWithMessagesRow, error)
 	GetTransactionByID(ctx context.Context, id uuid.UUID) (Transaction, error)
 	GetTransactionByReference(ctx context.Context, reference string) (Transaction, error)
+	// Aggregate transaction stats across all of a user's fiat accounts since a
+	// given time. Powers the business analytics dashboard (count / volume / avg /
+	// largest). Volume is the sum of absolute amounts (both in- and out-flows).
+	GetTransactionStatsSince(ctx context.Context, arg GetTransactionStatsSinceParams) (GetTransactionStatsSinceRow, error)
 	GetUserByEmail(ctx context.Context, email *string) (User, error)
 	GetUserByGoogleSub(ctx context.Context, googleSub *string) (User, error)
 	GetUserByID(ctx context.Context, id uuid.UUID) (User, error)
 	GetUserByPhone(ctx context.Context, phoneNumber string) (User, error)
 	GetUserByReferralCode(ctx context.Context, referralCode *string) (User, error)
 	GetUserFullByID(ctx context.Context, id uuid.UUID) (User, error)
+	GetUserLimitOverride(ctx context.Context, userID uuid.UUID) (UserLimitOverride, error)
 	GetUserPreferences(ctx context.Context, userID uuid.UUID) (UserPreference, error)
 	GetUserSecurity(ctx context.Context, id uuid.UUID) (GetUserSecurityRow, error)
 	GetUserSessionByID(ctx context.Context, id uuid.UUID) (UserSession, error)
 	GetUserSessionByRefreshTokenHash(ctx context.Context, refreshTokenHash string) (UserSession, error)
 	GetValidEmailOTP(ctx context.Context, arg GetValidEmailOTPParams) (EmailOtp, error)
 	GetValidOTP(ctx context.Context, arg GetValidOTPParams) (Otp, error)
+	// Per-currency transaction count and volume since a given time. Gives business
+	// accounts a currency-level breakdown of their activity.
+	GetVolumeByCurrencySince(ctx context.Context, arg GetVolumeByCurrencySinceParams) ([]GetVolumeByCurrencySinceRow, error)
 	GetWaasWalletByAddress(ctx context.Context, address string) (WaasWallet, error)
 	GetWaasWalletByIDAndUser(ctx context.Context, arg GetWaasWalletByIDAndUserParams) (WaasWallet, error)
 	GetWaasWalletByNetwork(ctx context.Context, arg GetWaasWalletByNetworkParams) (WaasWallet, error)
@@ -138,6 +148,7 @@ type Querier interface {
 	ListCryptoTransactionsByUser(ctx context.Context, arg ListCryptoTransactionsByUserParams) ([]CryptoTransaction, error)
 	ListMerchantStaff(ctx context.Context, businessUserID uuid.UUID) ([]MerchantStaff, error)
 	ListNotifications(ctx context.Context, arg ListNotificationsParams) ([]Notification, error)
+	ListPlatformLimits(ctx context.Context) ([]PlatformLimit, error)
 	ListRecentActivity(ctx context.Context, arg ListRecentActivityParams) ([]ListRecentActivityRow, error)
 	ListStaffMembers(ctx context.Context, arg ListStaffMembersParams) ([]AdminStaff, error)
 	ListTransactionsByAccount(ctx context.Context, arg ListTransactionsByAccountParams) ([]Transaction, error)
@@ -154,7 +165,14 @@ type Querier interface {
 	RevokeAllUserSessions(ctx context.Context, userID uuid.UUID) error
 	RevokeUserSessionByID(ctx context.Context, arg RevokeUserSessionByIDParams) error
 	SaveBusinessProfile(ctx context.Context, arg SaveBusinessProfileParams) (BusinessProfile, error)
+	// Flags (or clears) admin manual control over a user's KYC decision.
+	SetKycManualOverride(ctx context.Context, arg SetKycManualOverrideParams) error
+	// Records the KYC provider's latest automated decision (does not touch the
+	// final kyc_status).
+	SetKycProviderStatus(ctx context.Context, arg SetKycProviderStatusParams) error
 	SetReferralCode(ctx context.Context, arg SetReferralCodeParams) error
+	SetUserAccountType(ctx context.Context, arg SetUserAccountTypeParams) (SetUserAccountTypeRow, error)
+	SetUserBVN(ctx context.Context, arg SetUserBVNParams) (User, error)
 	UpdateCaasWalletPhone(ctx context.Context, arg UpdateCaasWalletPhoneParams) error
 	UpdateCaasWithdrawalStatus(ctx context.Context, arg UpdateCaasWithdrawalStatusParams) (CaasWithdrawal, error)
 	UpdateCryptoTransactionCaasResult(ctx context.Context, arg UpdateCryptoTransactionCaasResultParams) (CryptoTransaction, error)
@@ -175,6 +193,8 @@ type Querier interface {
 	UpdateUserPinHash(ctx context.Context, arg UpdateUserPinHashParams) error
 	UpdateUserPreferences(ctx context.Context, arg UpdateUserPreferencesParams) error
 	UpdateUserProfile(ctx context.Context, arg UpdateUserProfileParams) (User, error)
+	UpsertPlatformLimit(ctx context.Context, arg UpsertPlatformLimitParams) (PlatformLimit, error)
+	UpsertUserLimitOverride(ctx context.Context, arg UpsertUserLimitOverrideParams) (UserLimitOverride, error)
 }
 
 var _ Querier = (*Queries)(nil)

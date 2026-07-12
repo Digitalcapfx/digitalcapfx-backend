@@ -1,0 +1,6 @@
+# Migration runner image: the golang-migrate CLI with our migrations baked in.
+# Run via the Cloud Run Job "digitalcapfx-migrate" with args:
+#   -path=/migrations -database=<cloud-sql-url> up
+FROM migrate/migrate:v4.17.1
+
+COPY internal/db/migrations /migrations

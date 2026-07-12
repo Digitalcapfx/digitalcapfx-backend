@@ -16,7 +16,7 @@ INSERT INTO users (
     phone_number, email, first_name, last_name, pin_hash, country, role, auth_provider, account_type
 ) VALUES (
     $1, $2, $3, $4, $5, $6, $7, $8, 'business'
-) RETURNING id, phone_number, email, first_name, last_name, pin_hash, kyc_status, is_active, created_at, updated_at, bio, avatar_url, date_of_birth, nationality, is_email_verified, role, auth_provider, google_sub, totp_secret, totp_enabled, account_type, country, kyc_provider, referral_code, referred_by
+) RETURNING id, phone_number, email, first_name, last_name, pin_hash, kyc_status, is_active, created_at, updated_at, bio, avatar_url, date_of_birth, nationality, is_email_verified, role, auth_provider, google_sub, totp_secret, totp_enabled, account_type, country, kyc_provider, referral_code, referred_by, kyc_provider_status, kyc_manual_override, bvn
 `
 
 type CreateBusinessUserParams struct {
@@ -68,6 +68,9 @@ func (q *Queries) CreateBusinessUser(ctx context.Context, arg CreateBusinessUser
 		&i.KycProvider,
 		&i.ReferralCode,
 		&i.ReferredBy,
+		&i.KycProviderStatus,
+		&i.KycManualOverride,
+		&i.Bvn,
 	)
 	return i, err
 }
@@ -77,7 +80,7 @@ INSERT INTO users (
     email, first_name, last_name, google_sub, role, auth_provider
 ) VALUES (
     $1, $2, $3, $4, $5, $6
-) RETURNING id, phone_number, email, first_name, last_name, pin_hash, kyc_status, is_active, created_at, updated_at, bio, avatar_url, date_of_birth, nationality, is_email_verified, role, auth_provider, google_sub, totp_secret, totp_enabled, account_type, country, kyc_provider, referral_code, referred_by
+) RETURNING id, phone_number, email, first_name, last_name, pin_hash, kyc_status, is_active, created_at, updated_at, bio, avatar_url, date_of_birth, nationality, is_email_verified, role, auth_provider, google_sub, totp_secret, totp_enabled, account_type, country, kyc_provider, referral_code, referred_by, kyc_provider_status, kyc_manual_override, bvn
 `
 
 type CreateGoogleUserParams struct {
@@ -125,6 +128,9 @@ func (q *Queries) CreateGoogleUser(ctx context.Context, arg CreateGoogleUserPara
 		&i.KycProvider,
 		&i.ReferralCode,
 		&i.ReferredBy,
+		&i.KycProviderStatus,
+		&i.KycManualOverride,
+		&i.Bvn,
 	)
 	return i, err
 }
@@ -134,7 +140,7 @@ INSERT INTO users (
     phone_number, email, first_name, last_name, pin_hash, country, role, auth_provider, account_type
 ) VALUES (
     $1, $2, $3, $4, $5, $6, $7, $8, 'individual'
-) RETURNING id, phone_number, email, first_name, last_name, pin_hash, kyc_status, is_active, created_at, updated_at, bio, avatar_url, date_of_birth, nationality, is_email_verified, role, auth_provider, google_sub, totp_secret, totp_enabled, account_type, country, kyc_provider, referral_code, referred_by
+) RETURNING id, phone_number, email, first_name, last_name, pin_hash, kyc_status, is_active, created_at, updated_at, bio, avatar_url, date_of_birth, nationality, is_email_verified, role, auth_provider, google_sub, totp_secret, totp_enabled, account_type, country, kyc_provider, referral_code, referred_by, kyc_provider_status, kyc_manual_override, bvn
 `
 
 type CreateIndividualUserParams struct {
@@ -186,12 +192,15 @@ func (q *Queries) CreateIndividualUser(ctx context.Context, arg CreateIndividual
 		&i.KycProvider,
 		&i.ReferralCode,
 		&i.ReferredBy,
+		&i.KycProviderStatus,
+		&i.KycManualOverride,
+		&i.Bvn,
 	)
 	return i, err
 }
 
 const getUserByGoogleSub = `-- name: GetUserByGoogleSub :one
-SELECT id, phone_number, email, first_name, last_name, pin_hash, kyc_status, is_active, created_at, updated_at, bio, avatar_url, date_of_birth, nationality, is_email_verified, role, auth_provider, google_sub, totp_secret, totp_enabled, account_type, country, kyc_provider, referral_code, referred_by FROM users WHERE google_sub = $1
+SELECT id, phone_number, email, first_name, last_name, pin_hash, kyc_status, is_active, created_at, updated_at, bio, avatar_url, date_of_birth, nationality, is_email_verified, role, auth_provider, google_sub, totp_secret, totp_enabled, account_type, country, kyc_provider, referral_code, referred_by, kyc_provider_status, kyc_manual_override, bvn FROM users WHERE google_sub = $1
 `
 
 func (q *Queries) GetUserByGoogleSub(ctx context.Context, googleSub *string) (User, error) {
@@ -223,12 +232,15 @@ func (q *Queries) GetUserByGoogleSub(ctx context.Context, googleSub *string) (Us
 		&i.KycProvider,
 		&i.ReferralCode,
 		&i.ReferredBy,
+		&i.KycProviderStatus,
+		&i.KycManualOverride,
+		&i.Bvn,
 	)
 	return i, err
 }
 
 const getUserFullByID = `-- name: GetUserFullByID :one
-SELECT id, phone_number, email, first_name, last_name, pin_hash, kyc_status, is_active, created_at, updated_at, bio, avatar_url, date_of_birth, nationality, is_email_verified, role, auth_provider, google_sub, totp_secret, totp_enabled, account_type, country, kyc_provider, referral_code, referred_by FROM users WHERE id = $1
+SELECT id, phone_number, email, first_name, last_name, pin_hash, kyc_status, is_active, created_at, updated_at, bio, avatar_url, date_of_birth, nationality, is_email_verified, role, auth_provider, google_sub, totp_secret, totp_enabled, account_type, country, kyc_provider, referral_code, referred_by, kyc_provider_status, kyc_manual_override, bvn FROM users WHERE id = $1
 `
 
 func (q *Queries) GetUserFullByID(ctx context.Context, id uuid.UUID) (User, error) {
@@ -260,6 +272,9 @@ func (q *Queries) GetUserFullByID(ctx context.Context, id uuid.UUID) (User, erro
 		&i.KycProvider,
 		&i.ReferralCode,
 		&i.ReferredBy,
+		&i.KycProviderStatus,
+		&i.KycManualOverride,
+		&i.Bvn,
 	)
 	return i, err
 }
@@ -287,6 +302,51 @@ func (q *Queries) GetUserSecurity(ctx context.Context, id uuid.UUID) (GetUserSec
 	return i, err
 }
 
+const setUserBVN = `-- name: SetUserBVN :one
+UPDATE users SET bvn = $2, updated_at = now() WHERE id = $1 RETURNING id, phone_number, email, first_name, last_name, pin_hash, kyc_status, is_active, created_at, updated_at, bio, avatar_url, date_of_birth, nationality, is_email_verified, role, auth_provider, google_sub, totp_secret, totp_enabled, account_type, country, kyc_provider, referral_code, referred_by, kyc_provider_status, kyc_manual_override, bvn
+`
+
+type SetUserBVNParams struct {
+	ID  uuid.UUID `json:"id"`
+	Bvn *string   `json:"bvn"`
+}
+
+func (q *Queries) SetUserBVN(ctx context.Context, arg SetUserBVNParams) (User, error) {
+	row := q.db.QueryRow(ctx, setUserBVN, arg.ID, arg.Bvn)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.PhoneNumber,
+		&i.Email,
+		&i.FirstName,
+		&i.LastName,
+		&i.PinHash,
+		&i.KycStatus,
+		&i.IsActive,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.Bio,
+		&i.AvatarURL,
+		&i.DateOfBirth,
+		&i.Nationality,
+		&i.IsEmailVerified,
+		&i.Role,
+		&i.AuthProvider,
+		&i.GoogleSub,
+		&i.TOTPSecret,
+		&i.TOTPEnabled,
+		&i.AccountType,
+		&i.Country,
+		&i.KycProvider,
+		&i.ReferralCode,
+		&i.ReferredBy,
+		&i.KycProviderStatus,
+		&i.KycManualOverride,
+		&i.Bvn,
+	)
+	return i, err
+}
+
 const updateUserEmailVerified = `-- name: UpdateUserEmailVerified :exec
 UPDATE users SET is_email_verified = true, updated_at = now() WHERE id = $1
 `
@@ -302,11 +362,12 @@ SET first_name = COALESCE($2, first_name),
     last_name = COALESCE($3, last_name),
     bio = COALESCE($4, bio),
     avatar_url = COALESCE($5, avatar_url),
-    date_of_birth = COALESCE($6::date, date_of_birth),
+    date_of_birth = COALESCE($6, date_of_birth),
     nationality = COALESCE($7, nationality),
+    bvn = COALESCE($8, bvn),
     updated_at = now()
 WHERE id = $1
-RETURNING id, phone_number, email, first_name, last_name, pin_hash, kyc_status, is_active, created_at, updated_at, bio, avatar_url, date_of_birth, nationality, is_email_verified, role, auth_provider, google_sub, totp_secret, totp_enabled, account_type, country, kyc_provider, referral_code, referred_by
+RETURNING id, phone_number, email, first_name, last_name, pin_hash, kyc_status, is_active, created_at, updated_at, bio, avatar_url, date_of_birth, nationality, is_email_verified, role, auth_provider, google_sub, totp_secret, totp_enabled, account_type, country, kyc_provider, referral_code, referred_by, kyc_provider_status, kyc_manual_override, bvn
 `
 
 type UpdateUserProfileParams struct {
@@ -317,6 +378,7 @@ type UpdateUserProfileParams struct {
 	AvatarURL   *string   `json:"avatar_url"`
 	DateOfBirth *string   `json:"date_of_birth"`
 	Nationality *string   `json:"nationality"`
+	Bvn         *string   `json:"bvn"`
 }
 
 func (q *Queries) UpdateUserProfile(ctx context.Context, arg UpdateUserProfileParams) (User, error) {
@@ -328,6 +390,7 @@ func (q *Queries) UpdateUserProfile(ctx context.Context, arg UpdateUserProfilePa
 		arg.AvatarURL,
 		arg.DateOfBirth,
 		arg.Nationality,
+		arg.Bvn,
 	)
 	var i User
 	err := row.Scan(
@@ -356,6 +419,9 @@ func (q *Queries) UpdateUserProfile(ctx context.Context, arg UpdateUserProfilePa
 		&i.KycProvider,
 		&i.ReferralCode,
 		&i.ReferredBy,
+		&i.KycProviderStatus,
+		&i.KycManualOverride,
+		&i.Bvn,
 	)
 	return i, err
 }

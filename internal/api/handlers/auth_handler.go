@@ -108,6 +108,10 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 		response.BadRequest(w, "VALIDATION_ERROR", "phone, first_name, last_name, and pin are required")
 		return
 	}
+	if body.BVN != "" && !isValidBVN(body.BVN) {
+		response.BadRequest(w, "VALIDATION_ERROR", "bvn must be exactly 11 digits")
+		return
+	}
 
 	in := services.RegisterInput{
 		AccountType: body.AccountType,
@@ -117,6 +121,7 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 		LastName:    body.LastName,
 		PIN:         body.PIN,
 		Country:     body.Country,
+		BVN:         body.BVN,
 		DeviceIP:    realIP(r),
 		DeviceUA:    r.UserAgent(),
 	}
