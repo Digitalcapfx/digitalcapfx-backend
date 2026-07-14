@@ -198,6 +198,49 @@ func (q *Queries) GetUserByPhone(ctx context.Context, phoneNumber string) (User,
 	return i, err
 }
 
+const getUserByPhoneAny = `-- name: GetUserByPhoneAny :one
+SELECT id, phone_number, email, first_name, last_name, pin_hash, kyc_status, is_active, created_at, updated_at, bio, avatar_url, date_of_birth, nationality, is_email_verified, role, auth_provider, google_sub, totp_secret, totp_enabled, account_type, country, kyc_provider, referral_code, referred_by, kyc_provider_status, kyc_manual_override, bvn FROM users WHERE phone_number = ANY($1::text[]) LIMIT 1
+`
+
+// Matches a user by any of several equivalent phone forms (E.164, national,
+// country-code-without-plus). Lets a login/lookup succeed regardless of how the
+// number was formatted at signup — including legacy rows stored non-canonically.
+func (q *Queries) GetUserByPhoneAny(ctx context.Context, phones []string) (User, error) {
+	row := q.db.QueryRow(ctx, getUserByPhoneAny, phones)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.PhoneNumber,
+		&i.Email,
+		&i.FirstName,
+		&i.LastName,
+		&i.PinHash,
+		&i.KycStatus,
+		&i.IsActive,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.Bio,
+		&i.AvatarURL,
+		&i.DateOfBirth,
+		&i.Nationality,
+		&i.IsEmailVerified,
+		&i.Role,
+		&i.AuthProvider,
+		&i.GoogleSub,
+		&i.TOTPSecret,
+		&i.TOTPEnabled,
+		&i.AccountType,
+		&i.Country,
+		&i.KycProvider,
+		&i.ReferralCode,
+		&i.ReferredBy,
+		&i.KycProviderStatus,
+		&i.KycManualOverride,
+		&i.Bvn,
+	)
+	return i, err
+}
+
 const updateUserKYCStatus = `-- name: UpdateUserKYCStatus :one
 UPDATE users
 SET kyc_status = $2, updated_at = NOW()

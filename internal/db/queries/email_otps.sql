@@ -15,6 +15,14 @@ LIMIT 1;
 -- name: MarkEmailOTPUsed :exec
 UPDATE email_otps SET used = true WHERE id = $1;
 
+-- name: GetLatestEmailOTPSentAt :one
+-- Most recent time a code of this purpose was sent to an email — powers the
+-- resend cooldown.
+SELECT created_at FROM email_otps
+WHERE email = $1 AND purpose = $2
+ORDER BY created_at DESC
+LIMIT 1;
+
 -- name: DeleteExpiredEmailOTPs :exec
 DELETE FROM email_otps WHERE expires_at < NOW() OR used = true;
 

@@ -78,7 +78,32 @@ func (q *Queries) CreateCaasWallet(ctx context.Context, arg CreateCaasWalletPara
 // ── Admin / KYC management ────────────────────────────────────────────────────
 
 func (q *Queries) ListUsersAwaitingKYCReview(ctx context.Context) ([]UserFull, error) {
-	return nil, errNotImplemented
+	const sql = `
+	SELECT id, phone_number, email, first_name, last_name, pin_hash, kyc_status, is_active, role,
+	       auth_provider, google_sub, bio, avatar_url, date_of_birth, nationality, is_email_verified,
+	       created_at, updated_at
+	FROM users
+	WHERE kyc_status IN ('submitted', 'under_review', 'processing')
+	ORDER BY updated_at DESC`
+	rows, err := q.db.Query(ctx, sql)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []UserFull{}
+	for rows.Next() {
+		var i UserFull
+		if err := rows.Scan(
+			&i.ID, &i.PhoneNumber, &i.Email, &i.FirstName, &i.LastName, &i.PinHash,
+			&i.KycStatus, &i.IsActive, &i.Role, &i.AuthProvider, &i.GoogleSub, &i.Bio,
+			&i.AvatarURL, &i.DateOfBirth, &i.Nationality, &i.IsEmailVerified,
+			&i.CreatedAt, &i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	return items, rows.Err()
 }
 
 func (q *Queries) UpdateUserRole(ctx context.Context, arg UpdateUserRoleParams) (User, error) {
@@ -86,7 +111,14 @@ func (q *Queries) UpdateUserRole(ctx context.Context, arg UpdateUserRoleParams) 
 }
 
 func (q *Queries) RecordKycAdminAction(ctx context.Context, arg RecordKycAdminActionParams) (KycAdminAction, error) {
-	return KycAdminAction{}, errNotImplemented
+	const sql = `
+	INSERT INTO kyc_admin_actions (user_id, admin_id, action, reason)
+	VALUES ($1, $2, $3, $4)
+	RETURNING id, user_id, admin_id, action, reason, created_at`
+	row := q.db.QueryRow(ctx, sql, arg.UserID, arg.AdminID, arg.Action, arg.Reason)
+	var i KycAdminAction
+	err := row.Scan(&i.ID, &i.UserID, &i.AdminID, &i.Action, &i.Reason, &i.CreatedAt)
+	return i, err
 }
 
 // ── Nilos / Card (migration 000005) ───────────────────────────────────────────
@@ -416,17 +448,28 @@ type SetTOTPEnabledParams struct {
 }
 
 func (q *Queries) SetTOTPEnabled(ctx context.Context, arg SetTOTPEnabledParams) error {
-	return errNotImplemented
+	_, err := q.db.Exec(ctx,
+		`UPDATE users SET totp_enabled = $2, totp_secret = $3, updated_at = now() WHERE id = $1`,
+		arg.ID, arg.TOTPEnabled, arg.TOTPSecret)
+	return err
 }
 
 func (q *Queries) SetBiometricsEnabled(ctx context.Context, userID uuid.UUID, enabled bool) error {
-	return errNotImplemented
+	_, err := q.db.Exec(ctx,
+		`INSERT INTO user_preferences (user_id, biometrics_enabled)
+		 VALUES ($1, $2)
+		 ON CONFLICT (user_id) DO UPDATE SET biometrics_enabled = $2, updated_at = now()`,
+		userID, enabled)
+	return err
 }
 
 // ChangePIN updates the stored PIN hash for a user (requires old hash to have been
 // verified by the caller before invoking this).
 func (q *Queries) ChangePIN(ctx context.Context, id uuid.UUID, newPinHash string) error {
-	return errNotImplemented
+	_, err := q.db.Exec(ctx,
+		`UPDATE users SET pin_hash = $2, updated_at = now() WHERE id = $1`,
+		id, newPinHash)
+	return err
 }
 
 // ─── Migration 000008: user preferences ──────────────────────────────────────
@@ -469,42 +512,121 @@ type GetSupportTicketParams struct {
 	UserID uuid.UUID
 }
 
+const supportTicketCols = `id, user_id, reference, subject, category, status, priority, created_at, updated_at`
+
+func scanSupportTicket(row interface{ Scan(...any) error }) (SupportTicket, error) {
+	var t SupportTicket
+	err := row.Scan(&t.ID, &t.UserID, &t.Reference, &t.Subject, &t.Category, &t.Status, &t.Priority, &t.CreatedAt, &t.UpdatedAt)
+	return t, err
+}
+
 func (q *Queries) CreateSupportTicket(ctx context.Context, arg CreateSupportTicketParams) (SupportTicket, error) {
-	return SupportTicket{}, errNotImplemented
+	return scanSupportTicket(q.db.QueryRow(ctx,
+		`INSERT INTO support_tickets (user_id, reference, subject, category)
+		 VALUES ($1, $2, $3, $4) RETURNING `+supportTicketCols,
+		arg.UserID, arg.Reference, arg.Subject, arg.Category))
 }
 
 func (q *Queries) GetSupportTicket(ctx context.Context, arg GetSupportTicketParams) (SupportTicket, error) {
-	return SupportTicket{}, errNotImplemented
+	return scanSupportTicket(q.db.QueryRow(ctx,
+		`SELECT `+supportTicketCols+` FROM support_tickets WHERE id = $1 AND user_id = $2`,
+		arg.ID, arg.UserID))
 }
 
 func (q *Queries) ListSupportTickets(ctx context.Context, arg ListSupportTicketsParams) ([]SupportTicket, error) {
-	return nil, errNotImplemented
+	rows, err := q.db.Query(ctx,
+		`SELECT `+supportTicketCols+` FROM support_tickets WHERE user_id = $1
+		 ORDER BY created_at DESC LIMIT $2 OFFSET $3`,
+		arg.UserID, arg.Limit, arg.Offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []SupportTicket{}
+	for rows.Next() {
+		t, err := scanSupportTicket(rows)
+		if err != nil {
+			return nil, err
+		}
+		items = append(items, t)
+	}
+	return items, rows.Err()
 }
 
 func (q *Queries) CountSupportTickets(ctx context.Context, userID uuid.UUID) (int64, error) {
-	return 0, errNotImplemented
+	var n int64
+	err := q.db.QueryRow(ctx, `SELECT count(*) FROM support_tickets WHERE user_id = $1`, userID).Scan(&n)
+	return n, err
 }
 
 func (q *Queries) CreateSupportMessage(ctx context.Context, arg CreateSupportMessageParams) (SupportMessage, error) {
-	return SupportMessage{}, errNotImplemented
+	var m SupportMessage
+	err := q.db.QueryRow(ctx,
+		`INSERT INTO support_messages (ticket_id, sender_type, sender_id, body)
+		 VALUES ($1, $2, $3, $4)
+		 RETURNING id, ticket_id, sender_type, sender_id, body, created_at`,
+		arg.TicketID, arg.SenderType, arg.SenderID, arg.Body).
+		Scan(&m.ID, &m.TicketID, &m.SenderType, &m.SenderID, &m.Body, &m.CreatedAt)
+	if err == nil {
+		// Bump the ticket so it sorts to the top of the agent queue.
+		_, _ = q.db.Exec(ctx, `UPDATE support_tickets SET updated_at = now() WHERE id = $1`, arg.TicketID)
+	}
+	return m, err
 }
 
 func (q *Queries) ListSupportMessages(ctx context.Context, ticketID uuid.UUID) ([]SupportMessage, error) {
-	return nil, errNotImplemented
+	rows, err := q.db.Query(ctx,
+		`SELECT id, ticket_id, sender_type, sender_id, body, created_at
+		 FROM support_messages WHERE ticket_id = $1 ORDER BY created_at ASC`, ticketID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []SupportMessage{}
+	for rows.Next() {
+		var m SupportMessage
+		if err := rows.Scan(&m.ID, &m.TicketID, &m.SenderType, &m.SenderID, &m.Body, &m.CreatedAt); err != nil {
+			return nil, err
+		}
+		items = append(items, m)
+	}
+	return items, rows.Err()
 }
 
 func (q *Queries) UpdateSupportTicketStatus(ctx context.Context, id uuid.UUID, status string) (SupportTicket, error) {
-	return SupportTicket{}, errNotImplemented
+	return scanSupportTicket(q.db.QueryRow(ctx,
+		`UPDATE support_tickets SET status = $2, updated_at = now() WHERE id = $1 RETURNING `+supportTicketCols,
+		id, status))
 }
 
 // ─── Migration 000008: FAQs ───────────────────────────────────────────────────
 
 func (q *Queries) ListFAQs(ctx context.Context, category string) ([]FAQ, error) {
-	return nil, errNotImplemented
+	rows, err := q.db.Query(ctx,
+		`SELECT id, question, answer, category, sort_order, is_active, created_at
+		 FROM faqs WHERE is_active = true AND ($1 = '' OR category = $1)
+		 ORDER BY sort_order ASC, created_at ASC`, category)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []FAQ{}
+	for rows.Next() {
+		var f FAQ
+		if err := rows.Scan(&f.ID, &f.Question, &f.Answer, &f.Category, &f.SortOrder, &f.IsActive, &f.CreatedAt); err != nil {
+			return nil, err
+		}
+		items = append(items, f)
+	}
+	return items, rows.Err()
 }
 
 func (q *Queries) GetFAQ(ctx context.Context, id uuid.UUID) (FAQ, error) {
-	return FAQ{}, errNotImplemented
+	var f FAQ
+	err := q.db.QueryRow(ctx,
+		`SELECT id, question, answer, category, sort_order, is_active, created_at FROM faqs WHERE id = $1`, id).
+		Scan(&f.ID, &f.Question, &f.Answer, &f.Category, &f.SortOrder, &f.IsActive, &f.CreatedAt)
+	return f, err
 }
 
 // Admin FAQ management
@@ -517,11 +639,22 @@ type UpsertFAQParams struct {
 }
 
 func (q *Queries) UpsertFAQ(ctx context.Context, arg UpsertFAQParams) (FAQ, error) {
-	return FAQ{}, errNotImplemented
+	var f FAQ
+	err := q.db.QueryRow(ctx,
+		`INSERT INTO faqs (id, question, answer, category, sort_order)
+		 VALUES (COALESCE($1, gen_random_uuid()), $2, $3, $4, $5)
+		 ON CONFLICT (id) DO UPDATE SET
+		     question = EXCLUDED.question, answer = EXCLUDED.answer,
+		     category = EXCLUDED.category, sort_order = EXCLUDED.sort_order
+		 RETURNING id, question, answer, category, sort_order, is_active, created_at`,
+		arg.ID, arg.Question, arg.Answer, arg.Category, arg.SortOrder).
+		Scan(&f.ID, &f.Question, &f.Answer, &f.Category, &f.SortOrder, &f.IsActive, &f.CreatedAt)
+	return f, err
 }
 
 func (q *Queries) DeleteFAQ(ctx context.Context, id uuid.UUID) error {
-	return errNotImplemented
+	_, err := q.db.Exec(ctx, `DELETE FROM faqs WHERE id = $1`, id)
+	return err
 }
 
 // ─── Wallet detail + overview queries ────────────────────────────────────────

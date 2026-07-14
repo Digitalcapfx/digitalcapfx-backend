@@ -67,6 +67,9 @@ func NewServer(cfg *config.Config) (*Server, error) {
 	// Service layer
 	svc := services.New(pool, rdb, paymentsClient, caasClient, hub2Client, emailClient, metamapClient, nilosClient, cfg, logger)
 
+	// Founder bootstrap: promote configured OWNER_PHONES to the "owner" role.
+	svc.Auth.EnsureOwners(context.Background(), cfg.OwnerPhones)
+
 	// Router
 	r := newRouter(cfg, svc, pool, logger)
 

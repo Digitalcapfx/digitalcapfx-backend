@@ -34,11 +34,11 @@ import (
 )
 
 type HUB2Service struct {
-	pool        *pgxpool.Pool
-	hub2Client  *hub2.Client
-	caasClient  *caas.Client
-	withdrawal  *WithdrawalService // nil until set via SetWithdrawalService
-	logger      *zap.Logger
+	pool       *pgxpool.Pool
+	hub2Client *hub2.Client
+	caasClient *caas.Client
+	withdrawal *WithdrawalService // nil until set via SetWithdrawalService
+	logger     *zap.Logger
 }
 
 func NewHUB2Service(pool *pgxpool.Pool, hub2Client *hub2.Client, caasClient *caas.Client, logger *zap.Logger) *HUB2Service {
@@ -123,7 +123,7 @@ func (s *HUB2Service) HandleWebhook(ctx context.Context, payload hub2.WebhookPay
 	}
 
 	// Resolve user for transaction recording — not fatal if missing.
-	user, _ := q.GetUserByPhone(ctx, phone)
+	user, _ := q.GetUserByPhoneAny(ctx, phoneCandidates(phone))
 
 	// Safety net: ensure SCW is provisioned before calling FundUser.
 	// CaaS returns 404 if the phone has no SCW — would silently lose the deposit.

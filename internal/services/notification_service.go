@@ -31,11 +31,12 @@ const (
 
 type NotificationService struct {
 	pool   *pgxpool.Pool
+	fcm    *FCMService // nil when push is not configured
 	logger *zap.Logger
 }
 
-func NewNotificationService(pool *pgxpool.Pool, logger *zap.Logger) *NotificationService {
-	return &NotificationService{pool: pool, logger: logger}
+func NewNotificationService(pool *pgxpool.Pool, fcm *FCMService, logger *zap.Logger) *NotificationService {
+	return &NotificationService{pool: pool, fcm: fcm, logger: logger}
 }
 
 type CreateNotificationInput struct {
@@ -68,6 +69,94 @@ func (s *NotificationService) Create(ctx context.Context, in CreateNotificationI
 			zap.Error(err),
 		)
 	}
+
+	// Mirror the in-app notification to the user's mobile devices via FCM.
+	// Best-effort and asynchronous — a push failure must never affect the caller.
+	if s.fcm.Enabled() {
+		go s.pushToUser(context.Background(), in)
+	}
+}
+
+// pushToUser delivers a notification to all of a user's registered devices and
+// prunes any tokens FCM reports as invalid.
+func (s *NotificationService) pushToUser(ctx context.Context, in CreateNotificationInput) {
+	q := db.New(s.pool)
+	tokens, err := q.ListDeviceTokensByUser(ctx, in.UserID)
+	if err != nil || len(tokens) == 0 {
+		return
+	}
+
+	// Carry the type + metadata as data so the app can deep-link.
+	data := map[string]string{"type": in.Type}
+	for k, v := range in.Metadata {
+		data[k] = v
+	}
+
+	invalid, err := s.fcm.SendMulticast(ctx, tokens, in.Title, in.Body, data)
+	if err != nil {
+		s.logger.Warn("fcm push failed", zap.String("type", in.Type), zap.Error(err))
+	}
+	if len(invalid) > 0 {
+		if delErr := q.DeleteDeviceTokens(ctx, invalid); delErr != nil {
+			s.logger.Warn("prune invalid device tokens failed", zap.Error(delErr))
+		}
+	}
+}
+
+// CreateForPhone resolves a phone number to a user (any format) and records a
+// notification for them. Used by inbound webhooks that identify the customer by
+// phone. No-op if the phone doesn't match a user.
+func (s *NotificationService) CreateForPhone(ctx context.Context, phone string, in CreateNotificationInput) {
+	user, err := db.New(s.pool).GetUserByPhoneAny(ctx, phoneCandidates(phone))
+	if err != nil {
+		return
+	}
+	in.UserID = user.ID
+	s.Create(ctx, in)
+}
+
+// ─── Device token management (push registration) ───────────────────────────────
+
+// RegisterDevice stores (or re-assigns) a device's FCM registration token for a
+// user. Called by the app after obtaining a token (login / app start).
+func (s *NotificationService) RegisterDevice(ctx context.Context, userID uuid.UUID, token, platform string) error {
+	if token == "" {
+		return fmt.Errorf("device token is required")
+	}
+	if platform == "" {
+		platform = "unknown"
+	}
+	return db.New(s.pool).UpsertDeviceToken(ctx, db.UpsertDeviceTokenParams{
+		UserID:   userID,
+		Token:    token,
+		Platform: platform,
+	})
+}
+
+// UnregisterDevice removes a device token (called on logout / disable push).
+func (s *NotificationService) UnregisterDevice(ctx context.Context, userID uuid.UUID, token string) error {
+	return db.New(s.pool).DeleteDeviceToken(ctx, db.DeleteDeviceTokenParams{Token: token, UserID: userID})
+}
+
+// SendTestPush pushes a test notification to all of a user's devices so the
+// mobile team can verify delivery end-to-end.
+func (s *NotificationService) SendTestPush(ctx context.Context, userID uuid.UUID) (int, error) {
+	if !s.fcm.Enabled() {
+		return 0, fmt.Errorf("push notifications are not configured on this environment")
+	}
+	tokens, err := db.New(s.pool).ListDeviceTokensByUser(ctx, userID)
+	if err != nil {
+		return 0, err
+	}
+	if len(tokens) == 0 {
+		return 0, fmt.Errorf("no registered devices for this user")
+	}
+	invalid, err := s.fcm.SendMulticast(ctx, tokens, "DigitalFX test notification",
+		"🎉 Push notifications are working on your device.", map[string]string{"type": "test"})
+	if len(invalid) > 0 {
+		_ = db.New(s.pool).DeleteDeviceTokens(ctx, invalid)
+	}
+	return len(tokens) - len(invalid), err
 }
 
 // ─── Read / management ────────────────────────────────────────────────────────

@@ -4,10 +4,26 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/joho/godotenv"
 )
+
+// splitCSV splits a comma-separated env value into a trimmed, non-empty slice.
+func splitCSV(v string) []string {
+	if strings.TrimSpace(v) == "" {
+		return nil
+	}
+	parts := strings.Split(v, ",")
+	out := make([]string, 0, len(parts))
+	for _, p := range parts {
+		if t := strings.TrimSpace(p); t != "" {
+			out = append(out, t)
+		}
+	}
+	return out
+}
 
 type Config struct {
 	App         AppConfig
@@ -25,6 +41,18 @@ type Config struct {
 	KYCProvider string // "metamap" (default) | "sumsub"
 	Google      GoogleConfig
 	Nilos       NilosConfig
+	// OwnerPhones lists the phone numbers that should be promoted to the "owner"
+	// staff role on startup (comma-separated OWNER_PHONES env). This is the only
+	// way the founder account is designated — set at deploy time only.
+	OwnerPhones []string
+	// DefaultCountryCode is the numeric calling code (e.g. "234") used to expand
+	// national, 0-prefixed phone numbers into canonical E.164. E.164 inputs work
+	// for any country regardless of this. Env: DEFAULT_COUNTRY_CODE.
+	DefaultCountryCode string
+	// FirebaseCredentialsJSON is a service-account key for Firebase Cloud
+	// Messaging (push). Leave empty to use Application Default Credentials
+	// (Cloud Run workload identity). Env: FIREBASE_CREDENTIALS_JSON.
+	FirebaseCredentialsJSON string
 }
 
 type AppConfig struct {
@@ -64,8 +92,9 @@ type PaymentsAPIConfig struct {
 
 // CaaSConfig points to the Rach CaaS service (abstraction wallets / P2P by phone).
 type CaaSConfig struct {
-	BaseURL string
-	APIKey  string
+	BaseURL       string
+	APIKey        string
+	WebhookSecret string // HMAC-SHA256 secret for verifying inbound CaaS webhooks
 }
 
 // HUB2Config is the local payment gateway for XAF/XOF mobile money.
@@ -164,6 +193,7 @@ func Load() (*Config, error) {
 
 	cfg.CaaS.BaseURL = require("CAAS_API_URL")
 	cfg.CaaS.APIKey = require("CAAS_API_KEY")
+	cfg.CaaS.WebhookSecret = getEnv("CAAS_WEBHOOK_SECRET", "")
 
 	cfg.HUB2.BaseURL = getEnv("HUB2_BASE_URL", "https://api.hub2.io")
 	cfg.HUB2.APIKey = require("HUB2_API_KEY")
@@ -192,6 +222,10 @@ func Load() (*Config, error) {
 	cfg.Sumsub.LevelName = getEnv("SUMSUB_LEVEL_NAME", "basic-kyc-level")
 	cfg.Sumsub.WebhookSecret = getEnv("SUMSUB_WEBHOOK_SECRET", "")
 	cfg.KYCProvider = getEnv("KYC_PROVIDER", "metamap")
+
+	cfg.OwnerPhones = splitCSV(getEnv("OWNER_PHONES", ""))
+	cfg.DefaultCountryCode = getEnv("DEFAULT_COUNTRY_CODE", "")
+	cfg.FirebaseCredentialsJSON = getEnv("FIREBASE_CREDENTIALS_JSON", "")
 
 	cfg.Google.ClientID = getEnv("GOOGLE_CLIENT_ID", "")
 

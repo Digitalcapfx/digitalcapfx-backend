@@ -205,6 +205,28 @@ definitions:
         example: true
         type: boolean
     type: object
+  handlers.CaasWebhookPayload:
+    properties:
+      data:
+        properties:
+          amount:
+            type: string
+          blind_index:
+            type: string
+          currency:
+            type: string
+          phone:
+            type: string
+          reference:
+            type: string
+          status:
+            type: string
+          tx_hash:
+            type: string
+        type: object
+      event:
+        type: string
+    type: object
   handlers.CreateTicketRequest:
     properties:
       body:
@@ -878,6 +900,16 @@ definitions:
         example: eyJhbGci...
         type: string
     type: object
+  handlers.RegisterDeviceRequest:
+    properties:
+      platform:
+        description: ios | android | web
+        example: android
+        type: string
+      token:
+        example: fcm-registration-token
+        type: string
+    type: object
   handlers.RegisterRequest:
     properties:
       account_type:
@@ -891,7 +923,8 @@ definitions:
         example: https://acme.example.com
         type: string
       bvn:
-        description: Nigerian Bank Verification Number (11 digits)
+        description: Nigerian Bank Verification Number (11 digits). REQUIRED for Nigerian
+          customers (country NG or a +234 phone).
         example: "12345678901"
         type: string
       company_legal_name:
@@ -926,6 +959,12 @@ definitions:
         type: string
       pin:
         example: "123456"
+        type: string
+    type: object
+  handlers.ResendVerificationRequest:
+    properties:
+      email_or_phone:
+        example: alice@example.com
         type: string
     type: object
   handlers.ResetPINRequest:
@@ -1094,6 +1133,12 @@ definitions:
     properties:
       access_token:
         example: eyJhbGci...
+        type: string
+      account_type:
+        description: |-
+          AccountType ("individual" | "business") is included on auth responses so
+          the frontend can branch on tier without a separate profile call.
+        example: individual
         type: string
       expires_in:
         example: 1800
@@ -2998,6 +3043,39 @@ paths:
       summary: Disconnect a device
       tags:
       - auth
+  /auth/email/resend:
+    post:
+      consumes:
+      - application/json
+      description: Re-sends the email verification code WITHOUT requiring login —
+        for the pre-auth "check your email" screen. Identify the account by email
+        or phone. Rate-limited by a 60s cooldown (returns 429 with retry_after_seconds
+        for the frontend timer). Never reveals whether an account exists.
+      parameters:
+      - description: email or phone
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.ResendVerificationRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.MessageResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "429":
+          description: Cooldown active
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      summary: Resend email verification code (public)
+      tags:
+      - auth
   /auth/email/resend-otp:
     post:
       description: Sends a new 6-digit code to the authenticated user's registered
@@ -3232,7 +3310,9 @@ paths:
       description: Creates a new user account (individual or business), provisions
         fiat accounts, and returns a JWT pair. Set account_type to "individual" or
         "business". Business accounts require company-level fields; director info
-        and documents are submitted post-signup via /business/* endpoints.
+        and documents are submitted post-signup via /business/* endpoints. BVN is
+        REQUIRED for Nigerian customers (country "NG" or a +234 phone) — returns 400
+        BVN_REQUIRED otherwise.
       parameters:
       - description: New user details
         in: body
@@ -3988,6 +4068,68 @@ paths:
       summary: Mark notification as read
       tags:
       - notifications
+  /notifications/devices:
+    delete:
+      consumes:
+      - application/json
+      description: Removes the device's FCM token (call on logout or when the user
+        disables push).
+      parameters:
+      - description: FCM device token
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.RegisterDeviceRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.MessageResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Unregister a device from push notifications
+      tags:
+      - notifications
+    post:
+      consumes:
+      - application/json
+      description: Stores the mobile device's FCM registration token so the user receives
+        push notifications. Call after login / on app start whenever the token is
+        obtained or refreshed. Idempotent.
+      parameters:
+      - description: FCM device token
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.RegisterDeviceRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.MessageResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Register a device for push notifications
+      tags:
+      - notifications
   /notifications/read-all:
     patch:
       description: Marks every unread notification for the authenticated user as read.
@@ -4005,6 +4147,30 @@ paths:
       security:
       - BearerAuth: []
       summary: Mark all notifications as read
+      tags:
+      - notifications
+  /notifications/test-push:
+    post:
+      description: Sends a test push to all of the authenticated user's registered
+        devices — for the mobile team to verify delivery end-to-end.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.MessageResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Send a test push notification
       tags:
       - notifications
   /notifications/unread-count:
@@ -5603,6 +5769,40 @@ paths:
       summary: Initiate Mobile Money withdrawal
       tags:
       - wallets
+  /webhooks/caas:
+    post:
+      consumes:
+      - application/json
+      description: Receives account/settlement events from Rach CaaS (instant USD
+        account). Verified via HMAC-SHA256 over the raw body in the X-Webhook-Signature
+        header, using the CaaS webhook secret. On a credit/deposit event the owning
+        user is notified.
+      parameters:
+      - description: HMAC-SHA256 signature (hex)
+        in: header
+        name: X-Webhook-Signature
+        required: true
+        type: string
+      - description: Webhook payload
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.CaasWebhookPayload'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.MessageResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      summary: Rach CaaS Webhook
+      tags:
+      - webhooks
   /webhooks/hub2:
     post:
       consumes:

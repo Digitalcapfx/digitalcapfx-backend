@@ -302,6 +302,30 @@ func (q *Queries) GetUserSecurity(ctx context.Context, id uuid.UUID) (GetUserSec
 	return i, err
 }
 
+const promoteUserToOwnerByPhone = `-- name: PromoteUserToOwnerByPhone :one
+UPDATE users SET role = 'owner', updated_at = now() WHERE phone_number = $1
+RETURNING id, phone_number, email, role
+`
+
+type PromoteUserToOwnerByPhoneRow struct {
+	ID          uuid.UUID `json:"id"`
+	PhoneNumber string    `json:"phone_number"`
+	Email       *string   `json:"email"`
+	Role        string    `json:"role"`
+}
+
+func (q *Queries) PromoteUserToOwnerByPhone(ctx context.Context, phoneNumber string) (PromoteUserToOwnerByPhoneRow, error) {
+	row := q.db.QueryRow(ctx, promoteUserToOwnerByPhone, phoneNumber)
+	var i PromoteUserToOwnerByPhoneRow
+	err := row.Scan(
+		&i.ID,
+		&i.PhoneNumber,
+		&i.Email,
+		&i.Role,
+	)
+	return i, err
+}
+
 const setUserBVN = `-- name: SetUserBVN :one
 UPDATE users SET bvn = $2, updated_at = now() WHERE id = $1 RETURNING id, phone_number, email, first_name, last_name, pin_hash, kyc_status, is_active, created_at, updated_at, bio, avatar_url, date_of_birth, nationality, is_email_verified, role, auth_provider, google_sub, totp_secret, totp_enabled, account_type, country, kyc_provider, referral_code, referred_by, kyc_provider_status, kyc_manual_override, bvn
 `

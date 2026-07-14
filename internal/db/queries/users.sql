@@ -9,6 +9,12 @@ SELECT * FROM users WHERE id = $1 LIMIT 1;
 -- name: GetUserByPhone :one
 SELECT * FROM users WHERE phone_number = $1 LIMIT 1;
 
+-- name: GetUserByPhoneAny :one
+-- Matches a user by any of several equivalent phone forms (E.164, national,
+-- country-code-without-plus). Lets a login/lookup succeed regardless of how the
+-- number was formatted at signup — including legacy rows stored non-canonically.
+SELECT * FROM users WHERE phone_number = ANY(@phones::text[]) LIMIT 1;
+
 -- name: GetUserByEmail :one
 SELECT * FROM users WHERE email = $1 LIMIT 1;
 

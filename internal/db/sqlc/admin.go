@@ -79,28 +79,72 @@ type ListUsersForAdminParams struct {
 	Offset    int32
 }
 
+// adminUserFilterWhere is the shared WHERE clause for the admin user list and
+// count. Filters are optional: an empty string / nil disables that filter.
+const adminUserFilterWhere = `
+	WHERE ($1::text = '' OR u.first_name ILIKE '%'||$1||'%' OR u.last_name ILIKE '%'||$1||'%'
+	        OR u.email ILIKE '%'||$1||'%' OR u.phone_number ILIKE '%'||$1||'%')
+	  AND ($2::text = '' OR u.kyc_status = $2)
+	  AND ($3::bool IS NULL OR u.is_active = $3)
+	  AND ($4::text = '' OR u.role = $4)`
+
 func (q *Queries) ListUsersForAdmin(ctx context.Context, arg ListUsersForAdminParams) ([]AdminUserView, error) {
-	return nil, errNotImplemented
+	const sql = `
+	SELECT u.id, u.phone_number, u.email, u.first_name, u.last_name, u.kyc_status,
+	       u.is_active, u.role, u.created_at,
+	       (SELECT count(*) FROM accounts a WHERE a.user_id = u.id)::int AS account_count
+	FROM users u` + adminUserFilterWhere + `
+	ORDER BY u.created_at DESC
+	LIMIT $5 OFFSET $6`
+
+	rows, err := q.db.Query(ctx, sql, arg.Search, arg.KycStatus, arg.IsActive, arg.Role, arg.Limit, arg.Offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	items := []AdminUserView{}
+	for rows.Next() {
+		var i AdminUserView
+		if err := rows.Scan(
+			&i.ID, &i.PhoneNumber, &i.Email, &i.FirstName, &i.LastName, &i.KycStatus,
+			&i.IsActive, &i.Role, &i.CreatedAt, &i.AccountCount,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	return items, rows.Err()
 }
 
 func (q *Queries) CountUsersForAdmin(ctx context.Context, arg ListUsersForAdminParams) (int64, error) {
-	return 0, errNotImplemented
+	const sql = `SELECT count(*) FROM users u` + adminUserFilterWhere
+	var n int64
+	err := q.db.QueryRow(ctx, sql, arg.Search, arg.KycStatus, arg.IsActive, arg.Role).Scan(&n)
+	return n, err
 }
 
+// GetUserForAdmin returns the full user record; it delegates to the existing
+// single-user query.
 func (q *Queries) GetUserForAdmin(ctx context.Context, id uuid.UUID) (User, error) {
-	return User{}, errNotImplemented
+	return q.GetUserByID(ctx, id)
 }
 
 func (q *Queries) DisableUser(ctx context.Context, id uuid.UUID) error {
-	return errNotImplemented
+	_, err := q.db.Exec(ctx, `UPDATE users SET is_active = false, updated_at = now() WHERE id = $1`, id)
+	return err
 }
 
 func (q *Queries) EnableUser(ctx context.Context, id uuid.UUID) error {
-	return errNotImplemented
+	_, err := q.db.Exec(ctx, `UPDATE users SET is_active = true, updated_at = now() WHERE id = $1`, id)
+	return err
 }
 
+// ResetUserKYC returns the user to an unverified state and hands the decision
+// back to the automated provider (clears any admin manual override).
 func (q *Queries) ResetUserKYC(ctx context.Context, id uuid.UUID) error {
-	return errNotImplemented
+	_, err := q.db.Exec(ctx, `UPDATE users SET kyc_status = 'pending', kyc_manual_override = false, updated_at = now() WHERE id = $1`, id)
+	return err
 }
 
 // ─── Admin dashboard stats ────────────────────────────────────────────────────
@@ -116,9 +160,34 @@ type ListTransactionsByUserParams struct {
 }
 
 func (q *Queries) ListTransactionsByUser(ctx context.Context, arg ListTransactionsByUserParams) ([]Transaction, error) {
-	return nil, errNotImplemented
+	const sql = `
+	SELECT id, reference, account_id, type, amount, currency, fee, description, status, metadata, created_at, updated_at
+	FROM transactions
+	WHERE account_id IN (SELECT id FROM accounts WHERE user_id = $1)
+	ORDER BY created_at DESC
+	LIMIT $2 OFFSET $3`
+	rows, err := q.db.Query(ctx, sql, arg.UserID, arg.Limit, arg.Offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []Transaction{}
+	for rows.Next() {
+		var i Transaction
+		if err := rows.Scan(
+			&i.ID, &i.Reference, &i.AccountID, &i.Type, &i.Amount, &i.Currency,
+			&i.Fee, &i.Description, &i.Status, &i.Metadata, &i.CreatedAt, &i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	return items, rows.Err()
 }
 
 func (q *Queries) CountTransactionsByUser(ctx context.Context, userID uuid.UUID) (int64, error) {
-	return 0, errNotImplemented
+	const sql = `SELECT count(*) FROM transactions WHERE account_id IN (SELECT id FROM accounts WHERE user_id = $1)`
+	var n int64
+	err := q.db.QueryRow(ctx, sql, userID).Scan(&n)
+	return n, err
 }

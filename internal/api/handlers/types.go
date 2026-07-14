@@ -42,7 +42,7 @@ type RegisterRequest struct {
 	LastName    string `json:"last_name" example:"Dupont"`
 	PIN         string `json:"pin" example:"123456"`
 	Country     string `json:"country" example:"CM"`                // ISO 3166-1 alpha-2
-	BVN         string `json:"bvn,omitempty" example:"12345678901"` // Nigerian Bank Verification Number (11 digits)
+	BVN         string `json:"bvn,omitempty" example:"12345678901"` // Nigerian Bank Verification Number (11 digits). REQUIRED for Nigerian customers (country NG or a +234 phone).
 	// Business accounts only — company-level KYB fields collected at signup.
 	CompanyLegalName       string `json:"company_legal_name,omitempty" example:"Acme SARL"`
 	CompanyRegistrationNo  string `json:"company_registration_no,omitempty" example:"RC/DLA/2020/B/1234"`
@@ -61,11 +61,19 @@ type RefreshTokenRequest struct {
 	RefreshToken string `json:"refresh_token" example:"eyJhbGci..."`
 }
 
+// ResendVerificationRequest identifies the account to resend a verification code to.
+type ResendVerificationRequest struct {
+	EmailOrPhone string `json:"email_or_phone" example:"alice@example.com"`
+}
+
 type TokenPairData struct {
 	AccessToken  string `json:"access_token" example:"eyJhbGci..."`
 	RefreshToken string `json:"refresh_token" example:"eyJhbGci..."`
 	ExpiresIn    int64  `json:"expires_in" example:"1800"`
 	SessionID    string `json:"session_id" example:"550e8400-e29b-41d4-a716-446655440000"`
+	// AccountType ("individual" | "business") is included on auth responses so
+	// the frontend can branch on tier without a separate profile call.
+	AccountType string `json:"account_type,omitempty" example:"individual"`
 }
 
 type TokenPairResponse struct {

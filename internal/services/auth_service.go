@@ -35,7 +35,20 @@ var (
 	ErrSessionNotFound = errors.New("session not found")
 	ErrInvalidToken    = errors.New("invalid or expired token")
 	ErrSocialAuthUser  = errors.New("account uses social login — PIN not set")
+	ErrBVNRequired     = errors.New("BVN is required for Nigerian customers")
 )
+
+// isNigerianCustomer reports whether a customer should be treated as Nigerian
+// (and therefore must provide a BVN to open a Nigerian bank account). Detected
+// from the ISO country field or a Nigerian (+234) phone number — the phone is
+// already canonicalised to E.164, so local "0…" Nigerian numbers count too.
+func isNigerianCustomer(country, normalizedPhone string) bool {
+	switch strings.ToUpper(strings.TrimSpace(country)) {
+	case "NG", "NGA", "NIGERIA":
+		return true
+	}
+	return strings.HasPrefix(normalizedPhone, "+234")
+}
 
 // LoginResult is returned by Login. When Requires2FA is true the client must
 // call CompleteTOTPLogin with TOTPRef + a valid TOTP code to get a token pair.
@@ -121,7 +134,13 @@ func (s *AuthService) Register(ctx context.Context, in RegisterInput) (*token.Pa
 	// the client formats it (spaces, dashes, missing "+").
 	in.Phone = normalizePhone(in.Phone)
 
-	if _, err := q.GetUserByPhone(ctx, in.Phone); err == nil {
+	// Nigerian customers must provide a BVN — the account provider needs it to
+	// open their Nigerian bank account.
+	if isNigerianCustomer(in.Country, in.Phone) && strings.TrimSpace(in.BVN) == "" {
+		return nil, ErrBVNRequired
+	}
+
+	if _, err := q.GetUserByPhoneAny(ctx, phoneCandidates(in.Phone)); err == nil {
 		return nil, ErrUserExists
 	}
 
@@ -233,7 +252,7 @@ func (s *AuthService) Login(ctx context.Context, in LoginInput) (*LoginResult, e
 	q := db.New(s.pool)
 
 	in.Phone = normalizePhone(in.Phone)
-	user, err := q.GetUserByPhone(ctx, in.Phone)
+	user, err := q.GetUserByPhoneAny(ctx, phoneCandidates(in.Phone))
 	if err != nil {
 		return nil, ErrUserNotFound
 	}
@@ -247,11 +266,14 @@ func (s *AuthService) Login(ctx context.Context, in LoginInput) (*LoginResult, e
 		return nil, ErrInvalidPIN
 	}
 
-	// If the user has 2FA enabled, issue a short-lived pending ref instead of
-	// a full session. The client must complete the TOTP step before getting tokens.
+	// If the user has 2FA enabled, issue a short-lived signed pending token
+	// instead of a full session. The client must complete the TOTP step before
+	// getting tokens. Stateless — no Redis needed.
 	if sec, err := q.GetUserSecurity(ctx, user.ID); err == nil && sec.TOTPEnabled {
-		ref := generateSecureToken()[:16]
-		_ = s.rdb.Set(ctx, "2fa:pending:"+ref, user.ID.String(), 5*time.Minute)
+		ref, err := token.SignPending2FA(user.ID, s.cfg.JWT.Secret, 5*time.Minute)
+		if err != nil {
+			return nil, fmt.Errorf("issue 2fa pending token: %w", err)
+		}
 		return &LoginResult{Requires2FA: true, TOTPRef: ref}, nil
 	}
 
@@ -270,15 +292,9 @@ func (s *AuthService) Login(ctx context.Context, in LoginInput) (*LoginResult, e
 
 // CompleteTOTPLogin exchanges a pending 2FA ref + a valid TOTP code for a full JWT pair.
 func (s *AuthService) CompleteTOTPLogin(ctx context.Context, ref, code, deviceIP, deviceUA string) (*token.Pair, error) {
-	redisKey := "2fa:pending:" + ref
-	userIDStr, err := s.rdb.Get(ctx, redisKey).Result()
+	userID, err := token.ParsePending2FA(ref, s.cfg.JWT.Secret)
 	if err != nil {
 		return nil, ErrInvalidToken
-	}
-
-	userID, err := uuid.Parse(userIDStr)
-	if err != nil {
-		return nil, ErrUserNotFound
 	}
 
 	q := db.New(s.pool)
@@ -294,8 +310,6 @@ func (s *AuthService) CompleteTOTPLogin(ctx context.Context, ref, code, deviceIP
 	if !totp.Validate(code, *sec.TOTPSecret) {
 		return nil, ErrInvalidToken
 	}
-
-	s.rdb.Del(ctx, redisKey)
 
 	pair, newDevice, err := s.createSession(ctx, q, user.ID, user.PhoneNumber, user.Role, user.AccountType, deviceIP, deviceUA)
 	if err != nil {
@@ -431,6 +445,30 @@ func (s *AuthService) Logout(ctx context.Context, userID uuid.UUID, sessionID st
 
 // ─── Refresh Token ────────────────────────────────────────────────────────────
 
+// EnsureOwners promotes the configured phone numbers to the "owner" staff role.
+// It is the founder-bootstrap: run once at startup, idempotent, and the only way
+// an owner account is designated (OWNER_PHONES env, deploy-time only). Users must
+// already exist (have registered); non-matching phones are logged and skipped.
+func (s *AuthService) EnsureOwners(ctx context.Context, phones []string) {
+	if len(phones) == 0 {
+		return
+	}
+	q := db.New(s.pool)
+	for _, raw := range phones {
+		phone := normalizePhone(raw)
+		row, err := q.PromoteUserToOwnerByPhone(ctx, phone)
+		if err != nil {
+			s.logger.Warn("owner bootstrap: no user for phone (will retry next boot once they register)",
+				zap.String("phone", phone))
+			continue
+		}
+		s.logger.Info("owner bootstrap: promoted user to owner",
+			zap.String("user_id", row.ID.String()),
+			zap.String("phone", row.PhoneNumber),
+		)
+	}
+}
+
 func (s *AuthService) RefreshToken(ctx context.Context, refreshToken string) (*token.Pair, error) {
 	q := db.New(s.pool)
 
@@ -488,7 +526,7 @@ func (s *AuthService) ForgotPIN(ctx context.Context, emailOrPhone string) error 
 		userEmail = *u.Email
 		firstName = u.FirstName
 	} else {
-		u, err := q.GetUserByPhone(ctx, emailOrPhone)
+		u, err := q.GetUserByPhoneAny(ctx, phoneCandidates(emailOrPhone))
 		if err != nil || u.Email == nil {
 			return nil
 		}
@@ -541,7 +579,7 @@ func (s *AuthService) ResetPIN(ctx context.Context, in ResetPINInput) error {
 			userEmail = *u.Email
 		}
 	} else {
-		u, err := q.GetUserByPhone(ctx, in.EmailOrPhone)
+		u, err := q.GetUserByPhoneAny(ctx, phoneCandidates(in.EmailOrPhone))
 		if err != nil {
 			return ErrUserNotFound
 		}
@@ -598,6 +636,60 @@ func (s *AuthService) SendEmailVerificationOTP(ctx context.Context, userID uuid.
 	}
 
 	return s.sendEmailVerificationOTP(ctx, *user.Email, user.FirstName)
+}
+
+// EmailVerifyResendCooldown is the minimum wait between verification emails.
+const EmailVerifyResendCooldown = 60 * time.Second
+
+// ErrEmailAlreadyVerified indicates the account's email is already verified.
+var ErrEmailAlreadyVerified = errors.New("email already verified")
+
+// ResendVerificationResult reports the outcome so the frontend can show a timer.
+type ResendVerificationResult struct {
+	Sent            bool
+	CooldownSeconds int
+	RetryAfter      int64 // seconds; >0 when blocked by the cooldown
+}
+
+// ResendEmailVerification re-sends the email verification code WITHOUT requiring
+// a JWT — for the pre-auth "check your email" onboarding screen. Identify the
+// account by email or phone. Rate-limited by EmailVerifyResendCooldown so codes
+// aren't wasted, and it never reveals whether an account exists.
+func (s *AuthService) ResendEmailVerification(ctx context.Context, emailOrPhone string) (*ResendVerificationResult, error) {
+	q := db.New(s.pool)
+
+	var user db.User
+	var err error
+	if strings.Contains(emailOrPhone, "@") {
+		email := strings.ToLower(strings.TrimSpace(emailOrPhone))
+		user, err = q.GetUserByEmail(ctx, &email)
+	} else {
+		user, err = q.GetUserByPhoneAny(ctx, phoneCandidates(emailOrPhone))
+	}
+	// Unknown account (or no email on file) → pretend it was sent (no leak).
+	if err != nil || user.Email == nil {
+		return &ResendVerificationResult{Sent: true, CooldownSeconds: int(EmailVerifyResendCooldown.Seconds())}, nil
+	}
+
+	if user.IsEmailVerified {
+		return nil, ErrEmailAlreadyVerified
+	}
+
+	// Cooldown: block if a code was sent too recently.
+	if last, lerr := q.GetLatestEmailOTPSentAt(ctx, db.GetLatestEmailOTPSentAtParams{
+		Email:   *user.Email,
+		Purpose: "verify_email",
+	}); lerr == nil {
+		if elapsed := time.Since(last); elapsed < EmailVerifyResendCooldown {
+			retry := int64((EmailVerifyResendCooldown - elapsed).Seconds()) + 1
+			return &ResendVerificationResult{Sent: false, RetryAfter: retry, CooldownSeconds: int(EmailVerifyResendCooldown.Seconds())}, nil
+		}
+	}
+
+	if err := s.sendEmailVerificationOTP(ctx, *user.Email, user.FirstName); err != nil {
+		return nil, err
+	}
+	return &ResendVerificationResult{Sent: true, CooldownSeconds: int(EmailVerifyResendCooldown.Seconds())}, nil
 }
 
 func (s *AuthService) VerifyEmail(ctx context.Context, userID uuid.UUID, code string) error {
@@ -833,22 +925,7 @@ func ptrString(s string) *string {
 	return &s
 }
 
-// normalizePhone strips formatting (spaces, dashes, parentheses, dots) so the
-// same number entered at signup and at login always matches. A leading "+" is
-// preserved; all other non-digits are dropped.
-func normalizePhone(p string) string {
-	p = strings.TrimSpace(p)
-	var b strings.Builder
-	for i, r := range p {
-		switch {
-		case r >= '0' && r <= '9':
-			b.WriteRune(r)
-		case r == '+' && i == 0:
-			b.WriteRune(r)
-		}
-	}
-	return b.String()
-}
+// normalizePhone / canonicalPhone / phoneCandidates live in phone.go.
 
 func fallback(s, def string) string {
 	if s == "" {

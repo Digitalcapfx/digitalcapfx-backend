@@ -1,6 +1,8 @@
 package services
 
 import (
+	"context"
+
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/redis/go-redis/v9"
 	"go.uber.org/zap"
@@ -55,7 +57,21 @@ func New(
 	cfg *config.Config,
 	logger *zap.Logger,
 ) *Services {
-	notif := NewNotificationService(pool, logger)
+	// Configure phone-number canonicalisation before any normalization runs.
+	SetDefaultCallingCode(cfg.DefaultCountryCode)
+
+	// Firebase Cloud Messaging (mobile push). Optional: if init fails (e.g. no
+	// credentials in local dev) push is disabled and only in-app notifications
+	// are recorded.
+	var fcm *FCMService
+	if f, err := NewFCMService(context.Background(), cfg.FirebaseCredentialsJSON, logger); err != nil {
+		logger.Warn("FCM push disabled — Firebase not initialised", zap.Error(err))
+	} else {
+		fcm = f
+		logger.Info("FCM push notifications enabled")
+	}
+
+	notif := NewNotificationService(pool, fcm, logger)
 	hub2Svc := NewHUB2Service(pool, hub2Client, caasClient, logger)
 	limitsSvc := NewLimitsService(pool, DefaultLimitsResolver(), logger)
 	withdrawalSvc := NewWithdrawalService(pool, hub2Client, nilosClient, notif, limitsSvc, logger)

@@ -63,6 +63,7 @@ func newRouter(cfg *config.Config, svc *services.Services, pool *pgxpool.Pool, l
 	uploadH := handlers.NewUploadHandler(svc)
 	limitsH := handlers.NewLimitsHandler(svc)
 	paymentsWebhookH := handlers.NewPaymentsWebhookHandler(svc, cfg.PaymentsAPI.WebhookSecret, logger)
+	caasWebhookH := handlers.NewCaasWebhookHandler(svc, cfg.CaaS.WebhookSecret, logger)
 
 	kycRequired := middleware.KYCRequired(pool)
 
@@ -77,6 +78,7 @@ func newRouter(cfg *config.Config, svc *services.Services, pool *pgxpool.Pool, l
 	r.Post("/webhooks/metamap", kycH.MetaMapWebhook)
 	r.Post("/webhooks/kyc", kycH.ProviderWebhook)
 	r.Post("/webhooks/payments", paymentsWebhookH.Receive)
+	r.Post("/webhooks/caas", caasWebhookH.Receive)
 
 	// Swagger UI
 	r.Get("/swagger/*", httpSwagger.Handler(
@@ -97,6 +99,8 @@ func newRouter(cfg *config.Config, svc *services.Services, pool *pgxpool.Pool, l
 			r.Post("/token/refresh", authH.RefreshToken)
 			r.Post("/forgot-pin", authH.ForgotPIN)
 			r.Post("/reset-pin", authH.ResetPIN)
+			// Public email-verification resend (pre-auth "check your email" screen)
+			r.Post("/email/resend", authH.ResendEmailVerification)
 		})
 
 		// Support links — public (no auth needed for privacy policy / help center URLs)
@@ -280,6 +284,10 @@ func newRouter(cfg *config.Config, svc *services.Services, pool *pgxpool.Pool, l
 			r.Get("/notifications/unread-count", notificationH.UnreadCount)
 			r.Patch("/notifications/read-all", notificationH.MarkAllRead)
 			r.Patch("/notifications/{id}/read", notificationH.MarkRead)
+			// Push notifications — device (FCM token) registration + test
+			r.Post("/notifications/devices", notificationH.RegisterDevice)
+			r.Delete("/notifications/devices", notificationH.UnregisterDevice)
+			r.Post("/notifications/test-push", notificationH.TestPush)
 
 			// ── Admin routes (JWT + staff permission check) ──────────────────
 			r.Group(func(r chi.Router) {

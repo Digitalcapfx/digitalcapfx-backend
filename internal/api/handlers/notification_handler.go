@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"encoding/json"
 	"net/http"
 	"strconv"
 
@@ -18,6 +19,98 @@ type NotificationHandler struct {
 
 func NewNotificationHandler(svc *services.Services) *NotificationHandler {
 	return &NotificationHandler{svc: svc}
+}
+
+// RegisterDeviceRequest is the body for registering/removing a push token.
+type RegisterDeviceRequest struct {
+	Token    string `json:"token" example:"fcm-registration-token"`
+	Platform string `json:"platform,omitempty" example:"android"` // ios | android | web
+}
+
+// RegisterDevice godoc
+//
+//	@Summary      Register a device for push notifications
+//	@Description  Stores the mobile device's FCM registration token so the user receives push notifications. Call after login / on app start whenever the token is obtained or refreshed. Idempotent.
+//	@Tags         notifications
+//	@Accept       json
+//	@Produce      json
+//	@Security     BearerAuth
+//	@Param        body  body      RegisterDeviceRequest  true  "FCM device token"
+//	@Success      200   {object}  MessageResponse
+//	@Failure      400   {object}  ErrorResponse
+//	@Failure      401   {object}  ErrorResponse
+//	@Router       /notifications/devices [post]
+func (h *NotificationHandler) RegisterDevice(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		response.Unauthorized(w, "unauthorized")
+		return
+	}
+	var body RegisterDeviceRequest
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.Token == "" {
+		response.BadRequest(w, "VALIDATION_ERROR", "token is required")
+		return
+	}
+	if err := h.svc.Notifications.RegisterDevice(r.Context(), userID, body.Token, body.Platform); err != nil {
+		response.InternalError(w)
+		return
+	}
+	response.OKWithMessage(w, "device registered for push notifications", nil)
+}
+
+// UnregisterDevice godoc
+//
+//	@Summary      Unregister a device from push notifications
+//	@Description  Removes the device's FCM token (call on logout or when the user disables push).
+//	@Tags         notifications
+//	@Accept       json
+//	@Produce      json
+//	@Security     BearerAuth
+//	@Param        body  body      RegisterDeviceRequest  true  "FCM device token"
+//	@Success      200   {object}  MessageResponse
+//	@Failure      401   {object}  ErrorResponse
+//	@Router       /notifications/devices [delete]
+func (h *NotificationHandler) UnregisterDevice(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		response.Unauthorized(w, "unauthorized")
+		return
+	}
+	var body RegisterDeviceRequest
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.Token == "" {
+		response.BadRequest(w, "VALIDATION_ERROR", "token is required")
+		return
+	}
+	if err := h.svc.Notifications.UnregisterDevice(r.Context(), userID, body.Token); err != nil {
+		response.InternalError(w)
+		return
+	}
+	response.OKWithMessage(w, "device unregistered", nil)
+}
+
+// TestPush godoc
+//
+//	@Summary      Send a test push notification
+//	@Description  Sends a test push to all of the authenticated user's registered devices — for the mobile team to verify delivery end-to-end.
+//	@Tags         notifications
+//	@Produce      json
+//	@Security     BearerAuth
+//	@Success      200  {object}  MessageResponse
+//	@Failure      400  {object}  ErrorResponse
+//	@Failure      401  {object}  ErrorResponse
+//	@Router       /notifications/test-push [post]
+func (h *NotificationHandler) TestPush(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		response.Unauthorized(w, "unauthorized")
+		return
+	}
+	sent, err := h.svc.Notifications.SendTestPush(r.Context(), userID)
+	if err != nil {
+		response.BadRequest(w, "PUSH_FAILED", err.Error())
+		return
+	}
+	response.OKWithMessage(w, "test push sent to "+strconv.Itoa(sent)+" device(s)", nil)
 }
 
 // ListNotifications godoc

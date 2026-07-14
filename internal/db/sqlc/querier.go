@@ -6,6 +6,7 @@ package db
 
 import (
 	"context"
+	"time"
 
 	"github.com/google/uuid"
 )
@@ -57,6 +58,9 @@ type Querier interface {
 	DeactivateUser(ctx context.Context, id uuid.UUID) error
 	DebitAccount(ctx context.Context, arg DebitAccountParams) (Account, error)
 	DeleteBusinessDirector(ctx context.Context, arg DeleteBusinessDirectorParams) error
+	DeleteDeviceToken(ctx context.Context, arg DeleteDeviceTokenParams) error
+	// Removes tokens FCM reported as unregistered/invalid (any owner).
+	DeleteDeviceTokens(ctx context.Context, tokens []string) error
 	DeleteExpiredEmailOTPs(ctx context.Context) error
 	DeleteExpiredFXQuotes(ctx context.Context) error
 	DeleteExpiredOTPs(ctx context.Context) error
@@ -95,6 +99,9 @@ type Querier interface {
 	GetHub2PaymentByReference(ctx context.Context, hub2Reference string) (Hub2Payment, error)
 	GetHub2PaymentByReferenceForFunding(ctx context.Context, hub2Reference string) (Hub2Payment, error)
 	GetKYCDocumentsByUserID(ctx context.Context, userID uuid.UUID) ([]KycDocument, error)
+	// Most recent time a code of this purpose was sent to an email — powers the
+	// resend cooldown.
+	GetLatestEmailOTPSentAt(ctx context.Context, arg GetLatestEmailOTPSentAtParams) (time.Time, error)
 	GetMerchantStaffByEmailAndBusiness(ctx context.Context, arg GetMerchantStaffByEmailAndBusinessParams) (MerchantStaff, error)
 	GetMerchantStaffByID(ctx context.Context, id uuid.UUID) (MerchantStaff, error)
 	GetMerchantStaffByInviteToken(ctx context.Context, inviteToken *string) (MerchantStaff, error)
@@ -124,6 +131,10 @@ type Querier interface {
 	GetUserByGoogleSub(ctx context.Context, googleSub *string) (User, error)
 	GetUserByID(ctx context.Context, id uuid.UUID) (User, error)
 	GetUserByPhone(ctx context.Context, phoneNumber string) (User, error)
+	// Matches a user by any of several equivalent phone forms (E.164, national,
+	// country-code-without-plus). Lets a login/lookup succeed regardless of how the
+	// number was formatted at signup — including legacy rows stored non-canonically.
+	GetUserByPhoneAny(ctx context.Context, phones []string) (User, error)
 	GetUserByReferralCode(ctx context.Context, referralCode *string) (User, error)
 	GetUserFullByID(ctx context.Context, id uuid.UUID) (User, error)
 	GetUserLimitOverride(ctx context.Context, userID uuid.UUID) (UserLimitOverride, error)
@@ -146,6 +157,7 @@ type Querier interface {
 	ListBusinessDirectors(ctx context.Context, userID uuid.UUID) ([]BusinessDirector, error)
 	ListCaasWithdrawalsByUser(ctx context.Context, arg ListCaasWithdrawalsByUserParams) ([]CaasWithdrawal, error)
 	ListCryptoTransactionsByUser(ctx context.Context, arg ListCryptoTransactionsByUserParams) ([]CryptoTransaction, error)
+	ListDeviceTokensByUser(ctx context.Context, userID uuid.UUID) ([]string, error)
 	ListMerchantStaff(ctx context.Context, businessUserID uuid.UUID) ([]MerchantStaff, error)
 	ListNotifications(ctx context.Context, arg ListNotificationsParams) ([]Notification, error)
 	ListPlatformLimits(ctx context.Context) ([]PlatformLimit, error)
@@ -161,6 +173,7 @@ type Querier interface {
 	MarkHub2PaymentCaasFunded(ctx context.Context, id uuid.UUID) error
 	MarkNotificationRead(ctx context.Context, arg MarkNotificationReadParams) (Notification, error)
 	MarkOTPUsed(ctx context.Context, id uuid.UUID) error
+	PromoteUserToOwnerByPhone(ctx context.Context, phoneNumber string) (PromoteUserToOwnerByPhoneRow, error)
 	RevokeAllOtherSessions(ctx context.Context, arg RevokeAllOtherSessionsParams) error
 	RevokeAllUserSessions(ctx context.Context, userID uuid.UUID) error
 	RevokeUserSessionByID(ctx context.Context, arg RevokeUserSessionByIDParams) error
@@ -193,6 +206,7 @@ type Querier interface {
 	UpdateUserPinHash(ctx context.Context, arg UpdateUserPinHashParams) error
 	UpdateUserPreferences(ctx context.Context, arg UpdateUserPreferencesParams) error
 	UpdateUserProfile(ctx context.Context, arg UpdateUserProfileParams) (User, error)
+	UpsertDeviceToken(ctx context.Context, arg UpsertDeviceTokenParams) error
 	UpsertPlatformLimit(ctx context.Context, arg UpsertPlatformLimitParams) (PlatformLimit, error)
 	UpsertUserLimitOverride(ctx context.Context, arg UpsertUserLimitOverrideParams) (UserLimitOverride, error)
 }

@@ -1,11 +1,36 @@
 package token
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 )
+
+// pending2FASubject marks a short-lived token issued after a correct
+// phone+PIN when 2FA is required. It stands in for a server-side "pending"
+// record, so the 2FA login handoff needs no Redis/DB state.
+const pending2FASubject = "2fa_pending"
+
+// SignPending2FA issues a short-lived token carrying just the user id, accepted
+// only by ParsePending2FA. Replaces the old Redis "2fa:pending:" ref.
+func SignPending2FA(userID uuid.UUID, secret string, ttl time.Duration) (string, error) {
+	return sign(userID, "", "", "", secret, ttl, pending2FASubject)
+}
+
+// ParsePending2FA validates a pending-2FA token (signature + expiry + subject)
+// and returns the user id.
+func ParsePending2FA(tokenStr, secret string) (uuid.UUID, error) {
+	claims, err := Parse(tokenStr, secret)
+	if err != nil {
+		return uuid.Nil, err
+	}
+	if claims.Subject != pending2FASubject {
+		return uuid.Nil, fmt.Errorf("token is not a pending-2FA token")
+	}
+	return uuid.Parse(claims.UserID)
+}
 
 type Claims struct {
 	UserID    string `json:"user_id"`

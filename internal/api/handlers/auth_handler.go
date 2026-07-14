@@ -86,7 +86,7 @@ func (h *AuthHandler) VerifyOTP(w http.ResponseWriter, r *http.Request) {
 // Register godoc
 //
 //	@Summary      Register
-//	@Description  Creates a new user account (individual or business), provisions fiat accounts, and returns a JWT pair. Set account_type to "individual" or "business". Business accounts require company-level fields; director info and documents are submitted post-signup via /business/* endpoints.
+//	@Description  Creates a new user account (individual or business), provisions fiat accounts, and returns a JWT pair. Set account_type to "individual" or "business". Business accounts require company-level fields; director info and documents are submitted post-signup via /business/* endpoints. BVN is REQUIRED for Nigerian customers (country "NG" or a +234 phone) — returns 400 BVN_REQUIRED otherwise.
 //	@Tags         auth
 //	@Accept       json
 //	@Produce      json
@@ -145,6 +145,10 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 	pair, err := h.svc.Auth.Register(r.Context(), in)
 	if errors.Is(err, services.ErrUserExists) {
 		response.Conflict(w, "USER_EXISTS", "a user with this phone number already exists")
+		return
+	}
+	if errors.Is(err, services.ErrBVNRequired) {
+		response.BadRequest(w, "BVN_REQUIRED", "BVN is required for Nigerian customers")
 		return
 	}
 	if err != nil {
@@ -457,6 +461,47 @@ func (h *AuthHandler) SendEmailOTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	response.OKWithMessage(w, "verification code sent to your email", nil)
+}
+
+// ResendEmailVerification godoc
+//
+//	@Summary      Resend email verification code (public)
+//	@Description  Re-sends the email verification code WITHOUT requiring login — for the pre-auth "check your email" screen. Identify the account by email or phone. Rate-limited by a 60s cooldown (returns 429 with retry_after_seconds for the frontend timer). Never reveals whether an account exists.
+//	@Tags         auth
+//	@Accept       json
+//	@Produce      json
+//	@Param        body  body      ResendVerificationRequest  true  "email or phone"
+//	@Success      200   {object}  MessageResponse
+//	@Failure      400   {object}  ErrorResponse
+//	@Failure      429   {object}  ErrorResponse  "Cooldown active"
+//	@Router       /auth/email/resend [post]
+func (h *AuthHandler) ResendEmailVerification(w http.ResponseWriter, r *http.Request) {
+	var body ResendVerificationRequest
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.EmailOrPhone == "" {
+		response.BadRequest(w, "VALIDATION_ERROR", "email_or_phone is required")
+		return
+	}
+
+	result, err := h.svc.Auth.ResendEmailVerification(r.Context(), body.EmailOrPhone)
+	if errors.Is(err, services.ErrEmailAlreadyVerified) {
+		response.OKWithMessage(w, "this email is already verified — please log in", nil)
+		return
+	}
+	if err != nil {
+		response.InternalError(w)
+		return
+	}
+	if !result.Sent {
+		response.JSON(w, http.StatusTooManyRequests, response.Envelope{
+			Success: false,
+			Error: &response.Error{
+				Code:    "COOLDOWN_ACTIVE",
+				Message: fmt.Sprintf("please wait %d seconds before requesting another code", result.RetryAfter),
+			},
+		})
+		return
+	}
+	response.OKWithMessage(w, "if an account exists for that email, a verification code has been sent", nil)
 }
 
 // VerifyEmail godoc

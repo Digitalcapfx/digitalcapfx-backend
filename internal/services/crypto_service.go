@@ -192,7 +192,7 @@ func (s *CryptoService) Send(ctx context.Context, in SendCryptoInput) (*db.Crypt
 
 	// Resolve receiver's local user ID if they're on DigitalFX.
 	var receiverUserID *uuid.UUID
-	if receiverUser, err := q.GetUserByPhone(ctx, in.ReceiverPhone); err == nil {
+	if receiverUser, err := q.GetUserByPhoneAny(ctx, phoneCandidates(in.ReceiverPhone)); err == nil {
 		receiverUserID = &receiverUser.ID
 	}
 

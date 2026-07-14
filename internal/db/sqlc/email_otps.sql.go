@@ -92,6 +92,27 @@ func (q *Queries) DeleteExpiredEmailOTPs(ctx context.Context) error {
 	return err
 }
 
+const getLatestEmailOTPSentAt = `-- name: GetLatestEmailOTPSentAt :one
+SELECT created_at FROM email_otps
+WHERE email = $1 AND purpose = $2
+ORDER BY created_at DESC
+LIMIT 1
+`
+
+type GetLatestEmailOTPSentAtParams struct {
+	Email   string `json:"email"`
+	Purpose string `json:"purpose"`
+}
+
+// Most recent time a code of this purpose was sent to an email — powers the
+// resend cooldown.
+func (q *Queries) GetLatestEmailOTPSentAt(ctx context.Context, arg GetLatestEmailOTPSentAtParams) (time.Time, error) {
+	row := q.db.QueryRow(ctx, getLatestEmailOTPSentAt, arg.Email, arg.Purpose)
+	var created_at time.Time
+	err := row.Scan(&created_at)
+	return created_at, err
+}
+
 const getMetamapVerificationByApplicantID = `-- name: GetMetamapVerificationByApplicantID :one
 SELECT id, user_id, applicant_id, flow_id, identity_access, status, result_data, created_at, updated_at FROM metamap_verifications WHERE applicant_id = $1 LIMIT 1
 `

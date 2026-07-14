@@ -1876,6 +1876,52 @@ const docTemplate = `{
                 }
             }
         },
+        "/auth/email/resend": {
+            "post": {
+                "description": "Re-sends the email verification code WITHOUT requiring login — for the pre-auth \"check your email\" screen. Identify the account by email or phone. Rate-limited by a 60s cooldown (returns 429 with retry_after_seconds for the frontend timer). Never reveals whether an account exists.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Resend email verification code (public)",
+                "parameters": [
+                    {
+                        "description": "email or phone",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ResendVerificationRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.MessageResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "429": {
+                        "description": "Cooldown active",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/auth/email/resend-otp": {
             "post": {
                 "security": [
@@ -2215,7 +2261,7 @@ const docTemplate = `{
         },
         "/auth/register": {
             "post": {
-                "description": "Creates a new user account (individual or business), provisions fiat accounts, and returns a JWT pair. Set account_type to \"individual\" or \"business\". Business accounts require company-level fields; director info and documents are submitted post-signup via /business/* endpoints.",
+                "description": "Creates a new user account (individual or business), provisions fiat accounts, and returns a JWT pair. Set account_type to \"individual\" or \"business\". Business accounts require company-level fields; director info and documents are submitted post-signup via /business/* endpoints. BVN is REQUIRED for Nigerian customers (country \"NG\" or a +234 phone) — returns 400 BVN_REQUIRED otherwise.",
                 "consumes": [
                     "application/json"
                 ],
@@ -3297,6 +3343,100 @@ const docTemplate = `{
                 }
             }
         },
+        "/notifications/devices": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Stores the mobile device's FCM registration token so the user receives push notifications. Call after login / on app start whenever the token is obtained or refreshed. Idempotent.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "notifications"
+                ],
+                "summary": "Register a device for push notifications",
+                "parameters": [
+                    {
+                        "description": "FCM device token",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.RegisterDeviceRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.MessageResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Removes the device's FCM token (call on logout or when the user disables push).",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "notifications"
+                ],
+                "summary": "Unregister a device from push notifications",
+                "parameters": [
+                    {
+                        "description": "FCM device token",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.RegisterDeviceRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.MessageResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/notifications/read-all": {
             "patch": {
                 "security": [
@@ -3317,6 +3457,43 @@ const docTemplate = `{
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/handlers.MessageResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/notifications/test-push": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Sends a test push to all of the authenticated user's registered devices — for the mobile team to verify delivery end-to-end.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "notifications"
+                ],
+                "summary": "Send a test push notification",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.MessageResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
                         }
                     },
                     "401": {
@@ -5818,6 +5995,53 @@ const docTemplate = `{
                 }
             }
         },
+        "/webhooks/caas": {
+            "post": {
+                "description": "Receives account/settlement events from Rach CaaS (instant USD account). Verified via HMAC-SHA256 over the raw body in the X-Webhook-Signature header, using the CaaS webhook secret. On a credit/deposit event the owning user is notified.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "webhooks"
+                ],
+                "summary": "Rach CaaS Webhook",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "HMAC-SHA256 signature (hex)",
+                        "name": "X-Webhook-Signature",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "description": "Webhook payload",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.CaasWebhookPayload"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.MessageResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/webhooks/hub2": {
             "post": {
                 "description": "Receives Mobile Money payment status updates from HUB2. On a COLLECTION SUCCESSFUL event, DigitalFX automatically credits the user's CaaS USDC wallet. The request must carry a valid HMAC-SHA256 signature in the X-Hub2-Signature header.",
@@ -6573,6 +6797,40 @@ const docTemplate = `{
                 "success": {
                     "type": "boolean",
                     "example": true
+                }
+            }
+        },
+        "handlers.CaasWebhookPayload": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "type": "object",
+                    "properties": {
+                        "amount": {
+                            "type": "string"
+                        },
+                        "blind_index": {
+                            "type": "string"
+                        },
+                        "currency": {
+                            "type": "string"
+                        },
+                        "phone": {
+                            "type": "string"
+                        },
+                        "reference": {
+                            "type": "string"
+                        },
+                        "status": {
+                            "type": "string"
+                        },
+                        "tx_hash": {
+                            "type": "string"
+                        }
+                    }
+                },
+                "event": {
+                    "type": "string"
                 }
             }
         },
@@ -7517,6 +7775,20 @@ const docTemplate = `{
                 }
             }
         },
+        "handlers.RegisterDeviceRequest": {
+            "type": "object",
+            "properties": {
+                "platform": {
+                    "description": "ios | android | web",
+                    "type": "string",
+                    "example": "android"
+                },
+                "token": {
+                    "type": "string",
+                    "example": "fcm-registration-token"
+                }
+            }
+        },
         "handlers.RegisterRequest": {
             "type": "object",
             "properties": {
@@ -7534,7 +7806,7 @@ const docTemplate = `{
                     "example": "https://acme.example.com"
                 },
                 "bvn": {
-                    "description": "Nigerian Bank Verification Number (11 digits)",
+                    "description": "Nigerian Bank Verification Number (11 digits). REQUIRED for Nigerian customers (country NG or a +234 phone).",
                     "type": "string",
                     "example": "12345678901"
                 },
@@ -7579,6 +7851,15 @@ const docTemplate = `{
                 "pin": {
                     "type": "string",
                     "example": "123456"
+                }
+            }
+        },
+        "handlers.ResendVerificationRequest": {
+            "type": "object",
+            "properties": {
+                "email_or_phone": {
+                    "type": "string",
+                    "example": "alice@example.com"
                 }
             }
         },
@@ -7829,6 +8110,11 @@ const docTemplate = `{
                 "access_token": {
                     "type": "string",
                     "example": "eyJhbGci..."
+                },
+                "account_type": {
+                    "description": "AccountType (\"individual\" | \"business\") is included on auth responses so\nthe frontend can branch on tier without a separate profile call.",
+                    "type": "string",
+                    "example": "individual"
                 },
                 "expires_in": {
                     "type": "integer",

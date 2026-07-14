@@ -33,6 +33,10 @@ RETURNING *;
 -- name: SetUserBVN :one
 UPDATE users SET bvn = $2, updated_at = now() WHERE id = $1 RETURNING *;
 
+-- name: PromoteUserToOwnerByPhone :one
+UPDATE users SET role = 'owner', updated_at = now() WHERE phone_number = $1
+RETURNING id, phone_number, email, role;
+
 -- name: CreateIndividualUser :one
 INSERT INTO users (
     phone_number, email, first_name, last_name, pin_hash, country, role, auth_provider, account_type

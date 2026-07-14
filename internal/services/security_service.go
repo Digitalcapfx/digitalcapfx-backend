@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -69,36 +68,44 @@ func (s *SecurityService) SetupTOTP(ctx context.Context, userID uuid.UUID) (*TOT
 		return nil, fmt.Errorf("generate totp key: %w", err)
 	}
 
-	redisKey := "2fa:setup:" + userID.String()
-	if err := s.rdb.Set(ctx, redisKey, key.Secret(), 10*time.Minute).Err(); err != nil {
-		return nil, fmt.Errorf("store totp pending secret: %w", err)
+	// Persist the secret in a pending state (totp_enabled=false) on the user
+	// record. ConfirmTOTP activates it once a valid code is entered. Stateless —
+	// no Redis needed.
+	secret := key.Secret()
+	if err := q.SetTOTPEnabled(ctx, db.SetTOTPEnabledParams{
+		ID:          userID,
+		TOTPEnabled: false,
+		TOTPSecret:  &secret,
+	}); err != nil {
+		return nil, fmt.Errorf("store pending totp secret: %w", err)
 	}
 
-	return &TOTPSetupResult{Secret: key.Secret(), URI: key.URL()}, nil
+	return &TOTPSetupResult{Secret: secret, URI: key.URL()}, nil
 }
 
-// ConfirmTOTP verifies a TOTP code against the pending setup secret and activates 2FA.
+// ConfirmTOTP verifies a TOTP code against the pending secret stored during
+// setup and activates 2FA.
 func (s *SecurityService) ConfirmTOTP(ctx context.Context, userID uuid.UUID, code string) error {
-	redisKey := "2fa:setup:" + userID.String()
-	secret, err := s.rdb.Get(ctx, redisKey).Result()
-	if err != nil {
-		return ErrTOTPSetupExpired
+	q := db.New(s.pool)
+	sec, err := q.GetUserSecurity(ctx, userID)
+	if err != nil || sec.TOTPSecret == nil || *sec.TOTPSecret == "" {
+		return ErrTOTPSetupExpired // no pending secret — run setup first
 	}
-
-	if !totp.Validate(code, secret) {
+	if sec.TOTPEnabled {
+		return ErrTOTPAlreadyActive
+	}
+	if !totp.Validate(code, *sec.TOTPSecret) {
 		return ErrTOTPInvalid
 	}
 
-	q := db.New(s.pool)
 	if err := q.SetTOTPEnabled(ctx, db.SetTOTPEnabledParams{
 		ID:          userID,
 		TOTPEnabled: true,
-		TOTPSecret:  &secret,
+		TOTPSecret:  sec.TOTPSecret,
 	}); err != nil {
 		return fmt.Errorf("activate 2fa in db: %w", err)
 	}
 
-	s.rdb.Del(ctx, redisKey)
 	s.logger.Info("2fa enabled", zap.String("user", userID.String()))
 	return nil
 }
