@@ -16,6 +16,7 @@ import (
 	"github.com/rachfinance/digitalfx/internal/config"
 	"github.com/rachfinance/digitalfx/internal/kyc"
 	"github.com/rachfinance/digitalfx/internal/pkg/email"
+	"github.com/rachfinance/digitalfx/internal/pkg/sms"
 )
 
 // Services bundles every domain service, passed to handlers as a single dependency.
@@ -52,6 +53,7 @@ func New(
 	caasClient *caas.Client,
 	hub2Client *hub2.Client,
 	emailClient *email.Client,
+	smsClient *sms.Client,
 	metamapClient *metamap.Client,
 	nilosClient *nilos.Client,
 	cfg *config.Config,
@@ -85,7 +87,7 @@ func New(
 	}
 
 	return &Services{
-		Auth:           NewAuthService(pool, rdb, cfg, logger, emailClient),
+		Auth:           NewAuthService(pool, rdb, cfg, logger, emailClient, smsClient),
 		Account:        NewAccountService(pool, logger),
 		Wallet:         NewWalletService(pool, paymentsClient, hub2Client, logger),
 		Crypto:         NewCryptoService(pool, caasClient, hub2Client, logger),

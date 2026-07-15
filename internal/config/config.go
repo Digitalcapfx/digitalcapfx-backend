@@ -115,15 +115,17 @@ type GCPConfig struct {
 	SignerSA string
 }
 
-// BrevoConfig holds Brevo SMTP credentials for transactional email.
+// BrevoConfig holds Brevo credentials for transactional email (SMTP) and SMS (REST API v3).
 // SMTP host: smtp-relay.brevo.com, port 587 (STARTTLS).
 type BrevoConfig struct {
-	SMTPHost  string
-	SMTPPort  int
-	FromName  string
-	FromEmail string
-	SMTPUser  string // Brevo login email
-	SMTPKey   string // Brevo SMTP API key
+	SMTPHost      string
+	SMTPPort      int
+	FromName      string
+	FromEmail     string
+	SMTPUser      string // Brevo login email
+	SMTPKey       string // Brevo SMTP API key
+	APIKey        string // Brevo REST API key (v3) — used for transactional SMS
+	SMSSenderName string // Alphanumeric sender ID shown on SMS recipient's phone (max 11 chars)
 }
 
 // MetaMapConfig holds credentials for MetaMap identity verification.
@@ -211,6 +213,8 @@ func Load() (*Config, error) {
 	cfg.Brevo.FromEmail = getEnv("BREVO_FROM_EMAIL", "noreply@digitalfx.finance")
 	cfg.Brevo.SMTPUser = getEnv("BREVO_SMTP_USER", "")
 	cfg.Brevo.SMTPKey = getEnv("BREVO_SMTP_KEY", "")
+	cfg.Brevo.APIKey = getEnv("BREVO_API_KEY", "")        // REST v3 key for transactional SMS
+	cfg.Brevo.SMSSenderName = getEnv("BREVO_SMS_SENDER", "DigitalFX") // max 11 chars
 
 	cfg.MetaMap.ClientID = getEnv("METAMAP_CLIENT_ID", "")
 	cfg.MetaMap.ClientSecret = getEnv("METAMAP_CLIENT_SECRET", "")

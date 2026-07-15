@@ -17,6 +17,7 @@ import (
 	"github.com/rachfinance/digitalfx/internal/clients/payments"
 	"github.com/rachfinance/digitalfx/internal/config"
 	"github.com/rachfinance/digitalfx/internal/pkg/email"
+	"github.com/rachfinance/digitalfx/internal/pkg/sms"
 	"github.com/rachfinance/digitalfx/internal/services"
 )
 
@@ -64,8 +65,15 @@ func NewServer(cfg *config.Config) (*Server, error) {
 	)
 	nilosClient := nilos.New(cfg.Nilos.APIKey, cfg.Nilos.APISecret, nilos.WithBaseURL(cfg.Nilos.BaseURL))
 
+	// SMS client (Brevo transactional SMS REST API v3).
+	// smsClient is nil when no API key is configured (dev / test environments).
+	var smsClient *sms.Client
+	if cfg.Brevo.APIKey != "" {
+		smsClient = sms.New(cfg.Brevo.APIKey, cfg.Brevo.SMSSenderName)
+	}
+
 	// Service layer
-	svc := services.New(pool, rdb, paymentsClient, caasClient, hub2Client, emailClient, metamapClient, nilosClient, cfg, logger)
+	svc := services.New(pool, rdb, paymentsClient, caasClient, hub2Client, emailClient, smsClient, metamapClient, nilosClient, cfg, logger)
 
 	// Founder bootstrap: promote configured OWNER_PHONES to the "owner" role.
 	svc.Auth.EnsureOwners(context.Background(), cfg.OwnerPhones)

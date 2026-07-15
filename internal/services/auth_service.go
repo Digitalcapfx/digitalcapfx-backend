@@ -23,6 +23,7 @@ import (
 	db "github.com/rachfinance/digitalfx/internal/db/sqlc"
 	"github.com/rachfinance/digitalfx/internal/pkg/email"
 	"github.com/rachfinance/digitalfx/internal/pkg/hash"
+	"github.com/rachfinance/digitalfx/internal/pkg/sms"
 	"github.com/rachfinance/digitalfx/internal/pkg/token"
 )
 
@@ -64,10 +65,11 @@ type AuthService struct {
 	cfg         *config.Config
 	logger      *zap.Logger
 	emailClient *email.Client
+	smsClient   *sms.Client
 }
 
-func NewAuthService(pool *pgxpool.Pool, rdb *redis.Client, cfg *config.Config, logger *zap.Logger, emailClient *email.Client) *AuthService {
-	return &AuthService{pool: pool, rdb: rdb, cfg: cfg, logger: logger, emailClient: emailClient}
+func NewAuthService(pool *pgxpool.Pool, rdb *redis.Client, cfg *config.Config, logger *zap.Logger, emailClient *email.Client, smsClient *sms.Client) *AuthService {
+	return &AuthService{pool: pool, rdb: rdb, cfg: cfg, logger: logger, emailClient: emailClient, smsClient: smsClient}
 }
 
 // ─── Phone OTP ────────────────────────────────────────────────────────────────
@@ -86,8 +88,26 @@ func (s *AuthService) SendOTP(ctx context.Context, phone string) error {
 		return fmt.Errorf("create otp: %w", err)
 	}
 
-	// TODO: deliver via SMS provider (Twilio / Termii / Africa's Talking)
-	s.logger.Info("phone OTP created", zap.String("phone", phone), zap.String("code", code))
+	// Deliver the OTP via Brevo transactional SMS.
+	if s.smsClient != nil {
+		go func() {
+			if err := s.smsClient.SendOTP(context.Background(), phone, s.cfg.App.Name, code); err != nil {
+				s.logger.Error("send OTP SMS failed",
+					zap.String("phone", phone),
+					zap.Error(err),
+				)
+			} else {
+				s.logger.Info("OTP SMS sent", zap.String("phone", phone))
+			}
+		}()
+	} else {
+		// No SMS client configured — log the code in development so devs can test.
+		s.logger.Warn("SMS client not configured; OTP will not be delivered",
+			zap.String("phone", phone),
+			zap.String("code", code),
+		)
+	}
+
 	return nil
 }
 
