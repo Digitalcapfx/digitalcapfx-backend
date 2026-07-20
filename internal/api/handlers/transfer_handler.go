@@ -21,7 +21,7 @@ func NewTransferHandler(svc *services.Services) *TransferHandler {
 //
 //	@Summary      Internal fiat transfer
 //	@Description  Transfers fiat funds between two DigitalFX users using their phone numbers. Both sender and receiver must have an account in the requested currency.
-//	@Tags         transfers
+//	@Tags         Fiat - Nilos
 //	@Accept       json
 //	@Produce      json
 //	@Security     BearerAuth
@@ -57,7 +57,7 @@ func (h *TransferHandler) InternalTransfer(w http.ResponseWriter, r *http.Reques
 //
 //	@Summary      Mobile Money payment via HUB2
 //	@Description  Initiates either a collection (deposit) or disbursement (withdrawal) via the HUB2 Mobile Money gateway for XAF/XOF operators (MTN, Orange).
-//	@Tags         transfers
+//	@Tags         Mobile Money - HUB2
 //	@Accept       json
 //	@Produce      json
 //	@Security     BearerAuth
@@ -82,7 +82,7 @@ func (h *TransferHandler) Hub2Payment(w http.ResponseWriter, r *http.Request) {
 //
 //	@Summary      Exchange currency
 //	@Description  Converts between supported fiat currencies at the current FX rate. Rate provider integration is pending.
-//	@Tags         transfers
+//	@Tags         Fiat - Nilos
 //	@Accept       json
 //	@Produce      json
 //	@Security     BearerAuth

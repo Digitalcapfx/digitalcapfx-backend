@@ -14,6 +14,7 @@ import (
 type Querier interface {
 	AcceptMerchantStaffInvite(ctx context.Context, arg AcceptMerchantStaffInviteParams) error
 	AcceptStaffInvite(ctx context.Context, arg AcceptStaffInviteParams) error
+	CountActiveVirtualCards(ctx context.Context, userID uuid.UUID) (int64, error)
 	CountActivity(ctx context.Context, arg CountActivityParams) (int64, error)
 	CountAdminAuditLogs(ctx context.Context, arg CountAdminAuditLogsParams) (int64, error)
 	CountNotifications(ctx context.Context, arg CountNotificationsParams) (int64, error)
@@ -31,6 +32,7 @@ type Querier interface {
 	CreateCaasWalletFull(ctx context.Context, arg CreateCaasWalletFullParams) (CaasWallet, error)
 	// ─── CaaS withdrawal queries ──────────────────────────────────────────────────
 	CreateCaasWithdrawal(ctx context.Context, arg CreateCaasWithdrawalParams) (CaasWithdrawal, error)
+	CreateCardTransaction(ctx context.Context, arg CreateCardTransactionParams) (CardTransaction, error)
 	CreateCryptoTransaction(ctx context.Context, arg CreateCryptoTransactionParams) (CryptoTransaction, error)
 	CreateEmailOTP(ctx context.Context, arg CreateEmailOTPParams) (EmailOtp, error)
 	// ─── FX quote queries ─────────────────────────────────────────────────────────
@@ -52,6 +54,8 @@ type Querier interface {
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
 	CreateUserPreferences(ctx context.Context, arg CreateUserPreferencesParams) error
 	CreateUserSession(ctx context.Context, arg CreateUserSessionParams) (UserSession, error)
+	CreateVTUTransaction(ctx context.Context, arg CreateVTUTransactionParams) (VtuTransaction, error)
+	CreateVirtualCard(ctx context.Context, arg CreateVirtualCardParams) (VirtualCard, error)
 	// ─── WaaS (Payments API custody wallets) ──────────────────────────────────
 	CreateWaasWallet(ctx context.Context, arg CreateWaasWalletParams) (WaasWallet, error)
 	CreditAccount(ctx context.Context, arg CreditAccountParams) (Account, error)
@@ -77,6 +81,7 @@ type Querier interface {
 	GetActiveMerchantStaffByUser(ctx context.Context, staffUserID *uuid.UUID) ([]MerchantStaff, error)
 	GetAdminDashboardStats(ctx context.Context) (GetAdminDashboardStatsRow, error)
 	GetAdminUserView(ctx context.Context, id uuid.UUID) (GetAdminUserViewRow, error)
+	GetAllDeviceTokens(ctx context.Context) ([]string, error)
 	// Daily net fiat flow per day across all the user's fiat accounts.
 	// The service layer accumulates these into a balance trend and fills in
 	// crypto from live balances.
@@ -142,8 +147,10 @@ type Querier interface {
 	GetUserSecurity(ctx context.Context, id uuid.UUID) (GetUserSecurityRow, error)
 	GetUserSessionByID(ctx context.Context, id uuid.UUID) (UserSession, error)
 	GetUserSessionByRefreshTokenHash(ctx context.Context, refreshTokenHash string) (UserSession, error)
+	GetVTUTransactionByReference(ctx context.Context, reference *string) (VtuTransaction, error)
 	GetValidEmailOTP(ctx context.Context, arg GetValidEmailOTPParams) (EmailOtp, error)
 	GetValidOTP(ctx context.Context, arg GetValidOTPParams) (Otp, error)
+	GetVirtualCardByID(ctx context.Context, arg GetVirtualCardByIDParams) (VirtualCard, error)
 	// Per-currency transaction count and volume since a given time. Gives business
 	// accounts a currency-level breakdown of their activity.
 	GetVolumeByCurrencySince(ctx context.Context, arg GetVolumeByCurrencySinceParams) ([]GetVolumeByCurrencySinceRow, error)
@@ -156,6 +163,7 @@ type Querier interface {
 	ListAdminAuditLogs(ctx context.Context, arg ListAdminAuditLogsParams) ([]AdminAuditLog, error)
 	ListBusinessDirectors(ctx context.Context, userID uuid.UUID) ([]BusinessDirector, error)
 	ListCaasWithdrawalsByUser(ctx context.Context, arg ListCaasWithdrawalsByUserParams) ([]CaasWithdrawal, error)
+	ListCardTransactions(ctx context.Context, cardID uuid.UUID) ([]CardTransaction, error)
 	ListCryptoTransactionsByUser(ctx context.Context, arg ListCryptoTransactionsByUserParams) ([]CryptoTransaction, error)
 	ListDeviceTokensByUser(ctx context.Context, userID uuid.UUID) ([]string, error)
 	ListMerchantStaff(ctx context.Context, businessUserID uuid.UUID) ([]MerchantStaff, error)
@@ -164,6 +172,8 @@ type Querier interface {
 	ListRecentActivity(ctx context.Context, arg ListRecentActivityParams) ([]ListRecentActivityRow, error)
 	ListStaffMembers(ctx context.Context, arg ListStaffMembersParams) ([]AdminStaff, error)
 	ListTransactionsByAccount(ctx context.Context, arg ListTransactionsByAccountParams) ([]Transaction, error)
+	ListVTUTransactionsByUserID(ctx context.Context, userID uuid.UUID) ([]VtuTransaction, error)
+	ListVirtualCardsByUserID(ctx context.Context, userID uuid.UUID) ([]VirtualCard, error)
 	MarkAllNotificationsRead(ctx context.Context, userID uuid.UUID) error
 	MarkDirectorsComplete(ctx context.Context, userID uuid.UUID) error
 	MarkDocumentsComplete(ctx context.Context, userID uuid.UUID) error
@@ -206,6 +216,8 @@ type Querier interface {
 	UpdateUserPinHash(ctx context.Context, arg UpdateUserPinHashParams) error
 	UpdateUserPreferences(ctx context.Context, arg UpdateUserPreferencesParams) error
 	UpdateUserProfile(ctx context.Context, arg UpdateUserProfileParams) (User, error)
+	UpdateVTUTransactionStatus(ctx context.Context, arg UpdateVTUTransactionStatusParams) (VtuTransaction, error)
+	UpdateVirtualCard(ctx context.Context, arg UpdateVirtualCardParams) (VirtualCard, error)
 	UpsertDeviceToken(ctx context.Context, arg UpsertDeviceTokenParams) error
 	UpsertPlatformLimit(ctx context.Context, arg UpsertPlatformLimitParams) (PlatformLimit, error)
 	UpsertUserLimitOverride(ctx context.Context, arg UpsertUserLimitOverrideParams) (UserLimitOverride, error)

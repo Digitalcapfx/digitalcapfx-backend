@@ -66,12 +66,12 @@ func (h *ProfileHandler) GetProfile(w http.ResponseWriter, r *http.Request) {
 // UpdateProfile godoc
 //
 //	@Summary      Update profile
-//	@Description  Updates the authenticated user's profile fields: name, bio, avatar URL, date of birth, and nationality.
+//	@Description  Updates the authenticated user's editable profile fields: bio and avatar URL ONLY. Name, phone, email and KYC-verified identity fields (date of birth, nationality, BVN) are LOCKED — they cannot be changed here and are ignored if sent. Identity corrections go through KYC / admin review.
 //	@Tags         profile
 //	@Accept       json
 //	@Produce      json
 //	@Security     BearerAuth
-//	@Param        body  body      UpdateProfileRequest  true  "Profile fields to update"
+//	@Param        body  body      UpdateProfileRequest  true  "Editable profile fields (bio, avatar_url)"
 //	@Success      200   {object}  ProfileResponse
 //	@Failure      400   {object}  ErrorResponse
 //	@Failure      401   {object}  ErrorResponse
@@ -89,26 +89,13 @@ func (h *ProfileHandler) UpdateProfile(w http.ResponseWriter, r *http.Request) {
 		response.BadRequest(w, "VALIDATION_ERROR", "invalid request body")
 		return
 	}
-	// PATCH is a partial update: any omitted field keeps its current value, so
-	// only the fields actually provided are validated.
-	if body.DateOfBirth != nil && *body.DateOfBirth != "" && !isISODate(*body.DateOfBirth) {
-		response.BadRequest(w, "VALIDATION_ERROR", "date_of_birth must be in YYYY-MM-DD format")
-		return
-	}
-	if body.BVN != nil && *body.BVN != "" && !isValidBVN(*body.BVN) {
-		response.BadRequest(w, "VALIDATION_ERROR", "bvn must be exactly 11 digits")
-		return
-	}
 
+	// Only non-sensitive fields (bio, avatar) are applied. Name, phone, email and
+	// KYC-verified identity fields are never updated from this endpoint.
 	user, err := h.svc.Auth.UpdateProfile(r.Context(), services.UpdateProfileInput{
-		UserID:      userID,
-		FirstName:   body.FirstName,
-		LastName:    body.LastName,
-		Bio:         body.Bio,
-		AvatarURL:   body.AvatarURL,
-		DateOfBirth: body.DateOfBirth,
-		Nationality: body.Nationality,
-		BVN:         body.BVN,
+		UserID:    userID,
+		Bio:       body.Bio,
+		AvatarURL: body.AvatarURL,
 	})
 	if err != nil {
 		response.InternalError(w)

@@ -57,6 +57,10 @@ sql:
             go_type: "string"
           - column: "caas_withdrawals.amount"
             go_type: "string"
+          - column: "card_transactions.amount"
+            go_type: "string"
+          - column: "vtu_transactions.amount"
+            go_type: "string"
           - column: "crypto_transactions.local_fiat_amount"
             go_type:
               type: "string"

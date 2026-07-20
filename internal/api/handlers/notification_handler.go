@@ -23,14 +23,25 @@ func NewNotificationHandler(svc *services.Services) *NotificationHandler {
 
 // RegisterDeviceRequest is the body for registering/removing a push token.
 type RegisterDeviceRequest struct {
-	Token    string `json:"token" example:"fcm-registration-token"`
-	Platform string `json:"platform,omitempty" example:"android"` // ios | android | web
+	// Token is the Firebase Cloud Messaging registration token obtained on the
+	// device (Android/iOS/Web) via the Firebase SDK. Required.
+	Token string `json:"token" example:"fcm-registration-token" binding:"required"`
+	// Platform the token belongs to. Optional — defaults to "unknown".
+	Platform string `json:"platform,omitempty" example:"android" enums:"ios,android,web"`
 }
 
 // RegisterDevice godoc
 //
 //	@Summary      Register a device for push notifications
-//	@Description  Stores the mobile device's FCM registration token so the user receives push notifications. Call after login / on app start whenever the token is obtained or refreshed. Idempotent.
+//	@Description  Registers this device's Firebase Cloud Messaging (FCM) registration token so the authenticated user receives push notifications. This is the ONLY setup call the mobile app needs — the backend handles all sending automatically (project digitalcap-fx-501314, FCM v1 / HTTP API; no legacy server key required on the client).
+//	@Description
+//	@Description  **When to call:** (1) right after a successful login, (2) on every app start, and (3) whenever Firebase issues a new token via onTokenRefresh. It is idempotent — it upserts by token, and if a token previously belonged to another user it is reassigned to the current user. No need to unregister the old token first on refresh.
+//	@Description
+//	@Description  **platform:** one of `ios`, `android`, `web` (omitted → stored as `unknown`).
+//	@Description
+//	@Description  **What the device receives:** a standard FCM message = a `notification` block (`title`, `body`) for the system tray PLUS a `data` map for in-app routing. `data` ALWAYS contains `type` (the event), and event-specific extra keys. Route/deep-link on `data.type`. Known values: `login_detected`, `welcome`, `kyc_submitted`, `kyc_approved`, `kyc_rejected`, `transfer_sent`, `transfer_received`, `deposit_received`, `deposit_confirmed`, `withdrawal_processed`, `crypto_sent`, `crypto_received`, `exchange_completed`, `market_alert` (extra: `symbol`), `test`. CaaS / Instant-USD credits arrive as `type=deposit_confirmed` with `symbol=iUSD`, `tx_hash`, `reference`, `source=caas`.
+//	@Description
+//	@Description  **Token hygiene:** the server auto-prunes tokens that FCM reports as unregistered/invalid, so always re-register on token refresh to stay reachable. Call DELETE /notifications/devices on logout.
 //	@Tags         notifications
 //	@Accept       json
 //	@Produce      json
@@ -61,7 +72,7 @@ func (h *NotificationHandler) RegisterDevice(w http.ResponseWriter, r *http.Requ
 // UnregisterDevice godoc
 //
 //	@Summary      Unregister a device from push notifications
-//	@Description  Removes the device's FCM token (call on logout or when the user disables push).
+//	@Description  Removes this device's FCM token so it stops receiving push. Call on logout, or when the user turns push off in settings. Only removes the token if it belongs to the authenticated user. Send the same `token` string that was registered.
 //	@Tags         notifications
 //	@Accept       json
 //	@Produce      json
@@ -91,8 +102,9 @@ func (h *NotificationHandler) UnregisterDevice(w http.ResponseWriter, r *http.Re
 // TestPush godoc
 //
 //	@Summary      Send a test push notification
-//	@Description  Sends a test push to all of the authenticated user's registered devices — for the mobile team to verify delivery end-to-end.
+//	@Description  Sends a test push (`data.type = "test"`) to all of the authenticated user's registered devices so the mobile team can verify end-to-end delivery. Register a device via POST /notifications/devices first — this returns 400 "no registered devices for this user" if none are registered, or 400 if push is not configured on the environment. Send with an empty JSON body `{}` (a bodyless POST is rejected by the gateway with 411).
 //	@Tags         notifications
+//	@Accept       json
 //	@Produce      json
 //	@Security     BearerAuth
 //	@Success      200  {object}  MessageResponse

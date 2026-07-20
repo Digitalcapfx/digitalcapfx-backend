@@ -14,9 +14,9 @@ import (
 
 const createUserSession = `-- name: CreateUserSession :one
 INSERT INTO user_sessions
-    (user_id, refresh_token_hash, device_name, device_ip, device_ua, expires_at)
-VALUES ($1, $2, $3, $4, $5, $6)
-RETURNING id, user_id, refresh_token_hash, device_name, device_ip, device_ua, is_active, last_used_at, created_at, expires_at
+    (user_id, refresh_token_hash, device_name, device_ip, device_ua, device_location, expires_at)
+VALUES ($1, $2, $3, $4, $5, $6, $7)
+RETURNING id, user_id, refresh_token_hash, device_name, device_ip, device_ua, is_active, last_used_at, created_at, expires_at, device_location
 `
 
 type CreateUserSessionParams struct {
@@ -25,6 +25,7 @@ type CreateUserSessionParams struct {
 	DeviceName       *string   `json:"device_name"`
 	DeviceIP         *string   `json:"device_ip"`
 	DeviceUA         *string   `json:"device_ua"`
+	DeviceLocation   *string   `json:"device_location"`
 	ExpiresAt        time.Time `json:"expires_at"`
 }
 
@@ -35,6 +36,7 @@ func (q *Queries) CreateUserSession(ctx context.Context, arg CreateUserSessionPa
 		arg.DeviceName,
 		arg.DeviceIP,
 		arg.DeviceUA,
+		arg.DeviceLocation,
 		arg.ExpiresAt,
 	)
 	var i UserSession
@@ -49,12 +51,13 @@ func (q *Queries) CreateUserSession(ctx context.Context, arg CreateUserSessionPa
 		&i.LastUsedAt,
 		&i.CreatedAt,
 		&i.ExpiresAt,
+		&i.DeviceLocation,
 	)
 	return i, err
 }
 
 const getUserSessionByID = `-- name: GetUserSessionByID :one
-SELECT id, user_id, refresh_token_hash, device_name, device_ip, device_ua, is_active, last_used_at, created_at, expires_at FROM user_sessions WHERE id = $1 LIMIT 1
+SELECT id, user_id, refresh_token_hash, device_name, device_ip, device_ua, is_active, last_used_at, created_at, expires_at, device_location FROM user_sessions WHERE id = $1 LIMIT 1
 `
 
 func (q *Queries) GetUserSessionByID(ctx context.Context, id uuid.UUID) (UserSession, error) {
@@ -71,12 +74,13 @@ func (q *Queries) GetUserSessionByID(ctx context.Context, id uuid.UUID) (UserSes
 		&i.LastUsedAt,
 		&i.CreatedAt,
 		&i.ExpiresAt,
+		&i.DeviceLocation,
 	)
 	return i, err
 }
 
 const getUserSessionByRefreshTokenHash = `-- name: GetUserSessionByRefreshTokenHash :one
-SELECT id, user_id, refresh_token_hash, device_name, device_ip, device_ua, is_active, last_used_at, created_at, expires_at FROM user_sessions
+SELECT id, user_id, refresh_token_hash, device_name, device_ip, device_ua, is_active, last_used_at, created_at, expires_at, device_location FROM user_sessions
 WHERE refresh_token_hash = $1 AND is_active = true AND expires_at > NOW()
 LIMIT 1
 `
@@ -95,12 +99,13 @@ func (q *Queries) GetUserSessionByRefreshTokenHash(ctx context.Context, refreshT
 		&i.LastUsedAt,
 		&i.CreatedAt,
 		&i.ExpiresAt,
+		&i.DeviceLocation,
 	)
 	return i, err
 }
 
 const listActiveSessionsByUserID = `-- name: ListActiveSessionsByUserID :many
-SELECT id, user_id, refresh_token_hash, device_name, device_ip, device_ua, is_active, last_used_at, created_at, expires_at FROM user_sessions
+SELECT id, user_id, refresh_token_hash, device_name, device_ip, device_ua, is_active, last_used_at, created_at, expires_at, device_location FROM user_sessions
 WHERE user_id = $1 AND is_active = true AND expires_at > NOW()
 ORDER BY last_used_at DESC
 `
@@ -125,6 +130,7 @@ func (q *Queries) ListActiveSessionsByUserID(ctx context.Context, userID uuid.UU
 			&i.LastUsedAt,
 			&i.CreatedAt,
 			&i.ExpiresAt,
+			&i.DeviceLocation,
 		); err != nil {
 			return nil, err
 		}

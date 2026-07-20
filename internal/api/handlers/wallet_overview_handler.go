@@ -26,8 +26,8 @@ func NewWalletOverviewHandler(svc *services.Services) *WalletOverviewHandler {
 // GetOverview godoc
 //
 //	@Summary      Wallets overview
-//	@Description  Returns the Phone Send card (USDC balance + recent contacts) plus the unified wallet list (fiat + stablecoins + crypto). Filter with ?type=fiat|stablecoin|crypto.
-//	@Tags         wallets
+//	@Description  Combined view across ALL rails: the Phone Send card (iUSD balance + recent contacts) plus the unified wallet list — fiat (Nilos/HUB2), CaaS iUSD, and WaaS crypto + on-chain stablecoins. Every item carries a `provider` field (caas|waas|hub2|nilos). Filter with ?type=fiat|stablecoin|crypto.
+//	@Tags         Wallets - Overview
 //	@Produce      json
 //	@Security     BearerAuth
 //	@Param        type  query   string  false  "Wallet type filter"  Enums(fiat, stablecoin, crypto)
@@ -52,8 +52,8 @@ func (h *WalletOverviewHandler) GetOverview(w http.ResponseWriter, r *http.Reque
 // GetSupportedAssets godoc
 //
 //	@Summary      Supported assets
-//	@Description  Returns all addable assets (crypto networks + stablecoins) with has_wallet=true if the user has already provisioned that wallet. Used for the + Add flow.
-//	@Tags         wallets
+//	@Description  Returns all addable assets (WaaS crypto networks + CaaS iUSD) with has_wallet=true if the user has already provisioned that wallet, and a `provider` field (waas|caas). Used for the + Add flow.
+//	@Tags         Wallets - Overview
 //	@Produce      json
 //	@Security     BearerAuth
 //	@Success      200   {array}   map[string]any
@@ -78,8 +78,8 @@ func (h *WalletOverviewHandler) GetSupportedAssets(w http.ResponseWriter, r *htt
 // GetFiatWalletDetail godoc
 //
 //	@Summary      Fiat wallet detail
-//	@Description  Returns the wallet header (balance, account number, actions) for a specific fiat currency.
-//	@Tags         wallets
+//	@Description  Returns the wallet header (balance, account number, actions) for a specific fiat currency. Fiat is backed by Nilos (foreign currencies) or HUB2 (XAF/XOF mobile money).
+//	@Tags         Fiat - Nilos
 //	@Produce      json
 //	@Security     BearerAuth
 //	@Param        currency  path      string  true  "Currency code (USD, EUR, GBP, XAF, XOF)"
@@ -110,7 +110,7 @@ func (h *WalletOverviewHandler) GetFiatWalletDetail(w http.ResponseWriter, r *ht
 //
 //	@Summary      Fiat wallet transaction history
 //	@Description  Returns the transaction history for a fiat wallet with time-period grouping (THIS WEEK / LAST WEEK / EARLIER) and aggregate stats (In / Out / Total). Filterable by type and full-text search.
-//	@Tags         wallets
+//	@Tags         Fiat - Nilos
 //	@Produce      json
 //	@Security     BearerAuth
 //	@Param        currency  path    string  true   "Currency code"
@@ -152,9 +152,9 @@ func (h *WalletOverviewHandler) GetFiatTransactions(w http.ResponseWriter, r *ht
 
 // GetCryptoWalletDetail godoc
 //
-//	@Summary      Crypto wallet detail
-//	@Description  Returns the wallet header (live balance, receive address, actions) for a WaaS crypto wallet. Balance is fetched live from the Payments API.
-//	@Tags         wallets
+//	@Summary      Crypto wallet detail (WaaS)
+//	@Description  Returns the Rach WaaS wallet for a network: `wallet` is the native coin (e.g. POL) and `tokens[]` lists the on-chain stablecoins (USDT/USDC/…) held on that SAME address — so opening the Polygon wallet returns POL plus its USDT/USDC together. Each item carries `provider:"waas"`. Balances are fetched live from the Payments API. Distinct from CaaS iUSD (see /crypto/*).
+//	@Tags         WaaS - Crypto Wallets
 //	@Produce      json
 //	@Security     BearerAuth
 //	@Param        network  path      string  true  "Network (BTC, ETH, SOL, LTC, TRX, POL, BCH, XRP)"
@@ -185,7 +185,7 @@ func (h *WalletOverviewHandler) GetCryptoWalletDetail(w http.ResponseWriter, r *
 //
 //	@Summary      Crypto wallet transaction history
 //	@Description  Returns on-chain transaction history from the Payments API (WaaS) for a specific network.
-//	@Tags         wallets
+//	@Tags         WaaS - Crypto Wallets
 //	@Produce      json
 //	@Security     BearerAuth
 //	@Param        network  path    string  true   "Network"
@@ -216,9 +216,9 @@ func (h *WalletOverviewHandler) GetCryptoTransactions(w http.ResponseWriter, r *
 
 // GetStablecoinDetail godoc
 //
-//	@Summary      Stablecoin wallet detail
-//	@Description  Returns the wallet header for a stablecoin (USDC). Balance is fetched live from Rach CaaS.
-//	@Tags         wallets
+//	@Summary      iUSD wallet detail (CaaS stablecoin)
+//	@Description  Returns the wallet header for the CaaS Instant USD (iUSD) stablecoin. Balance is fetched live from Rach CaaS (settles on-chain as USDC, shown as iUSD). This is the CaaS rail; for WaaS on-chain USDT/USDC see /wallets/crypto/{network}.
+//	@Tags         CaaS - Instant USD (iUSD)
 //	@Produce      json
 //	@Security     BearerAuth
 //	@Param        symbol  path      string  true  "Token symbol (USDC)"
@@ -243,9 +243,9 @@ func (h *WalletOverviewHandler) GetStablecoinDetail(w http.ResponseWriter, r *ht
 
 // GetStablecoinTransactions godoc
 //
-//	@Summary      Stablecoin transaction history
-//	@Description  Returns CaaS P2P send/receive history for the USDC stablecoin wallet. Maps to the same data as GET /crypto/transactions.
-//	@Tags         wallets
+//	@Summary      iUSD transaction history (CaaS)
+//	@Description  Returns CaaS P2P send/receive history for the Instant USD (iUSD) wallet. Maps to the same data as GET /crypto/transactions.
+//	@Tags         CaaS - Instant USD (iUSD)
 //	@Produce      json
 //	@Security     BearerAuth
 //	@Param        symbol  path    string  true   "Token symbol (USDC)"
@@ -270,7 +270,7 @@ func (h *WalletOverviewHandler) GetStablecoinTransactions(w http.ResponseWriter,
 	}
 
 	// Reuse the existing CaaS transaction list.
-	txns, err := h.svc.Crypto.ListTransactions(r.Context(), userID, int32(page), int32(limit))
+	txns, err := h.svc.CaaS.ListTransactions(r.Context(), userID, int32(page), int32(limit))
 	if err != nil {
 		response.InternalError(w)
 		return

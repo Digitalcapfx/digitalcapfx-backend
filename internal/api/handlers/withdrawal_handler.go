@@ -28,7 +28,7 @@ func NewWithdrawalHandler(svc *services.Services) *WithdrawalHandler {
 //	@Summary      Preview fiat withdrawal
 //	@Description  Returns the exact fee and destination amount for a withdrawal
 //	              before the user submits. No funds are moved.
-//	@Tags         withdrawals
+//	@Tags         Fiat - Nilos
 //	@Accept       json
 //	@Produce      json
 //	@Security     BearerAuth
@@ -75,7 +75,7 @@ func (h *WithdrawalHandler) Quote(w http.ResponseWriter, r *http.Request) {
 //	              to a mobile money number (XAF/XOF via HUB2) or external bank
 //	              (SEPA/SWIFT/FPS via Nilos). The business FX rate is applied for
 //	              cross-currency withdrawals. Status starts as "processing".
-//	@Tags         withdrawals
+//	@Tags         Fiat - Nilos
 //	@Accept       json
 //	@Produce      json
 //	@Security     BearerAuth
@@ -146,7 +146,7 @@ func (h *WithdrawalHandler) Initiate(w http.ResponseWriter, r *http.Request) {
 // GetWithdrawal godoc
 //
 //	@Summary      Get a fiat withdrawal by ID
-//	@Tags         withdrawals
+//	@Tags         Fiat - Nilos
 //	@Produce      json
 //	@Security     BearerAuth
 //	@Param        id  path      string  true  "Withdrawal UUID"
@@ -177,7 +177,7 @@ func (h *WithdrawalHandler) Get(w http.ResponseWriter, r *http.Request) {
 //
 //	@Summary      List fiat withdrawals
 //	@Description  Returns a paginated list of the caller's fiat withdrawal requests.
-//	@Tags         withdrawals
+//	@Tags         Fiat - Nilos
 //	@Produce      json
 //	@Security     BearerAuth
 //	@Param        page      query  int  false  "Page number (default 1)"
@@ -208,7 +208,7 @@ func (h *WithdrawalHandler) List(w http.ResponseWriter, r *http.Request) {
 //	@Summary      List saved beneficiaries
 //	@Description  Returns all saved withdrawal destinations (banks and mobile money
 //	              numbers) for the authenticated user.
-//	@Tags         withdrawals
+//	@Tags         Fiat - Nilos
 //	@Produce      json
 //	@Security     BearerAuth
 //	@Success      200  {array}  BeneficiaryResponse
@@ -232,7 +232,7 @@ func (h *WithdrawalHandler) ListBeneficiaries(w http.ResponseWriter, r *http.Req
 //	@Summary      Save a new beneficiary
 //	@Description  Saves a bank account or mobile money number for quick repeat
 //	              withdrawals. The Nilos recipient ID is lazily cached on first use.
-//	@Tags         withdrawals
+//	@Tags         Fiat - Nilos
 //	@Accept       json
 //	@Produce      json
 //	@Security     BearerAuth
@@ -281,7 +281,7 @@ func (h *WithdrawalHandler) SaveBeneficiary(w http.ResponseWriter, r *http.Reque
 // DeleteBeneficiary godoc
 //
 //	@Summary      Delete a saved beneficiary
-//	@Tags         withdrawals
+//	@Tags         Fiat - Nilos
 //	@Produce      json
 //	@Security     BearerAuth
 //	@Param        id  path      string  true  "Beneficiary UUID"

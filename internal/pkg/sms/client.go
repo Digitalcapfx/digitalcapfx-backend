@@ -31,6 +31,9 @@ type Client struct {
 //   - senderName: Alphanumeric sender ID shown to recipients (max 11 chars).
 //     Use the app / brand name, e.g. "DigitalFX".
 func New(apiKey, senderName string) *Client {
+	if len(senderName) > 11 {
+		senderName = senderName[:11]
+	}
 	return &Client{
 		apiKey:     apiKey,
 		senderName: senderName,
@@ -44,6 +47,7 @@ type smsRequest struct {
 	Sender    string `json:"sender"`
 	Recipient string `json:"recipient"`
 	Content   string `json:"content"`
+	Type      string `json:"type,omitempty"`
 	Tag       string `json:"tag,omitempty"`
 }
 
@@ -63,6 +67,7 @@ func (c *Client) Send(ctx context.Context, recipient, message, tag string) error
 		Sender:    c.senderName,
 		Recipient: recipient,
 		Content:   message,
+		Type:      "transactional",
 		Tag:       tag,
 	})
 	if err != nil {

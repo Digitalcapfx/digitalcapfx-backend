@@ -23,6 +23,7 @@ import (
 
 type Server struct {
 	cfg    *config.Config
+	svc    *services.Services
 	http   *http.Server
 	logger *zap.Logger
 }
@@ -83,6 +84,7 @@ func NewServer(cfg *config.Config) (*Server, error) {
 
 	return &Server{
 		cfg:    cfg,
+		svc:    svc,
 		logger: logger,
 		http: &http.Server{
 			Addr:         ":" + cfg.Server.Port,
@@ -95,6 +97,9 @@ func NewServer(cfg *config.Config) (*Server, error) {
 }
 
 func (s *Server) Start(ctx context.Context) error {
+	// Start background workers
+	go s.svc.Market.Run(context.Background())
+
 	errCh := make(chan error, 1)
 
 	go func() {

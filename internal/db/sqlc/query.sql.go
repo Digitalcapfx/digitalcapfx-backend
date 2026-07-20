@@ -131,14 +131,6 @@ type UpdateAccountNilosParams struct {
 	BIC             *string
 }
 
-type CreateVirtualCardParams struct {
-	UserID      uuid.UUID
-	CardName    string
-	LastFour    string
-	Currency    string
-	CardNetwork string
-}
-
 type GetFXRateParams struct {
 	BaseCurrency  string
 	QuoteCurrency string
@@ -157,10 +149,6 @@ func (q *Queries) UpdateAccountNilos(ctx context.Context, arg UpdateAccountNilos
 
 func (q *Queries) GetAccountsByUserIDWithNilos(ctx context.Context, userID uuid.UUID) ([]AccountWithNilos, error) {
 	return nil, errNotImplemented
-}
-
-func (q *Queries) CreateVirtualCard(ctx context.Context, arg CreateVirtualCardParams) (VirtualCard, error) {
-	return VirtualCard{}, errNotImplemented
 }
 
 func (q *Queries) GetActiveVirtualCard(ctx context.Context, userID uuid.UUID) (VirtualCard, error) {
@@ -482,7 +470,26 @@ type UpsertUserPreferencesParams struct {
 }
 
 func (q *Queries) UpsertUserPreferences(ctx context.Context, arg UpsertUserPreferencesParams) (UserPreferences, error) {
-	return UserPreferences{}, errNotImplemented
+	const sql = `
+	INSERT INTO user_preferences (user_id, language, dark_mode, biometrics_enabled)
+	VALUES ($1, $2, $3, $4)
+	ON CONFLICT (user_id) DO UPDATE SET
+	    language           = EXCLUDED.language,
+	    dark_mode          = EXCLUDED.dark_mode,
+	    biometrics_enabled = EXCLUDED.biometrics_enabled,
+	    updated_at         = now()
+	RETURNING user_id, language, dark_mode, biometrics_enabled, created_at, updated_at`
+	row := q.db.QueryRow(ctx, sql, arg.UserID, arg.Language, arg.DarkMode, arg.BiometricsEnabled)
+	var i UserPreferences
+	err := row.Scan(
+		&i.UserID,
+		&i.Language,
+		&i.DarkMode,
+		&i.BiometricsEnabled,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
 }
 
 // ─── Migration 000008: support tickets ───────────────────────────────────────

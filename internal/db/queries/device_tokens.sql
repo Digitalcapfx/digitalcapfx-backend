@@ -15,3 +15,6 @@ DELETE FROM device_tokens WHERE token = $1 AND user_id = $2;
 -- name: DeleteDeviceTokens :exec
 -- Removes tokens FCM reported as unregistered/invalid (any owner).
 DELETE FROM device_tokens WHERE token = ANY(@tokens::text[]);
+
+-- name: GetAllDeviceTokens :many
+SELECT token FROM device_tokens;

@@ -569,12 +569,13 @@ func (h *AuthHandler) ListDevices(w http.ResponseWriter, r *http.Request) {
 	devices := make([]DeviceData, 0, len(sessions))
 	for _, s := range sessions {
 		devices = append(devices, DeviceData{
-			ID:         s.ID.String(),
-			DeviceName: derefStr(s.DeviceName, "Unknown Device"),
-			DeviceIP:   derefStr(s.DeviceIP, ""),
-			LastUsedAt: s.LastUsedAt,
-			CreatedAt:  s.CreatedAt,
-			IsCurrent:  s.ID.String() == currentSessionID,
+			ID:             s.ID.String(),
+			DeviceName:     derefStr(s.DeviceName, "Unknown Device"),
+			DeviceIP:       derefStr(s.DeviceIP, ""),
+			DeviceLocation: derefStr(s.DeviceLocation, "Unknown Location"),
+			LastUsedAt:     s.LastUsedAt,
+			CreatedAt:      s.CreatedAt,
+			IsCurrent:      s.ID.String() == currentSessionID,
 		})
 	}
 	response.OK(w, devices)

@@ -159,6 +159,26 @@ func (s *NotificationService) SendTestPush(ctx context.Context, userID uuid.UUID
 	return len(tokens) - len(invalid), err
 }
 
+// SendGlobalPush pushes a notification to all devices in the database.
+// Used for market spikes and major announcements.
+func (s *NotificationService) SendGlobalPush(ctx context.Context, title, body string, data map[string]string) {
+	if !s.fcm.Enabled() {
+		return
+	}
+	tokens, err := db.New(s.pool).GetAllDeviceTokens(ctx)
+	if err != nil || len(tokens) == 0 {
+		return
+	}
+
+	invalid, err := s.fcm.SendMulticast(ctx, tokens, title, body, data)
+	if err != nil {
+		s.logger.Warn("fcm global push failed", zap.Error(err))
+	}
+	if len(invalid) > 0 {
+		_ = db.New(s.pool).DeleteDeviceTokens(ctx, invalid)
+	}
+}
+
 // ─── Read / management ────────────────────────────────────────────────────────
 
 type NotificationListResult struct {

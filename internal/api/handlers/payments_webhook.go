@@ -33,28 +33,37 @@ type PaymentsWebhookPayload struct {
 	Data  PaymentsWebhookData `json:"data"`
 }
 
+// PaymentsWebhookData mirrors the Rach WaaS deposit webhook `data` object exactly
+// (payments confirmation_service.go / wallet_monitoring.go). currency is the
+// network code (e.g. "POL", "BTC") for native coins or the token symbol
+// ("USDT", "USDC"); amount is a high-precision decimal string.
 type PaymentsWebhookData struct {
-	CustomerID   string `json:"customer_id"`
-	Network      string `json:"network"`
-	Address      string `json:"address"`
-	Amount       string `json:"amount"`
-	Currency     string `json:"currency"`
-	TxHash       string `json:"tx_hash"`
-	Status       string `json:"status"`
-	SafeToCredit bool   `json:"safe_to_credit"`
+	CustomerID    string `json:"customer_id"`
+	Network       string `json:"network"`
+	Address       string `json:"address"`
+	Amount        string `json:"amount"`
+	Currency      string `json:"currency"`
+	TxHash        string `json:"tx_hash"`
+	Confirmations int    `json:"confirmations"`
+	Status        string `json:"status"`
+	DetectedAt    string `json:"detected_at"`
+	ConfirmedAt   string `json:"confirmed_at"`
+	SafeToCredit  bool   `json:"safe_to_credit"`
 }
 
 // Receive godoc
 //
-//	@Summary      Rach WaaS Webhook
-//	@Description  Handles transaction updates (detected/confirmed deposits) pushed by the Payments WaaS microservice.
+//	@Summary      Rach WaaS Webhook (crypto deposits)
+//	@Description  Receiver for Rach WaaS on-chain deposit events. Fires `wallet.deposit.detected` (seen on-chain, not credited) and `wallet.deposit.confirmed` (block-depth/settlement threshold met). On a confirmed event the owning user (resolved by derived address) is notified and the deposit is mirrored best-effort into their local ledger; the WaaS balance API remains authoritative. Signature: header `X-Webhook-Signature` = hex HMAC-SHA256 of the raw request body, keyed with the WaaS webhook secret (PAYMENTS_WEBHOOK_SECRET). Always returns 200 on business-logic issues to avoid provider retries.
 //	@Tags         webhooks
 //	@Accept       json
 //	@Produce      json
-//	@Param        X-Webhook-Signature  header    string                  true  "HMAC-SHA256 signature: hex"
+//	@Param        X-Webhook-Signature  header    string                  true  "hex HMAC-SHA256(rawBody, secret)"
+//	@Param        X-Webhook-Event      header    string                  false "Event name (e.g. wallet.deposit)"
 //	@Param        body                 body      PaymentsWebhookPayload  true  "Webhook payload"
 //	@Success      200                  {object}  MessageResponse
 //	@Failure      400                  {object}  ErrorResponse
+//	@Failure      401                  {object}  ErrorResponse
 //	@Router       /webhooks/payments [post]
 func (h *PaymentsWebhookHandler) Receive(w http.ResponseWriter, r *http.Request) {
 	body, err := io.ReadAll(io.LimitReader(r.Body, 1<<20)) // 1 MB limit
@@ -98,14 +107,8 @@ func (h *PaymentsWebhookHandler) Receive(w http.ResponseWriter, r *http.Request)
 			zap.String("address", payload.Data.Address),
 		)
 	case "wallet.deposit.confirmed":
-		if err := h.creditDeposit(r.Context(), payload.Data); err != nil {
-			h.logger.Error("failed to credit deposit",
-				zap.String("tx_hash", payload.Data.TxHash),
-				zap.String("address", payload.Data.Address),
-				zap.Error(err),
-			)
-			// Return 200 so webhook isn't retried for business logic failures
-		}
+		// Never errors: notifies the owner and mirror-credits best-effort.
+		h.handleConfirmedDeposit(r.Context(), payload.Data)
 	default:
 		h.logger.Info("payments webhook: unhandled event", zap.String("event", payload.Event))
 	}
@@ -113,53 +116,59 @@ func (h *PaymentsWebhookHandler) Receive(w http.ResponseWriter, r *http.Request)
 	response.OKWithMessage(w, "received", nil)
 }
 
-// creditDeposit credits a confirmed on-chain deposit to the owning user's
-// account and sends a notification. Called from Receive on
-// "wallet.deposit.confirmed" events.
-func (h *PaymentsWebhookHandler) creditDeposit(ctx context.Context, data PaymentsWebhookData) error {
-	if data.Address == "" || data.Amount == "" || data.Currency == "" {
-		return fmt.Errorf("missing required deposit fields (address/amount/currency)")
+// handleConfirmedDeposit processes a confirmed on-chain WaaS deposit: it resolves
+// the owning user by derived address, ALWAYS notifies them, and mirror-credits
+// their local ledger best-effort. It never returns an error — the WaaS balance
+// API is authoritative, and the webhook must always ack with 200.
+func (h *PaymentsWebhookHandler) handleConfirmedDeposit(ctx context.Context, data PaymentsWebhookData) {
+	if data.Address == "" {
+		h.logger.Warn("payments webhook: confirmed deposit missing address", zap.String("tx_hash", data.TxHash))
+		return
 	}
 
-	// Normalize currency (e.g. "USDC_POLYGON" → "USDC")
-	currency := normalizeCurrency(data.Currency)
-
-	amount, err := strconv.ParseFloat(data.Amount, 64)
-	if err != nil || amount <= 0 {
-		return fmt.Errorf("invalid amount %q: %w", data.Amount, err)
-	}
-
-	// Convert to smallest unit (multiply by 100 to get cents/base units)
-	amountInt := int64(amount * 100)
-
-	// Find the user by derived wallet address.
+	// Resolve the owner by the derived on-chain address.
 	wallet, err := h.svc.Wallet.GetWalletByAddress(ctx, data.Address)
 	if err != nil {
-		return fmt.Errorf("wallet not found for address %s: %w", data.Address, err)
+		h.logger.Error("payments webhook: wallet not found for address",
+			zap.String("address", data.Address), zap.String("tx_hash", data.TxHash), zap.Error(err))
+		return
 	}
 
-	if err := h.svc.Wallet.CreditWaasDeposit(ctx, wallet.UserID, currency, amountInt, data.TxHash); err != nil {
-		return fmt.Errorf("credit balance for user %s: %w", wallet.UserID, err)
-	}
+	// currency is a network code (POL/BTC/…) or token symbol (USDT/USDC).
+	currency := normalizeCurrency(data.Currency)
 
-	h.logger.Info("payments webhook: deposit credited",
-		zap.String("user_id", wallet.UserID.String()),
-		zap.String("currency", currency),
-		zap.Int64("amount_cents", amountInt),
-		zap.String("tx_hash", data.TxHash),
-	)
+	// Always notify the owner that their on-chain deposit confirmed.
 	h.svc.Notifications.Create(ctx, services.CreateNotificationInput{
 		UserID: wallet.UserID,
 		Type:   services.NotifDepositConfirmed,
-		Title:  fmt.Sprintf("Deposit Confirmed: %s %s", data.Amount, currency),
-		Body:   fmt.Sprintf("Your %s deposit of %s has been confirmed and credited to your account.", currency, data.Amount),
+		Title:  fmt.Sprintf("Crypto Deposit Confirmed: %s %s", data.Amount, currency),
+		Body:   fmt.Sprintf("Your %s deposit of %s %s on %s has been confirmed on-chain.", currency, data.Amount, currency, data.Network),
 		Metadata: map[string]string{
 			"tx_hash":  data.TxHash,
 			"network":  data.Network,
 			"currency": currency,
+			"amount":   data.Amount,
+			"source":   "waas",
 		},
 	})
-	return nil
+
+	// Best-effort mirror into a matching local ledger account if one exists.
+	// Skipped silently when the user has no account for this currency — the WaaS
+	// balance API remains the source of truth for crypto holdings.
+	if amount, perr := strconv.ParseFloat(data.Amount, 64); perr == nil && amount > 0 {
+		amountInt := int64(amount * 100)
+		if cerr := h.svc.Wallet.CreditWaasDeposit(ctx, wallet.UserID, currency, amountInt, data.TxHash); cerr != nil {
+			h.logger.Warn("payments webhook: local mirror-credit skipped",
+				zap.String("currency", currency), zap.String("user_id", wallet.UserID.String()), zap.Error(cerr))
+		}
+	}
+
+	h.logger.Info("payments webhook: confirmed deposit processed",
+		zap.String("user_id", wallet.UserID.String()),
+		zap.String("currency", currency),
+		zap.String("amount", data.Amount),
+		zap.String("tx_hash", data.TxHash),
+	)
 }
 
 func normalizeCurrency(raw string) string {

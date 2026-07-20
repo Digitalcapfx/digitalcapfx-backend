@@ -37,7 +37,7 @@ func newRouter(cfg *config.Config, svc *services.Services, pool *pgxpool.Pool, l
 	profileH := handlers.NewProfileHandler(svc)
 	accountH := handlers.NewAccountHandler(svc)
 	walletH := handlers.NewWalletHandler(svc)
-	cryptoH := handlers.NewCryptoHandler(svc)
+	caasH := handlers.NewCaaSHandler(svc)
 	transferH := handlers.NewTransferHandler(svc)
 	kycH := handlers.NewKYCHandler(svc)
 	adminH := handlers.NewAdminHandler(svc)
@@ -58,10 +58,13 @@ func newRouter(cfg *config.Config, svc *services.Services, pool *pgxpool.Pool, l
 	businessH := handlers.NewBusinessHandler(svc)
 	teamH := handlers.NewTeamHandler(svc)
 	referralH := handlers.NewReferralHandler(svc)
-	marketH := handlers.NewMarketHandler(cfg, logger)
+	marketH := handlers.NewMarketHandler(svc, logger)
 	swapH := handlers.NewSwapHandler(svc)
 	uploadH := handlers.NewUploadHandler(svc)
 	limitsH := handlers.NewLimitsHandler(svc)
+	cardsH := handlers.NewCardsHandler(svc.Cards)
+	vtuH := handlers.NewVTUHandler(svc.VTU)
+	ratesH := handlers.NewRatesHandler(svc)
 	paymentsWebhookH := handlers.NewPaymentsWebhookHandler(svc, cfg.PaymentsAPI.WebhookSecret, logger)
 	caasWebhookH := handlers.NewCaasWebhookHandler(svc, cfg.CaaS.WebhookSecret, logger)
 
@@ -106,11 +109,12 @@ func newRouter(cfg *config.Config, svc *services.Services, pool *pgxpool.Pool, l
 		// Support links — public (no auth needed for privacy policy / help center URLs)
 		r.Get("/support/links", supportH.GetAppLinks)
 
-		// Market data WebSocket — public; authenticates via ?key= mapped to the
-		// internal Payments API key by the proxy (mirrors the market-data service).
-		r.Get("/market/ws", marketH.ProxyWS)
+		// Market data
+		r.Get("/market/prices", marketH.GetPrices)
+		r.Get("/market/prices/{symbol}", marketH.GetPrice)
+		r.Get("/market/ws", marketH.WSHandler)
 
-		// ── Protected routes (JWT required) ─────────────────────────────────
+		// ─── Protected routes (JWT required) ──────────────────────────────────
 		r.Group(func(r chi.Router) {
 			r.Use(middleware.Auth(cfg.JWT.Secret))
 
@@ -149,6 +153,7 @@ func newRouter(cfg *config.Config, svc *services.Services, pool *pgxpool.Pool, l
 				r.Get("/status", kycH.GetStatus)
 				r.Get("/documents", kycH.ListDocuments)
 				r.Post("/documents", kycH.UploadDocument)
+				r.Post("/init", kycH.Initiate) // Generic KYC (Sumsub)
 				r.Post("/metamap/init", kycH.InitiateMetaMap)
 			})
 
@@ -183,9 +188,6 @@ func newRouter(cfg *config.Config, svc *services.Services, pool *pgxpool.Pool, l
 			r.Get("/referrals", referralH.GetReferralData)
 			r.Get("/referrals/points/ledger", referralH.GetPointsHistory)
 
-			// Market data REST proxy (rates, tickers, charts)
-			r.Get("/market/*", marketH.ProxyREST)
-
 			// Swap — token discovery and price quotes are available pre-KYC so
 			// users can browse and preview prices before verifying.
 			r.Get("/swap/tokens", swapH.GetTokens)
@@ -212,13 +214,21 @@ func newRouter(cfg *config.Config, svc *services.Services, pool *pgxpool.Pool, l
 					r.Get("/{currency}/transactions/{id}", accountH.GetTransaction)
 				})
 
-				// WaaS — custody wallets via Payments API
+				// WaaS — Rach Wallet-as-a-Service (HD crypto wallets, on-chain).
+				// NOTE: /wallets/deposit + /wallets/withdraw are HUB2 Mobile Money
+				// (tagged separately in swagger); the rest are the WaaS surface.
 				r.Route("/wallets", func(r chi.Router) {
 					r.Get("/", walletH.ListWallets)
 					r.Post("/", walletH.CreateWallet)
 					r.Get("/{walletId}/address", walletH.GetDepositAddress)
-					r.Post("/deposit", walletH.InitiateDeposit)
-					r.Post("/withdraw", walletH.InitiateWithdrawal)
+					r.Get("/addresses", walletH.ListAddresses)          // balances (native + tokens)
+					r.Get("/transactions", walletH.GetWaasTransactions) // on-chain history
+					r.Post("/transfer", walletH.TransferCrypto)         // send on-chain
+					r.Post("/estimate-gas", walletH.EstimateGas)
+					r.Get("/seed", walletH.RevealSeed)                // sensitive
+					r.Post("/export-key", walletH.ExportPrivateKey)   // sensitive
+					r.Post("/deposit", walletH.InitiateDeposit)       // HUB2 mobile money
+					r.Post("/withdraw", walletH.InitiateWithdrawal)   // HUB2 mobile money
 					r.Get("/swap/quote", walletH.GetSwapQuote)
 					r.Post("/swap/execute", walletH.ExecuteSwap)
 					r.Get("/swap/history", walletH.GetSwapHistory)
@@ -231,13 +241,13 @@ func newRouter(cfg *config.Config, svc *services.Services, pool *pgxpool.Pool, l
 
 				// CaaS — Instant USD Account (ERC-4337 SCW)
 				r.Route("/crypto", func(r chi.Router) {
-					r.Get("/wallet", cryptoH.GetWallet)
-					r.Post("/fund", cryptoH.FundAccount)
-					r.Get("/balances", cryptoH.GetBalances)
-					r.Post("/send", cryptoH.Send)
-					r.Post("/withdraw", cryptoH.Withdraw)
-					r.Get("/transactions", cryptoH.ListTransactions)
-					r.Get("/transactions/{id}", cryptoH.GetTransaction)
+					r.Get("/wallet", caasH.GetWallet)
+					r.Post("/fund", caasH.FundAccount)
+					r.Get("/balances", caasH.GetBalances)
+					r.Post("/send", caasH.Send)
+					r.Post("/withdraw", caasH.Withdraw)
+					r.Get("/transactions", caasH.ListTransactions)
+					r.Get("/transactions/{id}", caasH.GetTransaction)
 				})
 
 				// Transfers (fiat internal)
@@ -252,6 +262,12 @@ func newRouter(cfg *config.Config, svc *services.Services, pool *pgxpool.Pool, l
 				r.Get("/activity", activityH.GetFeed)
 				r.Get("/insights", insightsH.GetInsights)
 				r.Get("/crypto/contacts", dashboardH.GetRecentContacts)
+
+				// Currency rates (buy / sell / standard per currency) — read-only
+				// for customers: standard rate to display balances, buy/sell for
+				// asset purchase/sale. Admin manages them under /admin/currency-rates.
+				r.Get("/rates", ratesH.ListRates)
+				r.Get("/rates/{currency}", ratesH.GetRate)
 
 				// ── Exchange ────────────────────────────────────────────────
 				r.Get("/exchange/rate", exchangeH.GetRate)
@@ -277,6 +293,21 @@ func newRouter(cfg *config.Config, svc *services.Services, pool *pgxpool.Pool, l
 				r.Get("/withdrawals/beneficiaries", withdrawalH.ListBeneficiaries)
 				r.Post("/withdrawals/beneficiaries", withdrawalH.SaveBeneficiary)
 				r.Delete("/withdrawals/beneficiaries/{id}", withdrawalH.DeleteBeneficiary)
+
+				// Virtual Cards
+				r.Route("/cards", func(r chi.Router) {
+					r.Get("/", cardsH.ListCards)
+					r.Post("/", cardsH.CreateCard)
+					r.Patch("/{id}", cardsH.UpdateCard)
+				})
+
+				// VTU & Bills
+				r.Route("/vtu", func(r chi.Router) {
+					r.Get("/transactions", vtuH.ListVTUTransactions)
+					r.Post("/airtime", vtuH.PurchaseAirtime)
+					r.Post("/data", vtuH.PurchaseData)
+					r.Post("/bills/pay", vtuH.PayBill)
+				})
 			})
 
 			// Notifications (no KYC gate — available from day 1)
@@ -364,6 +395,12 @@ func newRouter(cfg *config.Config, svc *services.Services, pool *pgxpool.Pool, l
 					Post("/admin/withdrawal-rates", adminH.SetWithdrawalRate)
 				r.With(middleware.RequirePermission(services.PermWithdrawalsView)).
 					Get("/admin/withdrawal-rates", adminH.ListWithdrawalRates)
+
+				// Currency rates (buy / sell / standard per currency)
+				r.With(middleware.RequirePermission(services.PermRatesView)).
+					Get("/admin/currency-rates", ratesH.AdminListRates)
+				r.With(middleware.RequirePermission(services.PermRatesManage)).
+					Put("/admin/currency-rates/{currency}", ratesH.AdminSetRate)
 
 				// Account-tier limits (platform-wide, admin-editable)
 				r.With(middleware.RequirePermission(services.PermLimitsView)).

@@ -15,7 +15,7 @@ import (
 const createAccount = `-- name: CreateAccount :one
 INSERT INTO accounts (user_id, currency, account_number)
 VALUES ($1, $2, $3)
-RETURNING id, user_id, currency, balance, available_balance, account_number, status, created_at, updated_at, nilos_account_id, nilos_customer_id, iban, bic
+RETURNING id, user_id, currency, balance, available_balance, account_number, status, created_at, updated_at, nilos_account_id, nilos_customer_id, iban, bic, sort_code, account_number_uk
 `
 
 type CreateAccountParams struct {
@@ -41,6 +41,8 @@ func (q *Queries) CreateAccount(ctx context.Context, arg CreateAccountParams) (A
 		&i.NilosCustomerID,
 		&i.Iban,
 		&i.Bic,
+		&i.SortCode,
+		&i.AccountNumberUk,
 	)
 	return i, err
 }
@@ -51,7 +53,7 @@ SET balance           = balance + $2,
     available_balance = available_balance + $2,
     updated_at        = NOW()
 WHERE id = $1
-RETURNING id, user_id, currency, balance, available_balance, account_number, status, created_at, updated_at, nilos_account_id, nilos_customer_id, iban, bic
+RETURNING id, user_id, currency, balance, available_balance, account_number, status, created_at, updated_at, nilos_account_id, nilos_customer_id, iban, bic, sort_code, account_number_uk
 `
 
 type CreditAccountParams struct {
@@ -76,6 +78,8 @@ func (q *Queries) CreditAccount(ctx context.Context, arg CreditAccountParams) (A
 		&i.NilosCustomerID,
 		&i.Iban,
 		&i.Bic,
+		&i.SortCode,
+		&i.AccountNumberUk,
 	)
 	return i, err
 }
@@ -86,7 +90,7 @@ SET balance           = balance - $2,
     available_balance = available_balance - $2,
     updated_at        = NOW()
 WHERE id = $1 AND available_balance >= $2
-RETURNING id, user_id, currency, balance, available_balance, account_number, status, created_at, updated_at, nilos_account_id, nilos_customer_id, iban, bic
+RETURNING id, user_id, currency, balance, available_balance, account_number, status, created_at, updated_at, nilos_account_id, nilos_customer_id, iban, bic, sort_code, account_number_uk
 `
 
 type DebitAccountParams struct {
@@ -111,6 +115,8 @@ func (q *Queries) DebitAccount(ctx context.Context, arg DebitAccountParams) (Acc
 		&i.NilosCustomerID,
 		&i.Iban,
 		&i.Bic,
+		&i.SortCode,
+		&i.AccountNumberUk,
 	)
 	return i, err
 }
@@ -127,7 +133,7 @@ func (q *Queries) FreezeAccount(ctx context.Context, id uuid.UUID) error {
 }
 
 const getAccountByID = `-- name: GetAccountByID :one
-SELECT id, user_id, currency, balance, available_balance, account_number, status, created_at, updated_at, nilos_account_id, nilos_customer_id, iban, bic FROM accounts WHERE id = $1 LIMIT 1
+SELECT id, user_id, currency, balance, available_balance, account_number, status, created_at, updated_at, nilos_account_id, nilos_customer_id, iban, bic, sort_code, account_number_uk FROM accounts WHERE id = $1 LIMIT 1
 `
 
 func (q *Queries) GetAccountByID(ctx context.Context, id uuid.UUID) (Account, error) {
@@ -147,12 +153,14 @@ func (q *Queries) GetAccountByID(ctx context.Context, id uuid.UUID) (Account, er
 		&i.NilosCustomerID,
 		&i.Iban,
 		&i.Bic,
+		&i.SortCode,
+		&i.AccountNumberUk,
 	)
 	return i, err
 }
 
 const getAccountByUserAndCurrency = `-- name: GetAccountByUserAndCurrency :one
-SELECT id, user_id, currency, balance, available_balance, account_number, status, created_at, updated_at, nilos_account_id, nilos_customer_id, iban, bic FROM accounts
+SELECT id, user_id, currency, balance, available_balance, account_number, status, created_at, updated_at, nilos_account_id, nilos_customer_id, iban, bic, sort_code, account_number_uk FROM accounts
 WHERE user_id = $1 AND currency = $2
 LIMIT 1
 `
@@ -179,12 +187,14 @@ func (q *Queries) GetAccountByUserAndCurrency(ctx context.Context, arg GetAccoun
 		&i.NilosCustomerID,
 		&i.Iban,
 		&i.Bic,
+		&i.SortCode,
+		&i.AccountNumberUk,
 	)
 	return i, err
 }
 
 const getAccountForUpdate = `-- name: GetAccountForUpdate :one
-SELECT id, user_id, currency, balance, available_balance, account_number, status, created_at, updated_at, nilos_account_id, nilos_customer_id, iban, bic FROM accounts
+SELECT id, user_id, currency, balance, available_balance, account_number, status, created_at, updated_at, nilos_account_id, nilos_customer_id, iban, bic, sort_code, account_number_uk FROM accounts
 WHERE id = $1
 LIMIT 1
 FOR UPDATE
@@ -207,12 +217,14 @@ func (q *Queries) GetAccountForUpdate(ctx context.Context, id uuid.UUID) (Accoun
 		&i.NilosCustomerID,
 		&i.Iban,
 		&i.Bic,
+		&i.SortCode,
+		&i.AccountNumberUk,
 	)
 	return i, err
 }
 
 const getAccountsByUserID = `-- name: GetAccountsByUserID :many
-SELECT id, user_id, currency, balance, available_balance, account_number, status, created_at, updated_at, nilos_account_id, nilos_customer_id, iban, bic FROM accounts
+SELECT id, user_id, currency, balance, available_balance, account_number, status, created_at, updated_at, nilos_account_id, nilos_customer_id, iban, bic, sort_code, account_number_uk FROM accounts
 WHERE user_id = $1
 ORDER BY currency
 `
@@ -240,6 +252,8 @@ func (q *Queries) GetAccountsByUserID(ctx context.Context, userID uuid.UUID) ([]
 			&i.NilosCustomerID,
 			&i.Iban,
 			&i.Bic,
+			&i.SortCode,
+			&i.AccountNumberUk,
 		); err != nil {
 			return nil, err
 		}
@@ -256,15 +270,19 @@ UPDATE accounts
 SET nilos_account_id = $2,
     iban = $3,
     bic = $4,
+    sort_code = $5,
+    account_number_uk = $6,
     updated_at = NOW()
 WHERE id = $1
 `
 
 type UpdateNilosAccountDetailsParams struct {
-	ID             uuid.UUID `json:"id"`
-	NilosAccountID *string   `json:"nilos_account_id"`
-	Iban           *string   `json:"iban"`
-	Bic            *string   `json:"bic"`
+	ID              uuid.UUID `json:"id"`
+	NilosAccountID  *string   `json:"nilos_account_id"`
+	Iban            *string   `json:"iban"`
+	Bic             *string   `json:"bic"`
+	SortCode        *string   `json:"sort_code"`
+	AccountNumberUk *string   `json:"account_number_uk"`
 }
 
 func (q *Queries) UpdateNilosAccountDetails(ctx context.Context, arg UpdateNilosAccountDetailsParams) error {
@@ -273,6 +291,8 @@ func (q *Queries) UpdateNilosAccountDetails(ctx context.Context, arg UpdateNilos
 		arg.NilosAccountID,
 		arg.Iban,
 		arg.Bic,
+		arg.SortCode,
+		arg.AccountNumberUk,
 	)
 	return err
 }

@@ -15,26 +15,26 @@ import (
 	"github.com/rachfinance/digitalfx/internal/services"
 )
 
-type CryptoHandler struct {
+type CaaSHandler struct {
 	svc *services.Services
 }
 
-func NewCryptoHandler(svc *services.Services) *CryptoHandler {
-	return &CryptoHandler{svc: svc}
+func NewCaaSHandler(svc *services.Services) *CaaSHandler {
+	return &CaaSHandler{svc: svc}
 }
 
 // GetWallet godoc
 //
-//	@Summary      Get or create ERC-4337 abstraction wallet
-//	@Description  Returns the caller's ERC-4337 Smart Contract Wallet (SCW), provisioning it on the CaaS service if this is the first call. The wallet is identified by the user's phone number.
-//	@Tags         crypto
+//	@Summary      Get or create the user's iUSD (CaaS) wallet
+//	@Description  Returns the caller's Instant USD (iUSD) wallet — an EIP-4337 Smart Contract Wallet (SCW) provisioned on Rach CaaS, keyed by the user's phone number (provisioned on first call). This is the CaaS rail (instant dollars that settle on-chain as USDC), NOT the Rach WaaS HD crypto wallets. Customer-facing unit is always iUSD.
+//	@Tags         CaaS - Instant USD (iUSD)
 //	@Produce      json
 //	@Security     BearerAuth
 //	@Success      200  {object}  CaasWalletResponse
 //	@Failure      401  {object}  ErrorResponse
 //	@Failure      500  {object}  ErrorResponse
 //	@Router       /crypto/wallet [get]
-func (h *CryptoHandler) GetWallet(w http.ResponseWriter, r *http.Request) {
+func (h *CaaSHandler) GetWallet(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	phone, _ := middleware.UserPhoneFromContext(r.Context())
 	if !ok {
@@ -42,7 +42,7 @@ func (h *CryptoHandler) GetWallet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	wallet, err := h.svc.Crypto.GetOrCreateWallet(r.Context(), userID, phone)
+	wallet, err := h.svc.CaaS.GetOrCreateWallet(r.Context(), userID, phone)
 	if err != nil {
 		response.InternalError(w)
 		return
@@ -53,23 +53,23 @@ func (h *CryptoHandler) GetWallet(w http.ResponseWriter, r *http.Request) {
 
 // GetBalances godoc
 //
-//	@Summary      Get stablecoin balances
-//	@Description  Returns the USDC balance of the caller's ERC-4337 Smart Contract Wallet from the CaaS service.
-//	@Tags         crypto
+//	@Summary      Get iUSD balance
+//	@Description  Returns the caller's Instant USD (iUSD) balance from Rach CaaS. iUSD settles on-chain as USDC inside the EIP-4337 Smart Contract Wallet, but is always shown to the customer as iUSD. This is separate from any USDT/USDC held in the Rach WaaS crypto wallets.
+//	@Tags         CaaS - Instant USD (iUSD)
 //	@Produce      json
 //	@Security     BearerAuth
 //	@Success      200  {object}  CryptoBalanceResponse
 //	@Failure      401  {object}  ErrorResponse
 //	@Failure      500  {object}  ErrorResponse
 //	@Router       /crypto/balances [get]
-func (h *CryptoHandler) GetBalances(w http.ResponseWriter, r *http.Request) {
+func (h *CaaSHandler) GetBalances(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
 		response.Unauthorized(w, "unauthorized")
 		return
 	}
 
-	balances, err := h.svc.Crypto.GetBalances(r.Context(), userID)
+	balances, err := h.svc.CaaS.GetBalances(r.Context(), userID)
 	if err != nil {
 		response.InternalError(w)
 		return
@@ -80,9 +80,9 @@ func (h *CryptoHandler) GetBalances(w http.ResponseWriter, r *http.Request) {
 
 // FundAccount godoc
 //
-//	@Summary      Fund Instant USD Account via Mobile Money
-//	@Description  Step 4–5 of the Instant USD Account flow. Initiates a HUB2 Mobile Money collection: the customer receives a push-to-pay prompt on their phone. After they approve, HUB2 fires a webhook which triggers DigitalFX to instruct Rach CaaS to convert the XOF/XAF to USDC/USDT and credit the customer's ERC-4337 Smart Contract Wallet. The customer sees their updated balance via GET /crypto/balances once Rach CaaS confirms the fiat and completes the OTC conversion.
-//	@Tags         crypto
+//	@Summary      Fund iUSD account via Mobile Money
+//	@Description  Funds the customer's Instant USD (iUSD) account. Initiates a HUB2 Mobile Money collection: the customer receives a push-to-pay prompt on their phone. After they approve, HUB2 fires a webhook which triggers Rach CaaS to convert the XOF/XAF to on-chain USDC and credit the customer's EIP-4337 Smart Contract Wallet — reflected to the customer as iUSD. Poll GET /crypto/balances for the updated iUSD balance once CaaS confirms the fiat and completes the conversion.
+//	@Tags         CaaS - Instant USD (iUSD)
 //	@Accept       json
 //	@Produce      json
 //	@Security     BearerAuth
@@ -92,7 +92,7 @@ func (h *CryptoHandler) GetBalances(w http.ResponseWriter, r *http.Request) {
 //	@Failure      401   {object}  ErrorResponse
 //	@Failure      500   {object}  ErrorResponse
 //	@Router       /crypto/fund [post]
-func (h *CryptoHandler) FundAccount(w http.ResponseWriter, r *http.Request) {
+func (h *CaaSHandler) FundAccount(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
 		response.Unauthorized(w, "unauthorized")
@@ -116,7 +116,7 @@ func (h *CryptoHandler) FundAccount(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	hub2Ref, err := h.svc.Crypto.InitiateFunding(r.Context(), services.FundingInput{
+	hub2Ref, err := h.svc.CaaS.InitiateFunding(r.Context(), services.FundingInput{
 		UserID:   userID,
 		Currency: body.Currency,
 		Amount:   body.Amount,
@@ -138,9 +138,9 @@ func (h *CryptoHandler) FundAccount(w http.ResponseWriter, r *http.Request) {
 
 // Send godoc
 //
-//	@Summary      Send USDT or USDC to another user
-//	@Description  Transfers stablecoins (USDT or USDC) from the caller to another DigitalFX user identified by phone number. An FX quote is obtained first, then the CaaS P2P transfer is executed. Amount is in USD-equivalent decimal (e.g. "50.00").
-//	@Tags         crypto
+//	@Summary      Send iUSD to another user (Phone Send)
+//	@Description  Transfers Instant USD (iUSD) from the caller to another DigitalFX user identified by phone number, via Rach CaaS (settles on-chain as USDC between the two EIP-4337 wallets). Amount is USD-equivalent decimal (e.g. "50.00"). Note: the `token` field selects the on-chain settlement asset (USDC/USDT) but the customer-facing unit is iUSD. This is the CaaS P2P rail, distinct from WaaS on-chain crypto transfers.
+//	@Tags         CaaS - Instant USD (iUSD)
 //	@Accept       json
 //	@Produce      json
 //	@Security     BearerAuth
@@ -150,7 +150,7 @@ func (h *CryptoHandler) FundAccount(w http.ResponseWriter, r *http.Request) {
 //	@Failure      401   {object}  ErrorResponse
 //	@Failure      500   {object}  ErrorResponse
 //	@Router       /crypto/send [post]
-func (h *CryptoHandler) Send(w http.ResponseWriter, r *http.Request) {
+func (h *CaaSHandler) Send(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	phone, _ := middleware.UserPhoneFromContext(r.Context())
 	if !ok {
@@ -176,7 +176,7 @@ func (h *CryptoHandler) Send(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	tx, err := h.svc.Crypto.Send(r.Context(), services.SendCryptoInput{
+	tx, err := h.svc.CaaS.Send(r.Context(), services.SendCryptoInput{
 		SenderUserID:  userID,
 		SenderPhone:   phone,
 		ReceiverPhone: body.ReceiverPhone,
@@ -205,9 +205,9 @@ func (h *CryptoHandler) Send(w http.ResponseWriter, r *http.Request) {
 
 // ListTransactions godoc
 //
-//	@Summary      List crypto transactions
-//	@Description  Returns a paginated list of crypto (USDT/USDC) transactions for the authenticated user.
-//	@Tags         crypto
+//	@Summary      List iUSD (CaaS) transactions
+//	@Description  Returns a paginated list of the user's Instant USD (iUSD / CaaS) transactions — funding, Phone Send transfers, and off-ramp withdrawals. These are CaaS-rail movements, not WaaS on-chain crypto history (see /wallets/crypto/{network}/transactions for that).
+//	@Tags         CaaS - Instant USD (iUSD)
 //	@Produce      json
 //	@Security     BearerAuth
 //	@Param        page      query     int  false  "Page number (default 1)"
@@ -216,7 +216,7 @@ func (h *CryptoHandler) Send(w http.ResponseWriter, r *http.Request) {
 //	@Failure      401       {object}  ErrorResponse
 //	@Failure      500       {object}  ErrorResponse
 //	@Router       /crypto/transactions [get]
-func (h *CryptoHandler) ListTransactions(w http.ResponseWriter, r *http.Request) {
+func (h *CaaSHandler) ListTransactions(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
 		response.Unauthorized(w, "unauthorized")
@@ -232,7 +232,7 @@ func (h *CryptoHandler) ListTransactions(w http.ResponseWriter, r *http.Request)
 		perPage = 20
 	}
 
-	txs, err := h.svc.Crypto.ListTransactions(r.Context(), userID, int32(page), int32(perPage))
+	txs, err := h.svc.CaaS.ListTransactions(r.Context(), userID, int32(page), int32(perPage))
 	if err != nil {
 		response.InternalError(w)
 		return
@@ -243,9 +243,9 @@ func (h *CryptoHandler) ListTransactions(w http.ResponseWriter, r *http.Request)
 
 // GetTransaction godoc
 //
-//	@Summary      Get a crypto transaction
-//	@Description  Returns a single crypto transaction by its UUID.
-//	@Tags         crypto
+//	@Summary      Get an iUSD (CaaS) transaction
+//	@Description  Returns a single Instant USD (iUSD / CaaS) transaction by its UUID.
+//	@Tags         CaaS - Instant USD (iUSD)
 //	@Produce      json
 //	@Security     BearerAuth
 //	@Param        id  path      string  true  "Transaction UUID"
@@ -254,7 +254,7 @@ func (h *CryptoHandler) ListTransactions(w http.ResponseWriter, r *http.Request)
 //	@Failure      401 {object}  ErrorResponse
 //	@Failure      404 {object}  ErrorResponse
 //	@Router       /crypto/transactions/{id} [get]
-func (h *CryptoHandler) GetTransaction(w http.ResponseWriter, r *http.Request) {
+func (h *CaaSHandler) GetTransaction(w http.ResponseWriter, r *http.Request) {
 	id, err := uuid.Parse(chi.URLParam(r, "id"))
 	if err != nil {
 		response.BadRequest(w, "INVALID_ID", "invalid transaction id")
@@ -266,9 +266,9 @@ func (h *CryptoHandler) GetTransaction(w http.ResponseWriter, r *http.Request) {
 
 // Withdraw godoc
 //
-//	@Summary      Initiate stablecoin off-ramp withdrawal
-//	@Description  Initiates a stablecoin (USDC/USDT) off-ramp withdrawal from the user's ERC-4337 Smart Contract Wallet to their Mobile Money number.
-//	@Tags         crypto
+//	@Summary      Withdraw iUSD to Mobile Money (off-ramp)
+//	@Description  Off-ramps Instant USD (iUSD) from the user's EIP-4337 Smart Contract Wallet back to fiat on their Mobile Money number, via Rach CaaS (settles the on-chain USDC and pays out local currency). The `token` field is the on-chain settlement asset; the customer balance is iUSD.
+//	@Tags         CaaS - Instant USD (iUSD)
 //	@Accept       json
 //	@Produce      json
 //	@Security     BearerAuth
@@ -278,7 +278,7 @@ func (h *CryptoHandler) GetTransaction(w http.ResponseWriter, r *http.Request) {
 //	@Failure      401   {object}  ErrorResponse
 //	@Failure      500   {object}  ErrorResponse
 //	@Router       /crypto/withdraw [post]
-func (h *CryptoHandler) Withdraw(w http.ResponseWriter, r *http.Request) {
+func (h *CaaSHandler) Withdraw(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	phone, _ := middleware.UserPhoneFromContext(r.Context())
 	if !ok {
@@ -302,7 +302,7 @@ func (h *CryptoHandler) Withdraw(w http.ResponseWriter, r *http.Request) {
 
 	idempotencyKey := fmt.Sprintf("WTH-%s", uuid.New().String())
 
-	withdrawal, err := h.svc.Crypto.Withdraw(r.Context(), services.WithdrawCryptoInput{
+	withdrawal, err := h.svc.CaaS.Withdraw(r.Context(), services.WithdrawCryptoInput{
 		UserID:         userID,
 		Phone:          phone,
 		Amount:         body.Amount,

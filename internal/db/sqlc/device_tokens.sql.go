@@ -35,6 +35,30 @@ func (q *Queries) DeleteDeviceTokens(ctx context.Context, tokens []string) error
 	return err
 }
 
+const getAllDeviceTokens = `-- name: GetAllDeviceTokens :many
+SELECT token FROM device_tokens
+`
+
+func (q *Queries) GetAllDeviceTokens(ctx context.Context) ([]string, error) {
+	rows, err := q.db.Query(ctx, getAllDeviceTokens)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []string{}
+	for rows.Next() {
+		var token string
+		if err := rows.Scan(&token); err != nil {
+			return nil, err
+		}
+		items = append(items, token)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listDeviceTokensByUser = `-- name: ListDeviceTokensByUser :many
 SELECT token FROM device_tokens WHERE user_id = $1
 `

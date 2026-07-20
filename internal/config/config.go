@@ -191,7 +191,7 @@ func Load() (*Config, error) {
 	cfg.PaymentsAPI.BaseURL = require("PAYMENTS_API_URL")
 	cfg.PaymentsAPI.APIKey = require("PAYMENTS_API_KEY")
 	cfg.PaymentsAPI.WebhookSecret = getEnv("PAYMENTS_WEBHOOK_SECRET", "")
-	cfg.PaymentsAPI.MarketDataURL = getEnv("PAYMENTS_MARKET_DATA_URL", "http://localhost:8090")
+	cfg.PaymentsAPI.MarketDataURL = getEnv("PAYMENTS_MARKET_DATA_URL", "https://api.rach.finance")
 
 	cfg.CaaS.BaseURL = require("CAAS_API_URL")
 	cfg.CaaS.APIKey = require("CAAS_API_KEY")

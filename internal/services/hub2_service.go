@@ -5,8 +5,8 @@ package services
 // The full 9-step Instant USD Account funding flow is:
 //
 //  Step 1  Customer calls GET /crypto/wallet → ERC-4337 SCW provisioned on Rach CaaS.
-//  Step 2  Customer calls POST /crypto/fund → CryptoService.InitiateFunding.
-//  Step 3  CryptoService calls HUB2 Collect → HUB2 sends push-to-pay to customer's phone.
+//  Step 2  Customer calls POST /crypto/fund → CaaSService.InitiateFunding.
+//  Step 3  CaaSService calls HUB2 Collect → HUB2 sends push-to-pay to customer's phone.
 //  Step 4  Customer approves on their Mobile Money app.
 //  Step 5  HUB2 fires POST /webhooks/hub2 (COLLECTION SUCCESSFUL).
 //  Step 6  HandleWebhook (this file) calls CaaS FundUser:

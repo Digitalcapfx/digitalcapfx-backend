@@ -14,7 +14,7 @@ import (
 type staffPermCtxKey struct{}
 
 // LoadStaffPermissions is a middleware that runs after Auth. It looks up the
-// authenticated user in the staff_members table, loads their role +
+// authenticated user in the admin_staff table, loads their role +
 // custom/revoked permissions into the request context, and rejects the request
 // with 403 if the user is not a staff member or has been disabled.
 //
@@ -41,7 +41,7 @@ func LoadStaffPermissions(pool *pgxpool.Pool) func(http.Handler) http.Handler {
 				return
 			}
 
-			// Non-owner: must have an active staff_members record.
+			// Non-owner: must have an active admin_staff record.
 			var (
 				staffID            string
 				staffName          string
@@ -54,10 +54,10 @@ func LoadStaffPermissions(pool *pgxpool.Pool) func(http.Handler) http.Handler {
 
 			err := pool.QueryRow(r.Context(), `
 				SELECT id::text, name, email, role,
-				       COALESCE(custom_permissions, '{}'),
-				       COALESCE(revoked_permissions, '{}'),
+				       COALESCE(custom_permissions, '[]'::jsonb),
+				       COALESCE(revoked_permissions, '[]'::jsonb),
 				       is_active
-				FROM staff_members
+				FROM admin_staff
 				WHERE user_id = $1
 			`, userID).Scan(
 				&staffID, &staffName, &staffEmail, &staffRole,
@@ -119,7 +119,7 @@ func StaffPermissionsFromContext(ctx context.Context) (services.StaffPermissionS
 	return s, ok
 }
 
-// StaffIDFromContext returns the staff_members.id (not user_id) for audit logging.
+// StaffIDFromContext returns the admin_staff.id (not user_id) for audit logging.
 func StaffIDFromContext(ctx context.Context) (uuid.UUID, bool) {
 	s, ok := ctx.Value(staffPermCtxKey{}).(services.StaffPermissionSet)
 	if !ok || s.StaffID == "" {

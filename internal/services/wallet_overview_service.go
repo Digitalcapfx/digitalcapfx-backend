@@ -20,28 +20,37 @@ import (
 // ─── Response types ───────────────────────────────────────────────────────────
 
 // WalletItem is a single entry in the unified wallet list (fiat / stablecoin / crypto).
+//
+// Type says WHAT it is; Provider says WHICH Rach rail powers it — this is what
+// keeps the two very different "stablecoins" apart:
+//   - Provider "caas"  → Instant USD (iUSD), an EIP-4337 SCW (Rach CaaS). Type "stablecoin".
+//   - Provider "waas"  → on-chain crypto AND on-chain stablecoins (USDT/USDC per
+//     chain) held in a Rach WaaS HD wallet. Type "crypto" or "stablecoin".
+//   - Provider "hub2"/"nilos" → fiat accounts. Type "fiat".
 type WalletItem struct {
 	ID               string  `json:"id"`
 	Symbol           string  `json:"symbol"`
 	Name             string  `json:"name"`
-	Type             string  `json:"type"`             // "fiat" | "stablecoin" | "crypto"
-	Balance          string  `json:"balance"`          // decimal string
+	Type             string  `json:"type"`               // "fiat" | "stablecoin" | "crypto"
+	Provider         string  `json:"provider,omitempty"` // "caas" | "waas" | "hub2" | "nilos"
+	Balance          string  `json:"balance"`            // decimal string
 	BalanceRaw       float64 `json:"balance_raw"`
-	FormattedBalance string  `json:"formatted_balance"` // "$12,450.75" | "0.4523 BTC"
+	FormattedBalance string  `json:"formatted_balance"`         // "$12,450.75" | "0.4523 BTC"
 	CurrencySymbol   string  `json:"currency_symbol,omitempty"` // "$" "€" "£"
 	Flag             string  `json:"flag,omitempty"`
-	Address          string  `json:"address,omitempty"`       // crypto / stablecoin receive address
-	Network          string  `json:"network,omitempty"`       // "BTC" "ETH" etc.
+	Address          string  `json:"address,omitempty"`        // crypto / stablecoin receive address
+	Network          string  `json:"network,omitempty"`        // "BTC" "ETH" etc.
 	AccountNumber    string  `json:"account_number,omitempty"` // fiat account number
 	BalanceUSD       float64 `json:"balance_usd"`
 	HasWallet        bool    `json:"has_wallet"` // false = not yet provisioned
 }
 
-// PhoneSendCard is the "Phone Send — Instant · Stablecoin-powered" card at the top.
+// PhoneSendCard is the "Phone Send — Instant · iUSD-powered" card at the top.
+// Phone Send moves Instant USD (iUSD) over the CaaS rail.
 type PhoneSendCard struct {
 	Balance          float64       `json:"balance"`
-	BalanceFormatted string        `json:"balance_formatted"` // "$15,000.00 USDC"
-	Token            string        `json:"token"`             // "USDC"
+	BalanceFormatted string        `json:"balance_formatted"` // "15,000.00 iUSD"
+	Token            string        `json:"token"`             // "iUSD"
 	RecentContacts   []ContactItem `json:"recent_contacts"`
 }
 
@@ -54,8 +63,13 @@ type WalletsOverview struct {
 }
 
 // WalletDetailResponse is the wallet detail screen header.
+//
+// For a WaaS crypto wallet, Wallet is the native coin and Tokens lists the
+// on-chain stablecoins (USDT/USDC/…) held on that same address — so opening
+// e.g. the Polygon wallet shows POL plus its USDT/USDC together.
 type WalletDetailResponse struct {
 	Wallet  WalletItem    `json:"wallet"`
+	Tokens  []WalletItem  `json:"tokens,omitempty"`
 	Actions WalletActions `json:"actions"`
 }
 
@@ -74,13 +88,13 @@ type WalletTxItem struct {
 	Direction       string    `json:"direction"` // "in" | "out"
 	Label           string    `json:"label"`     // "Sent", "Received", "Exchanged EUR → USD"
 	Description     string    `json:"description"`
-	Amount          string    `json:"amount"`     // "+$500.00" | "-$500.00"
+	Amount          string    `json:"amount"` // "+$500.00" | "-$500.00"
 	AmountRaw       float64   `json:"amount_raw"`
 	Currency        string    `json:"currency"`
 	Status          string    `json:"status"`
 	Reference       string    `json:"reference"`
 	ConvertedAmount *string   `json:"converted_amount,omitempty"` // "→ $1,080.00"
-	Period          string    `json:"period"` // "this_week" | "last_week" | "earlier"
+	Period          string    `json:"period"`                     // "this_week" | "last_week" | "earlier"
 	CreatedAt       time.Time `json:"created_at"`
 }
 
@@ -115,7 +129,8 @@ type SupportedAsset struct {
 	Symbol    string `json:"symbol"`
 	Name      string `json:"name"`
 	Network   string `json:"network"`
-	Type      string `json:"type"` // "crypto" | "stablecoin"
+	Type      string `json:"type"`               // "crypto" | "stablecoin"
+	Provider  string `json:"provider,omitempty"` // "caas" | "waas"
 	HasWallet bool   `json:"has_wallet"`
 	Address   string `json:"address,omitempty"`
 }
@@ -166,44 +181,53 @@ func (s *WalletOverviewService) GetOverview(ctx context.Context, userID uuid.UUI
 				Symbol:           acc.Currency,
 				Name:             currencyName(acc.Currency),
 				Type:             "fiat",
+				Provider:         fiatProvider(acc.Currency),
 				Balance:          formatBalance(bal, acc.Currency),
 				BalanceRaw:       bal,
 				FormattedBalance: fiatFormatted(bal, acc.Currency),
 				CurrencySymbol:   currencySymbol(acc.Currency),
 				Flag:             currencyFlag(acc.Currency),
-				AccountNumber:    acc.AccountNumber,
+				AccountNumber:    mobileMoneyAccountNumber(acc.Currency, acc.AccountNumber, user.PhoneNumber),
 				BalanceUSD:       roundUSD(balUSD),
 				HasWallet:        true,
 			})
 		}
 	}
 
-	// ── Stablecoins (CaaS) ───────────────────────────────────────────────────
+	// ── Instant USD (CaaS) — settles on-chain as USDC, shown as iUSD ──────────
 	var caasUSDC float64
 	if walletType == "" || walletType == "stablecoin" {
 		if user.PhoneNumber != "" {
+			var addr string
 			if bal, err := s.caasClient.GetBalance(ctx, user.PhoneNumber); err == nil {
 				caasUSDC = parseFloatSafe(bal.BalanceUSDC)
-				totalUSD += caasUSDC
-				wallets = append(wallets, WalletItem{
-					Symbol:           "USDC",
-					Name:             "USD Coin",
-					Type:             "stablecoin",
-					Balance:          fmt.Sprintf("%.2f", caasUSDC),
-					BalanceRaw:       caasUSDC,
-					FormattedBalance: fmt.Sprintf("%s USDC", formatNumber(caasUSDC, 2)),
-					Address:          bal.WalletAddress,
-					BalanceUSD:       roundUSD(caasUSDC),
-					HasWallet:        true,
-				})
+				addr = bal.WalletAddress
 			} else {
-				s.logger.Warn("wallet overview: caas balance unavailable", zap.Error(err))
+				// Balance read can fail for a freshly-provisioned, unfunded SCW —
+				// still show the iUSD wallet at 0 rather than hiding it.
+				s.logger.Warn("wallet overview: caas balance unavailable, showing 0 iUSD", zap.Error(err))
 			}
+			totalUSD += caasUSDC
+			wallets = append(wallets, WalletItem{
+				Symbol:           IUSDSymbol,
+				Name:             IUSDName,
+				Type:             "stablecoin",
+				Provider:         "caas",
+				Balance:          fmt.Sprintf("%.2f", caasUSDC),
+				BalanceRaw:       caasUSDC,
+				FormattedBalance: fmt.Sprintf("%s %s", formatNumber(caasUSDC, 2), IUSDSymbol),
+				Address:          addr,
+				BalanceUSD:       roundUSD(caasUSDC),
+				HasWallet:        true,
+			})
 		}
 	}
 
-	// ── Crypto wallets (WaaS) ────────────────────────────────────────────────
-	if walletType == "" || walletType == "crypto" {
+	// ── Crypto + on-chain stablecoins (WaaS) ─────────────────────────────────
+	// One WaaS HD address per chain can hold the native coin (type "crypto")
+	// AND on-chain stablecoins like USDT/USDC (type "stablecoin", provider
+	// "waas") — the latter are DISTINCT from CaaS iUSD above.
+	if walletType == "" || walletType == "crypto" || walletType == "stablecoin" {
 		waasWallets, err := q.GetWaasWalletsByUserID(ctx, userID)
 		if err != nil {
 			s.logger.Warn("wallet overview: could not load waas wallets", zap.Error(err))
@@ -213,22 +237,49 @@ func (s *WalletOverviewService) GetOverview(ctx context.Context, userID uuid.UUI
 		addrBalances := s.fetchWaaSBalances(ctx, user.ID.String())
 
 		for _, w := range waasWallets {
-			bal := addrBalances[strings.ToUpper(w.Network)]
-			balUSD := bal / rates[strings.ToUpper(w.Network)]
-			totalUSD += balUSD
-			wallets = append(wallets, WalletItem{
-				ID:               w.ID.String(),
-				Symbol:           strings.ToUpper(w.Network),
-				Name:             cryptoName(w.Network),
-				Type:             "crypto",
-				Balance:          fmt.Sprintf("%.8f", bal),
-				BalanceRaw:       bal,
-				FormattedBalance: formatCrypto(bal, w.Network),
-				Address:          w.Address,
-				Network:          strings.ToUpper(w.Network),
-				BalanceUSD:       roundUSD(balUSD),
-				HasWallet:        true,
-			})
+			net := strings.ToUpper(w.Network)
+			nb := addrBalances[net]
+
+			// Native coin.
+			if walletType == "" || walletType == "crypto" {
+				balUSD := nb.Native / rates[net]
+				totalUSD += balUSD
+				wallets = append(wallets, WalletItem{
+					ID:               w.ID.String(),
+					Symbol:           net,
+					Name:             cryptoName(w.Network),
+					Type:             "crypto",
+					Provider:         "waas",
+					Balance:          fmt.Sprintf("%.8f", nb.Native),
+					BalanceRaw:       nb.Native,
+					FormattedBalance: formatCrypto(nb.Native, w.Network),
+					Address:          w.Address,
+					Network:          net,
+					BalanceUSD:       roundUSD(balUSD),
+					HasWallet:        true,
+				})
+			}
+
+			// On-chain stablecoins on this same address (≈ $1 each).
+			if walletType == "" || walletType == "stablecoin" {
+				for _, tok := range nb.Tokens {
+					totalUSD += tok.Balance
+					wallets = append(wallets, WalletItem{
+						ID:               w.ID.String() + ":" + tok.Currency,
+						Symbol:           tok.Currency,
+						Name:             fmt.Sprintf("%s on %s", stablecoinName(tok.Currency), cryptoName(w.Network)),
+						Type:             "stablecoin",
+						Provider:         "waas",
+						Balance:          fmt.Sprintf("%.2f", tok.Balance),
+						BalanceRaw:       tok.Balance,
+						FormattedBalance: fmt.Sprintf("%s %s", formatNumber(tok.Balance, 2), tok.Currency),
+						Address:          w.Address,
+						Network:          net,
+						BalanceUSD:       roundUSD(tok.Balance),
+						HasWallet:        true,
+					})
+				}
+			}
 		}
 	}
 
@@ -241,8 +292,8 @@ func (s *WalletOverviewService) GetOverview(ctx context.Context, userID uuid.UUI
 
 	phoneSend := PhoneSendCard{
 		Balance:          caasUSDC,
-		BalanceFormatted: fmt.Sprintf("$%s USDC", formatNumber(caasUSDC, 2)),
-		Token:            "USDC",
+		BalanceFormatted: fmt.Sprintf("%s %s", formatNumber(caasUSDC, 2), IUSDSymbol),
+		Token:            IUSDSymbol,
 		RecentContacts:   contacts,
 	}
 
@@ -254,20 +305,66 @@ func (s *WalletOverviewService) GetOverview(ctx context.Context, userID uuid.UUI
 	}, nil
 }
 
-// fetchWaaSBalances calls ListCustomerAddresses and returns network → balance map.
-// On any error, returns an empty map (callers get zero balances rather than failing).
-func (s *WalletOverviewService) fetchWaaSBalances(ctx context.Context, customerID string) map[string]float64 {
-	out := map[string]float64{}
+// waasToken is a single on-chain token balance held in a WaaS wallet.
+type waasToken struct {
+	Currency string
+	Balance  float64
+}
+
+// waasNetworkBalance is a WaaS address's holdings on one chain: the native coin
+// plus any on-chain stablecoins (USDT/USDC/…) sitting on that same address.
+type waasNetworkBalance struct {
+	Native float64
+	Tokens []waasToken
+}
+
+// isNativeCurrency reports whether a balance currency is the native coin of a
+// WaaS network. The payments backend labels the native balance with the NETWORK
+// CODE (getNativeCurrencyName → "POL", "BSC", "ETH", …), so `currency == network`
+// is the real rule. The alias cases are defensive safety nets in case the native
+// coin ever arrives under its ticker instead:
+//   - POL network: also accept "MATIC" — Polygon renamed MATIC → POL, same token,
+//     so we must never drop it.
+//   - BSC network: also accept "BNB".
+func isNativeCurrency(network, currency string) bool {
+	network = strings.ToUpper(network)
+	currency = strings.ToUpper(currency)
+	if currency == network {
+		return true
+	}
+	switch network {
+	case "POL":
+		return currency == "MATIC" // POL == MATIC (rebrand)
+	case "BSC":
+		return currency == "BNB"
+	}
+	return false
+}
+
+// waasStablecoins are the on-chain stablecoins WaaS can custody per chain. These
+// are DISTINCT from CaaS iUSD — they live in the WaaS HD wallet, not the SCW.
+var waasStablecoins = map[string]bool{"USDT": true, "USDC": true, "DAI": true, "BUSD": true}
+
+// fetchWaaSBalances calls ListCustomerAddresses and returns, per network, the
+// native-coin balance plus any on-chain stablecoin balances. On any error it
+// returns an empty map (callers get zero balances rather than failing).
+func (s *WalletOverviewService) fetchWaaSBalances(ctx context.Context, customerID string) map[string]waasNetworkBalance {
+	out := map[string]waasNetworkBalance{}
 	resp, err := s.paymentsClient.ListCustomerAddresses(ctx, customerID, false)
 	if err != nil {
 		s.logger.Warn("waas: could not fetch address balances", zap.Error(err))
 		return out
 	}
 
+	// Matches the payments AddressBalance model exactly (address_balances table):
+	// each address carries total_received (cumulative) and a balances[] array of
+	// { currency, balance } rows. currency is the network code for the native
+	// coin (e.g. "POL", "BSC") or the token symbol for stablecoins ("USDT",
+	// "USDC"); balance is a decimal string. There is no top-level current balance.
 	type addrPayload struct {
-		Network  string `json:"network"`
-		Balance  string `json:"balance"`
-		Balances []struct {
+		Network       string `json:"network"`
+		TotalReceived string `json:"total_received"`
+		Balances      []struct {
 			Currency string `json:"currency"`
 			Balance  string `json:"balance"`
 		} `json:"balances"`
@@ -278,15 +375,25 @@ func (s *WalletOverviewService) fetchWaaSBalances(ctx context.Context, customerI
 		if err := json.Unmarshal(raw, &addr); err != nil {
 			continue
 		}
-		network := strings.ToUpper(addr.Network)
-		// Prefer top-level balance if present, else first entry in Balances[].
-		balStr := addr.Balance
-		if balStr == "" && len(addr.Balances) > 0 {
-			balStr = addr.Balances[0].Balance
+		net := strings.ToUpper(addr.Network)
+		nb := out[net]
+
+		// Classify each balance as native coin vs on-chain stablecoin. Native is
+		// summed (never overwritten) so a POL/MATIC alias split is never lost.
+		for _, b := range addr.Balances {
+			cur := strings.ToUpper(strings.TrimSpace(b.Currency))
+			f, ferr := strconv.ParseFloat(strings.TrimSpace(b.Balance), 64)
+			if ferr != nil || cur == "" {
+				continue
+			}
+			switch {
+			case isNativeCurrency(net, cur):
+				nb.Native += f
+			case waasStablecoins[cur]:
+				nb.Tokens = append(nb.Tokens, waasToken{Currency: cur, Balance: f})
+			}
 		}
-		if f, err := strconv.ParseFloat(balStr, 64); err == nil {
-			out[network] = f
-		}
+		out[net] = nb
 	}
 	return out
 }
@@ -301,18 +408,27 @@ func (s *WalletOverviewService) GetFiatWalletDetail(ctx context.Context, userID 
 	}
 	bal := pgNumericToFloat(acc.Balance)
 
+	// For HUB2 mobile-money currencies the identifier is the user's phone.
+	acctNumber := acc.AccountNumber
+	if IsMobileMoneyCurrency(acc.Currency) {
+		if u, uerr := q.GetUserByID(ctx, userID); uerr == nil {
+			acctNumber = mobileMoneyAccountNumber(acc.Currency, acc.AccountNumber, u.PhoneNumber)
+		}
+	}
+
 	return &WalletDetailResponse{
 		Wallet: WalletItem{
 			ID:               acc.ID.String(),
 			Symbol:           acc.Currency,
 			Name:             currencyName(acc.Currency),
 			Type:             "fiat",
+			Provider:         fiatProvider(acc.Currency),
 			Balance:          formatBalance(bal, acc.Currency),
 			BalanceRaw:       bal,
 			FormattedBalance: fiatFormatted(bal, acc.Currency),
 			CurrencySymbol:   currencySymbol(acc.Currency),
 			Flag:             currencyFlag(acc.Currency),
-			AccountNumber:    acc.AccountNumber,
+			AccountNumber:    acctNumber,
 			BalanceUSD:       roundUSD(bal / defaultFXRates()[acc.Currency]),
 			HasWallet:        true,
 		},
@@ -397,24 +513,46 @@ func (s *WalletOverviewService) GetCryptoWalletDetail(ctx context.Context, userI
 		return nil, ErrWalletNotFound
 	}
 
-	// Try live balance from Payments API.
-	balMap := s.fetchWaaSBalances(ctx, userID.String())
-	bal := balMap[strings.ToUpper(network)]
+	// Try live balances from Payments API (WaaS): native coin + on-chain tokens.
+	net := strings.ToUpper(wallet.Network)
+	nb := s.fetchWaaSBalances(ctx, userID.String())[net]
+	bal := nb.Native
+
+	// On-chain stablecoins (USDT/USDC/…) sitting on this same WaaS address.
+	tokens := make([]WalletItem, 0, len(nb.Tokens))
+	for _, tok := range nb.Tokens {
+		tokens = append(tokens, WalletItem{
+			ID:               wallet.ID.String() + ":" + tok.Currency,
+			Symbol:           tok.Currency,
+			Name:             fmt.Sprintf("%s on %s", stablecoinName(tok.Currency), cryptoName(wallet.Network)),
+			Type:             "stablecoin",
+			Provider:         "waas",
+			Balance:          fmt.Sprintf("%.2f", tok.Balance),
+			BalanceRaw:       tok.Balance,
+			FormattedBalance: fmt.Sprintf("%s %s", formatNumber(tok.Balance, 2), tok.Currency),
+			Address:          wallet.Address,
+			Network:          net,
+			BalanceUSD:       roundUSD(tok.Balance),
+			HasWallet:        true,
+		})
+	}
 
 	return &WalletDetailResponse{
 		Wallet: WalletItem{
 			ID:               wallet.ID.String(),
-			Symbol:           strings.ToUpper(wallet.Network),
+			Symbol:           net,
 			Name:             cryptoName(wallet.Network),
 			Type:             "crypto",
+			Provider:         "waas",
 			Balance:          fmt.Sprintf("%.8f", bal),
 			BalanceRaw:       bal,
 			FormattedBalance: formatCrypto(bal, wallet.Network),
 			Address:          wallet.Address,
-			Network:          strings.ToUpper(wallet.Network),
-			BalanceUSD:       roundUSD(bal / defaultFXRates()[strings.ToUpper(wallet.Network)]),
+			Network:          net,
+			BalanceUSD:       roundUSD(bal / defaultFXRates()[net]),
 			HasWallet:        true,
 		},
+		Tokens:  tokens,
 		Actions: WalletActions{CanSend: true, CanReceive: true, CanExchange: false, CanWithdraw: false},
 	}, nil
 }
@@ -453,30 +591,32 @@ func (s *WalletOverviewService) GetStablecoinDetail(ctx context.Context, userID 
 		return nil, ErrUserNotFound
 	}
 
-	bal, err := s.caasClient.GetBalance(ctx, user.PhoneNumber)
-	if err != nil {
-		return nil, fmt.Errorf("caas balance: %w", err)
+	// iUSD (formerly shown as USDC) is the only supported CaaS stablecoin.
+	sym := strings.ToUpper(symbol)
+	if sym != "IUSD" && sym != "USDC" {
+		return nil, fmt.Errorf("unsupported stablecoin: %s", symbol)
 	}
 
-	sym := strings.ToUpper(symbol)
+	// Balance read is best-effort — a freshly-provisioned, unfunded SCW should
+	// still show iUSD 0 rather than erroring.
 	var balFloat float64
 	var addr string
-	switch sym {
-	case "USDC":
+	if bal, berr := s.caasClient.GetBalance(ctx, user.PhoneNumber); berr == nil {
 		balFloat = parseFloatSafe(bal.BalanceUSDC)
 		addr = bal.WalletAddress
-	default:
-		return nil, fmt.Errorf("unsupported stablecoin: %s", sym)
+	} else {
+		s.logger.Warn("stablecoin detail: caas balance unavailable, showing 0 iUSD", zap.Error(berr))
 	}
 
 	return &WalletDetailResponse{
 		Wallet: WalletItem{
-			Symbol:           sym,
-			Name:             stablecoinName(sym),
+			Symbol:           IUSDSymbol,
+			Name:             IUSDName,
 			Type:             "stablecoin",
+			Provider:         "caas",
 			Balance:          fmt.Sprintf("%.2f", balFloat),
 			BalanceRaw:       balFloat,
-			FormattedBalance: fmt.Sprintf("%s %s", formatNumber(balFloat, 2), sym),
+			FormattedBalance: fmt.Sprintf("%s %s", formatNumber(balFloat, 2), IUSDSymbol),
 			Address:          addr,
 			BalanceUSD:       roundUSD(balFloat),
 			HasWallet:        true,
@@ -497,15 +637,19 @@ func (s *WalletOverviewService) GetSupportedAssets(ctx context.Context, userID u
 	}
 
 	assets := []SupportedAsset{
-		{Symbol: "BTC", Name: "Bitcoin", Network: "BTC", Type: "crypto"},
-		{Symbol: "ETH", Name: "Ethereum", Network: "ETH", Type: "crypto"},
-		{Symbol: "SOL", Name: "Solana", Network: "SOL", Type: "crypto"},
-		{Symbol: "LTC", Name: "Litecoin", Network: "LTC", Type: "crypto"},
-		{Symbol: "TRX", Name: "TRON", Network: "TRX", Type: "crypto"},
-		{Symbol: "POL", Name: "Polygon", Network: "POL", Type: "crypto"},
-		{Symbol: "BCH", Name: "Bitcoin Cash", Network: "BCH", Type: "crypto"},
-		{Symbol: "XRP", Name: "XRP", Network: "XRP", Type: "crypto"},
-		{Symbol: "USDC", Name: "USD Coin", Network: "ERC-20", Type: "stablecoin"},
+		// Rach WaaS — native coins (each chain's HD address can also hold
+		// on-chain USDT/USDC once funded).
+		{Symbol: "BTC", Name: "Bitcoin", Network: "BTC", Type: "crypto", Provider: "waas"},
+		{Symbol: "ETH", Name: "Ethereum", Network: "ETH", Type: "crypto", Provider: "waas"},
+		{Symbol: "BSC", Name: "BNB Smart Chain", Network: "BSC", Type: "crypto", Provider: "waas"},
+		{Symbol: "SOL", Name: "Solana", Network: "SOL", Type: "crypto", Provider: "waas"},
+		{Symbol: "LTC", Name: "Litecoin", Network: "LTC", Type: "crypto", Provider: "waas"},
+		{Symbol: "TRX", Name: "TRON", Network: "TRX", Type: "crypto", Provider: "waas"},
+		{Symbol: "POL", Name: "Polygon", Network: "POL", Type: "crypto", Provider: "waas"},
+		{Symbol: "BCH", Name: "Bitcoin Cash", Network: "BCH", Type: "crypto", Provider: "waas"},
+		{Symbol: "XRP", Name: "XRP", Network: "XRP", Type: "crypto", Provider: "waas"},
+		// Rach CaaS — Instant USD (EIP-4337 SCW), a different rail from WaaS.
+		{Symbol: IUSDSymbol, Name: IUSDName, Network: "EIP-4337", Type: "stablecoin", Provider: "caas"},
 	}
 
 	for i, a := range assets {
@@ -520,8 +664,19 @@ func (s *WalletOverviewService) GetSupportedAssets(ctx context.Context, userID u
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
+// supportedNetworks lists the Rach WaaS networks (spec enum:
+// BTC BCH LTC ETH BSC POL TRX SOL XRP).
 func supportedNetworks() []string {
-	return []string{"BTC", "ETH", "SOL", "LTC", "TRX", "POL", "BCH", "XRP"}
+	return []string{"BTC", "BCH", "LTC", "ETH", "BSC", "POL", "TRX", "SOL", "XRP"}
+}
+
+// fiatProvider reports which rail settles a fiat currency: HUB2 for the CFA
+// mobile-money currencies, Nilos for everything else.
+func fiatProvider(currency string) string {
+	if IsMobileMoneyCurrency(currency) {
+		return "hub2"
+	}
+	return "nilos"
 }
 
 func currencySymbol(c string) string {

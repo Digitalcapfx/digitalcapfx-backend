@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -54,11 +55,11 @@ func (s *WalletService) CreateWallet(ctx context.Context, userID uuid.UUID, netw
 		CustomerID: customerID,
 		WordCount:  12,
 	})
-	if err != nil {
-		// 409 / duplicate means the wallet already exists — that's fine, proceed.
-		if apiErr, ok := err.(*payments.APIError); !ok || apiErr.Status != 409 {
-			return nil, fmt.Errorf("payments api create customer wallet: %w", err)
-		}
+	if err != nil && !isDuplicateWalletErr(err) {
+		// Any error OTHER than "customer already has a wallet" is fatal. A
+		// duplicate is expected on the 2nd+ network for a user and is fine —
+		// we just proceed to derive the new address.
+		return nil, fmt.Errorf("payments api create customer wallet: %w", err)
 	}
 
 	// Derive a fresh address on the requested network (index 0 by default; the
@@ -88,6 +89,23 @@ func (s *WalletService) CreateWallet(ctx context.Context, userID uuid.UUID, netw
 func (s *WalletService) ListWallets(ctx context.Context, userID uuid.UUID) ([]db.WaasWallet, error) {
 	q := db.New(s.pool)
 	return q.GetWaasWalletsByUserID(ctx, userID)
+}
+
+// isDuplicateWalletErr reports whether a CreateCustomerWallet error means the
+// customer already has an HD wallet — which is fine (we just derive the new
+// address). Tolerates both the correct 409 status AND the message, because the
+// payments API currently returns 500 "already has a wallet" for a duplicate
+// (should be 409). This is why the 2nd+ network was failing with a 500.
+func isDuplicateWalletErr(err error) bool {
+	apiErr, ok := err.(*payments.APIError)
+	if !ok {
+		return false
+	}
+	if apiErr.Status == 409 {
+		return true
+	}
+	m := strings.ToLower(apiErr.Message)
+	return strings.Contains(m, "already has a wallet") || strings.Contains(m, "already exists")
 }
 
 type DepositInput struct {

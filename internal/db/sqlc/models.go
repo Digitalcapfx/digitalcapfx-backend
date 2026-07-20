@@ -26,6 +26,8 @@ type Account struct {
 	NilosCustomerID  *string        `json:"nilos_customer_id"`
 	Iban             *string        `json:"iban"`
 	Bic              *string        `json:"bic"`
+	SortCode         *string        `json:"sort_code"`
+	AccountNumberUk  *string        `json:"account_number_uk"`
 }
 
 type AdminAuditLog struct {
@@ -140,6 +142,19 @@ type CaasWithdrawal struct {
 	Status           string    `json:"status"`
 	CreatedAt        time.Time `json:"created_at"`
 	UpdatedAt        time.Time `json:"updated_at"`
+}
+
+type CardTransaction struct {
+	ID              uuid.UUID `json:"id"`
+	CardID          uuid.UUID `json:"card_id"`
+	Amount          string    `json:"amount"`
+	Currency        string    `json:"currency"`
+	MerchantName    string    `json:"merchant_name"`
+	MerchantCity    *string   `json:"merchant_city"`
+	MerchantCountry *string   `json:"merchant_country"`
+	Status          string    `json:"status"`
+	ProviderTxID    *string   `json:"provider_tx_id"`
+	CreatedAt       time.Time `json:"created_at"`
 }
 
 type CryptoTransaction struct {
@@ -452,17 +467,46 @@ type UserSession struct {
 	LastUsedAt       time.Time `json:"last_used_at"`
 	CreatedAt        time.Time `json:"created_at"`
 	ExpiresAt        time.Time `json:"expires_at"`
+	DeviceLocation   *string   `json:"device_location"`
 }
 
 type VirtualCard struct {
-	ID          uuid.UUID `json:"id"`
-	UserID      uuid.UUID `json:"user_id"`
-	CardName    string    `json:"card_name"`
-	LastFour    string    `json:"last_four"`
-	Currency    string    `json:"currency"`
-	CardNetwork string    `json:"card_network"`
-	IsActive    bool      `json:"is_active"`
-	CreatedAt   time.Time `json:"created_at"`
+	ID               uuid.UUID  `json:"id"`
+	UserID           uuid.UUID  `json:"user_id"`
+	CardName         string     `json:"card_name"`
+	LastFour         string     `json:"last_four"`
+	Currency         string     `json:"currency"`
+	CardNetwork      string     `json:"card_network"`
+	IsActive         bool       `json:"is_active"`
+	CreatedAt        time.Time  `json:"created_at"`
+	FundingAccountID *uuid.UUID `json:"funding_account_id"`
+	FundingWalletID  *uuid.UUID `json:"funding_wallet_id"`
+	ColorTheme       *string    `json:"color_theme"`
+	CardArtID        *string    `json:"card_art_id"`
+	BillingAddress   []byte     `json:"billing_address"`
+	MaskedPan        *string    `json:"masked_pan"`
+	Expiry           *string    `json:"expiry"`
+	CvvEncrypted     *string    `json:"cvv_encrypted"`
+	Status           string     `json:"status"`
+	ProviderCardID   *string    `json:"provider_card_id"`
+	UpdatedAt        time.Time  `json:"updated_at"`
+}
+
+type VtuTransaction struct {
+	ID            uuid.UUID `json:"id"`
+	UserID        uuid.UUID `json:"user_id"`
+	AccountID     uuid.UUID `json:"account_id"`
+	Amount        string    `json:"amount"`
+	Currency      string    `json:"currency"`
+	ServiceType   string    `json:"service_type"`
+	Provider      string    `json:"provider"`
+	TargetPhone   *string   `json:"target_phone"`
+	TargetAccount *string   `json:"target_account"`
+	Reference     *string   `json:"reference"`
+	ProviderRef   *string   `json:"provider_ref"`
+	Status        string    `json:"status"`
+	CreatedAt     time.Time `json:"created_at"`
+	UpdatedAt     time.Time `json:"updated_at"`
 }
 
 type WaasWallet struct {

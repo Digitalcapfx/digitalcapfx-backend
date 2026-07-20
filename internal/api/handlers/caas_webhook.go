@@ -46,12 +46,12 @@ type CaasWebhookPayload struct {
 
 // Receive godoc
 //
-//	@Summary      Rach CaaS Webhook
-//	@Description  Receives account/settlement events from Rach CaaS (instant USD account). Verified via HMAC-SHA256 over the raw body in the X-Webhook-Signature header, using the CaaS webhook secret. On a credit/deposit event the owning user is notified.
+//	@Summary      Rach CaaS Webhook (Instant USD / iUSD)
+//	@Description  Receiver for Rach CaaS account/settlement events (funding, on-chain credit, P2P transfer, off-ramp). Follows the standard Rach webhook signing — header `X-Webhook-Signature` = hex HMAC-SHA256 of the raw request body, keyed with the CaaS webhook secret (CAAS_WEBHOOK_SECRET), which is SEPARATE from the WaaS secret. Verification also tolerates alternate header names and base64 as a hardening fallback. On a credit/deposit event the owning user (resolved by phone) is notified, always labeled iUSD (never USDC). Always returns 200 on business-logic issues so the provider does not retry.
 //	@Tags         webhooks
 //	@Accept       json
 //	@Produce      json
-//	@Param        X-Webhook-Signature  header    string              true  "HMAC-SHA256 signature (hex)"
+//	@Param        X-Webhook-Signature  header    string              true  "hex HMAC-SHA256(rawBody, CaaS secret)"
 //	@Param        body                 body      CaasWebhookPayload  true  "Webhook payload"
 //	@Success      200                  {object}  MessageResponse
 //	@Failure      401                  {object}  ErrorResponse
@@ -92,24 +92,23 @@ func (h *CaasWebhookHandler) Receive(w http.ResponseWriter, r *http.Request) {
 		zap.String("reference", payload.Data.Reference),
 	)
 
-	// Notify the customer on a successful credit/deposit/settlement. The CaaS
-	// balance itself is authoritative and fetched live, so this is a signal only.
+	// Notify the customer when their wallet receives funds. Rach CaaS sends
+	// "transfer.received" (plus credit/deposit/settle variants); the balance
+	// itself is authoritative and fetched live, so this is a signal only.
 	ev := strings.ToLower(payload.Event + " " + payload.Data.Status)
-	credited := strings.Contains(ev, "credit") || strings.Contains(ev, "deposit") ||
+	credited := strings.Contains(ev, "received") || strings.Contains(ev, "transfer") ||
+		strings.Contains(ev, "credit") || strings.Contains(ev, "deposit") ||
 		strings.Contains(ev, "settle") || strings.Contains(ev, "success")
 
 	if credited && payload.Data.Phone != "" {
-		currency := payload.Data.Currency
-		if currency == "" {
-			currency = "USDC"
-		}
+		// Customer-facing label is always iUSD (Instant USD), never USDC.
 		h.svc.Notifications.CreateForPhone(r.Context(), payload.Data.Phone, services.CreateNotificationInput{
 			Type:  services.NotifDepositConfirmed,
-			Title: fmt.Sprintf("USD Account Credited: %s %s", payload.Data.Amount, currency),
-			Body:  fmt.Sprintf("Your instant USD account has been credited with %s %s.", payload.Data.Amount, currency),
+			Title: fmt.Sprintf("Instant USD Received: %s iUSD", payload.Data.Amount),
+			Body:  fmt.Sprintf("Your Instant USD account has been credited with %s iUSD.", payload.Data.Amount),
 			Metadata: map[string]string{
 				"tx_hash":   payload.Data.TxHash,
-				"currency":  currency,
+				"symbol":    "iUSD",
 				"reference": payload.Data.Reference,
 				"source":    "caas",
 			},

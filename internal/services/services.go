@@ -24,7 +24,7 @@ type Services struct {
 	Auth           *AuthService
 	Account        *AccountService
 	Wallet         *WalletService
-	Crypto         *CryptoService
+	CaaS           *CaaSService // Instant USD (iUSD) — EIP-4337 SCW rail
 	KYC            *KYCService
 	HUB2           *HUB2Service
 	Dashboard      *DashboardService
@@ -41,9 +41,13 @@ type Services struct {
 	Business       *BusinessService
 	Referral       *ReferralService
 	Swap           *SwapService
+	Market         *MarketService
 	Upload         *UploadService
 	UserManagement *UserManagementService
+	Cards          *CardService
+	VTU            *VTUService
 	Limits         *LimitsService
+	Rates          *RatesService
 }
 
 func New(
@@ -90,7 +94,7 @@ func New(
 		Auth:           NewAuthService(pool, rdb, cfg, logger, emailClient, smsClient),
 		Account:        NewAccountService(pool, logger),
 		Wallet:         NewWalletService(pool, paymentsClient, hub2Client, logger),
-		Crypto:         NewCryptoService(pool, caasClient, hub2Client, logger),
+		CaaS:           NewCaaSService(pool, caasClient, hub2Client, logger),
 		KYC:            NewKYCService(pool, cfg, logger, kycProvider, emailClient, notif, nilosClient),
 		HUB2:           hub2Svc,
 		Dashboard:      NewDashboardService(pool, nilosClient, paymentsClient, caasClient, logger),
@@ -110,5 +114,9 @@ func New(
 		Upload:         NewUploadService(cfg, logger),
 		Limits:         limitsSvc,
 		UserManagement: NewUserManagementService(pool, logger),
+		Cards:          NewCardService(pool, logger),
+		VTU:            NewVTUService(pool, hub2Client, logger),
+		Market:         NewMarketService(cfg, logger, notif),
+		Rates:          NewRatesService(pool),
 	}
 }

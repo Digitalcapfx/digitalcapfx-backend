@@ -74,14 +74,10 @@ func New(apiKey, apiSecret string, opts ...Option) *Client {
 	return c
 }
 
-// sign returns hex(HMAC-SHA256(path + "?" + queryString + body, apiSecret)).
-// queryString must NOT include the leading "?".
+// sign returns hex(HMAC-SHA256(path + body, apiSecret)).
+// The query string is not included in the signature per Nilos docs.
 func (c *Client) sign(path, queryString, body string) string {
-	input := path
-	if queryString != "" {
-		input += "?" + queryString
-	}
-	input += body
+	input := path + body
 	mac := hmac.New(sha256.New, []byte(c.apiSecret))
 	mac.Write([]byte(input))
 	return hex.EncodeToString(mac.Sum(nil))

@@ -24,7 +24,7 @@ func NewDashboardHandler(svc *services.Services) *DashboardHandler {
 //	@Tags         dashboard
 //	@Produce      json
 //	@Security     BearerAuth
-//	@Success      200  {object}  object
+//	@Success      200  {object}  services.DashboardData
 //	@Failure      401  {object}  ErrorResponse
 //	@Failure      403  {object}  ErrorResponse  "KYC not approved"
 //	@Failure      500  {object}  ErrorResponse

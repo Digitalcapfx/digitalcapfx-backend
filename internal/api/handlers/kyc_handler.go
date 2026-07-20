@@ -120,6 +120,36 @@ func (h *KYCHandler) UploadDocument(w http.ResponseWriter, r *http.Request) {
 	response.Created(w, doc)
 }
 
+// Initiate godoc
+//
+//	@Summary      Start or Resume KYC verification
+//	@Description  Creates or resumes a KYC session (e.g. for Sumsub). The returned token is used with the provider SDK.
+//	@Tags         kyc
+//	@Produce      json
+//	@Security     BearerAuth
+//	@Success      200  {object}  MetaMapInitResponse
+//	@Failure      401  {object}  ErrorResponse
+//	@Failure      500  {object}  ErrorResponse
+//	@Router       /kyc/init [post]
+func (h *KYCHandler) Initiate(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		response.Unauthorized(w, "unauthorized")
+		return
+	}
+
+	result, err := h.svc.KYC.InitiateKYC(r.Context(), userID)
+	if err != nil {
+		response.InternalError(w)
+		return
+	}
+
+	response.OK(w, map[string]string{
+		"token": result.AccessToken,
+		"flow":  result.FlowID,
+	})
+}
+
 // ─── MetaMap ──────────────────────────────────────────────────────────────────
 
 // InitiateMetaMap godoc

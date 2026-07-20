@@ -122,6 +122,68 @@ func (c *Client) GetStatus(ctx context.Context, reference string) (string, error
 	return resp.Status, nil
 }
 
+// ── VAS (Value Added Services) Mocks ─────────────────────────────────────────
+
+type PurchaseAirtimeRequest struct {
+	Amount   float64 `json:"amount"`
+	Currency string  `json:"currency"`
+	Phone    string  `json:"phone"`
+	Operator string  `json:"operator"` // MTN, Orange, etc.
+}
+
+type PurchaseAirtimeResponse struct {
+	Reference string `json:"reference"`
+	Status    string `json:"status"`
+}
+
+func (c *Client) PurchaseAirtime(ctx context.Context, req PurchaseAirtimeRequest) (*PurchaseAirtimeResponse, error) {
+	// MOCK: This simulates calling Hub2's VAS airtime endpoint.
+	// In reality we would call c.post(ctx, "/v1/vas/airtime", ...)
+	time.Sleep(500 * time.Millisecond) // Simulate network delay
+	return &PurchaseAirtimeResponse{
+		Reference: fmt.Sprintf("HUB2-VAS-%d", time.Now().UnixNano()),
+		Status:    "SUCCESSFUL",
+	}, nil
+}
+
+type PurchaseDataRequest struct {
+	BundleID string `json:"bundleId"`
+	Phone    string `json:"phone"`
+	Operator string `json:"operator"`
+}
+
+type PurchaseDataResponse struct {
+	Reference string `json:"reference"`
+	Status    string `json:"status"`
+}
+
+func (c *Client) PurchaseData(ctx context.Context, req PurchaseDataRequest) (*PurchaseDataResponse, error) {
+	time.Sleep(500 * time.Millisecond)
+	return &PurchaseDataResponse{
+		Reference: fmt.Sprintf("HUB2-VAS-%d", time.Now().UnixNano()),
+		Status:    "SUCCESSFUL",
+	}, nil
+}
+
+type PayBillRequest struct {
+	BillerID      string  `json:"billerId"` // ENEO, CIE, etc.
+	AccountNumber string  `json:"accountNumber"`
+	Amount        float64 `json:"amount"`
+}
+
+type PayBillResponse struct {
+	Reference string `json:"reference"`
+	Status    string `json:"status"`
+}
+
+func (c *Client) PayBill(ctx context.Context, req PayBillRequest) (*PayBillResponse, error) {
+	time.Sleep(500 * time.Millisecond)
+	return &PayBillResponse{
+		Reference: fmt.Sprintf("HUB2-VAS-%d", time.Now().UnixNano()),
+		Status:    "SUCCESSFUL",
+	}, nil
+}
+
 // ── HTTP helpers ─────────────────────────────────────────────────────────────
 
 func (c *Client) post(ctx context.Context, path string, body, out any) error {

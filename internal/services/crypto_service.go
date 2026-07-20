@@ -13,22 +13,31 @@ import (
 	db "github.com/rachfinance/digitalfx/internal/db/sqlc"
 )
 
-type CryptoService struct {
+// The CaaS balance settles on-chain as USDC, but it is presented to customers as
+// "iUSD" (Instant USD) — the customer-facing brand for the Rach CaaS balance.
+// USDC stays only in the internal CaaS/on-chain integration, never in what the
+// customer sees.
+const (
+	IUSDSymbol = "iUSD"
+	IUSDName   = "Instant USD"
+)
+
+type CaaSService struct {
 	pool       *pgxpool.Pool
 	caasClient *caas.Client
 	hub2Client *hub2.Client
 	logger     *zap.Logger
 }
 
-func NewCryptoService(pool *pgxpool.Pool, caasClient *caas.Client, hub2Client *hub2.Client, logger *zap.Logger) *CryptoService {
-	return &CryptoService{pool: pool, caasClient: caasClient, hub2Client: hub2Client, logger: logger}
+func NewCaaSService(pool *pgxpool.Pool, caasClient *caas.Client, hub2Client *hub2.Client, logger *zap.Logger) *CaaSService {
+	return &CaaSService{pool: pool, caasClient: caasClient, hub2Client: hub2Client, logger: logger}
 }
 
 // ─── Step 3: Create Instant USD Account ──────────────────────────────────────
 
 // GetOrCreateWallet provisions an ERC-4337 SCW for the user via CaaS and
 // caches the wallet address in the local DB.
-func (s *CryptoService) GetOrCreateWallet(ctx context.Context, userID uuid.UUID, phone string) (*db.CaasWallet, error) {
+func (s *CaaSService) GetOrCreateWallet(ctx context.Context, userID uuid.UUID, phone string) (*db.CaasWallet, error) {
 	q := db.New(s.pool)
 
 	existing, err := q.GetCaasWalletByUserID(ctx, userID)
@@ -80,7 +89,7 @@ type FundingInput struct {
 //   - DigitalFX physically transfers XOF to Rach CaaS's bank account (Ivory Coast).
 //   - Rach CaaS confirms fiat receipt, converts via OTC partners, credits the SCW.
 //   - Customer sees updated balance via GET /crypto/balances (live from CaaS).
-func (s *CryptoService) InitiateFunding(ctx context.Context, in FundingInput) (string, error) {
+func (s *CaaSService) InitiateFunding(ctx context.Context, in FundingInput) (string, error) {
 	q := db.New(s.pool)
 
 	// Get user to confirm they exist and to get their canonical phone for CaaS.
@@ -143,7 +152,19 @@ func (s *CryptoService) InitiateFunding(ctx context.Context, in FundingInput) (s
 
 // GetBalances returns the live USDC balance for the user's SCW.
 // CaaS only returns USDC — USDT is not currently supported in the settlement engine.
-func (s *CryptoService) GetBalances(ctx context.Context, userID uuid.UUID) (*caas.BalanceResponse, error) {
+// InstantUSDBalance is the customer-facing CaaS balance. The value settles
+// on-chain as USDC but is presented as iUSD (Instant USD). balance_usdc is kept
+// for backward compatibility.
+type InstantUSDBalance struct {
+	Symbol           string  `json:"symbol"`       // "iUSD"
+	Name             string  `json:"name"`         // "Instant USD"
+	Balance          float64 `json:"balance"`      // numeric iUSD balance
+	BalanceUSDC      string  `json:"balance_usdc"` // raw on-chain USDC (compat)
+	BalanceFormatted string  `json:"balance_formatted"`
+	WalletAddress    string  `json:"wallet_address,omitempty"`
+}
+
+func (s *CaaSService) GetBalances(ctx context.Context, userID uuid.UUID) (*InstantUSDBalance, error) {
 	q := db.New(s.pool)
 
 	// Look up user to get their phone number (CaaS identifies users by phone).
@@ -152,7 +173,19 @@ func (s *CryptoService) GetBalances(ctx context.Context, userID uuid.UUID) (*caa
 		return nil, ErrAccountNotFound
 	}
 
-	return s.caasClient.GetBalance(ctx, user.PhoneNumber)
+	out := &InstantUSDBalance{Symbol: IUSDSymbol, Name: IUSDName, BalanceUSDC: "0"}
+	// Best-effort: an unfunded / freshly-provisioned SCW should read as 0 iUSD,
+	// not 500.
+	if bal, berr := s.caasClient.GetBalance(ctx, user.PhoneNumber); berr == nil {
+		out.BalanceUSDC = bal.BalanceUSDC
+		out.Balance = parseFloatSafe(bal.BalanceUSDC)
+		out.WalletAddress = bal.WalletAddress
+	} else {
+		s.logger.Warn("crypto balances: caas balance unavailable, returning 0 iUSD",
+			zap.String("user_id", userID.String()), zap.Error(berr))
+	}
+	out.BalanceFormatted = fmt.Sprintf("%.2f %s", out.Balance, IUSDSymbol)
+	return out, nil
 }
 
 type SendCryptoInput struct {
@@ -170,7 +203,7 @@ type SendCryptoInput struct {
 //  1. Submit transfer to CaaS using a DIRECT_CRYPTO quote_id — no FX conversion
 //     needed for USDC-to-USDC (1:1 with USD), which avoids an extra round-trip.
 //  2. Record the pending transaction locally; status updated via webhook.
-func (s *CryptoService) Send(ctx context.Context, in SendCryptoInput) (*db.CryptoTransaction, error) {
+func (s *CaaSService) Send(ctx context.Context, in SendCryptoInput) (*db.CryptoTransaction, error) {
 	q := db.New(s.pool)
 
 	// DIRECT_CRYPTO:{TOKEN}:{AMOUNT} bypasses the FX quote step for same-token
@@ -220,7 +253,7 @@ func (s *CryptoService) Send(ctx context.Context, in SendCryptoInput) (*db.Crypt
 	return &tx, nil
 }
 
-func (s *CryptoService) ListTransactions(ctx context.Context, userID uuid.UUID, page, perPage int32) ([]db.CryptoTransaction, error) {
+func (s *CaaSService) ListTransactions(ctx context.Context, userID uuid.UUID, page, perPage int32) ([]db.CryptoTransaction, error) {
 	q := db.New(s.pool)
 	return q.ListCryptoTransactionsByUser(ctx, db.ListCryptoTransactionsByUserParams{
 		SenderUserID:   userID,
@@ -242,7 +275,7 @@ type WithdrawCryptoInput struct {
 
 // Withdraw initiates a stablecoin off-ramp from the user's SCW to a Mobile Money number.
 // CaaS debits the SCW and disburses fiat asynchronously via the payout_network operator.
-func (s *CryptoService) Withdraw(ctx context.Context, in WithdrawCryptoInput) (*db.CaasWithdrawal, error) {
+func (s *CaaSService) Withdraw(ctx context.Context, in WithdrawCryptoInput) (*db.CaasWithdrawal, error) {
 	q := db.New(s.pool)
 
 	// Idempotency guard — return existing record if already submitted.
@@ -289,7 +322,7 @@ func (s *CryptoService) Withdraw(ctx context.Context, in WithdrawCryptoInput) (*
 
 // UpdatePhone re-links the user's SCW to a new phone number on CaaS and refreshes
 // the local blind_index. Call this when a user changes their registered phone.
-func (s *CryptoService) UpdatePhone(ctx context.Context, userID uuid.UUID, oldPhone, newPhone string) error {
+func (s *CaaSService) UpdatePhone(ctx context.Context, userID uuid.UUID, oldPhone, newPhone string) error {
 	q := db.New(s.pool)
 
 	resp, err := s.caasClient.UpdatePhone(ctx, caas.UpdatePhoneRequest{

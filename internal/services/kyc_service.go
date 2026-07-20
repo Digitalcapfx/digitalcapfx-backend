@@ -83,6 +83,29 @@ type MetaMapVerificationResult struct {
 	Status         string `json:"status"`
 }
 
+// InitiateKYC generates an access token for the configured KYC provider (e.g. Sumsub).
+// If the user previously started the process, providing the same user ID resumes it.
+func (s *KYCService) InitiateKYC(ctx context.Context, userID uuid.UUID) (*kyc.VerificationSession, error) {
+	q := db.New(s.pool)
+
+	user, err := q.GetUserByID(ctx, userID)
+	if err != nil {
+		return nil, ErrUserNotFound
+	}
+
+	emailStr := ""
+	if user.Email != nil {
+		emailStr = *user.Email
+	}
+
+	session, err := s.provider.Initiate(ctx, userID.String(), user.PhoneNumber, emailStr)
+	if err != nil {
+		return nil, fmt.Errorf("kyc %s initiate: %w", s.provider.Name(), err)
+	}
+
+	return session, nil
+}
+
 // InitiateMetaMapVerification creates or returns an existing MetaMap applicant
 // for the user. The mobile client uses the returned identity_access token with
 // the MetaMap SDK to launch the verification flow.
@@ -302,6 +325,9 @@ func (s *KYCService) notifyKYCApproved(ctx context.Context, user db.User) {
 		Title:  "Identity Verified ✓",
 		Body:   "Your identity has been verified. You now have full access to transfers, wallets, and crypto.",
 	})
+
+	// Provision Nilos fiat accounts now that KYC is approved.
+	go s.provisionNilosAccounts(context.Background(), user)
 }
 
 // notifyKYCRejected sends the rejection email + notification.
@@ -373,6 +399,10 @@ func (s *KYCService) AdminApproveKYC(ctx context.Context, userID, adminID uuid.U
 	})
 
 	s.logger.Info("kyc approved by admin", zap.String("user_id", userID.String()), zap.String("admin_id", adminID.String()))
+
+	// Provision Nilos fiat accounts now that KYC is approved.
+	go s.provisionNilosAccounts(context.Background(), user)
+
 	return nil
 }
 
@@ -442,4 +472,91 @@ func (s *KYCService) AdminReleaseKYCToProvider(ctx context.Context, userID, admi
 	}
 	s.logger.Info("kyc control released to provider", zap.String("user_id", userID.String()), zap.String("admin_id", adminID.String()))
 	return nil
+}
+
+// ─── Nilos Account Provisioning ───────────────────────────────────────────────
+
+func (s *KYCService) provisionNilosAccounts(ctx context.Context, user db.User) {
+	if s.nilosClient == nil {
+		s.logger.Warn("nilos client not configured, skipping virtual account provisioning", zap.String("user_id", user.ID.String()))
+		return
+	}
+
+	q := db.New(s.pool)
+	accounts, err := q.GetAccountsByUserID(ctx, user.ID)
+	if err != nil {
+		s.logger.Error("failed to get user accounts for nilos provisioning", zap.Error(err))
+		return
+	}
+
+	baseName := fmt.Sprintf("DigitalFX %s %s", user.FirstName, user.LastName)
+
+	for _, acc := range accounts {
+		// Only provision if it doesn't already have a nilos account ID
+		if acc.NilosAccountID != nil {
+			continue
+		}
+
+		var rail string
+		switch acc.Currency {
+		case "EUR":
+			rail = nilos.RailSEPA
+		case "GBP":
+			rail = nilos.RailFPS
+		default:
+			continue // We only provision EUR and GBP virtual accounts currently
+		}
+
+		accountName := fmt.Sprintf("%s %s", baseName, acc.Currency)
+		nilosAcc, err := s.nilosClient.CreateAccount(ctx, nilos.CreateAccountRequest{
+			Name: accountName,
+			Rail: rail,
+		})
+		if err != nil {
+			s.logger.Error("failed to provision nilos account",
+				zap.String("user_id", user.ID.String()),
+				zap.String("currency", acc.Currency),
+				zap.Error(err),
+			)
+			continue
+		}
+
+		var iban, bic, sortCode, accountNumberUK *string
+		if rail == nilos.RailSEPA {
+			if val := nilosAcc.DetailString("iban"); val != "" {
+				iban = &val
+			}
+			if val := nilosAcc.DetailString("bic"); val != "" {
+				bic = &val
+			}
+		} else if rail == nilos.RailFPS {
+			if val := nilosAcc.DetailString("accountNumber"); val != "" {
+				accountNumberUK = &val
+			}
+			if val := nilosAcc.DetailString("sortCode"); val != "" {
+				sortCode = &val
+			}
+		}
+
+		if err := q.UpdateNilosAccountDetails(ctx, db.UpdateNilosAccountDetailsParams{
+			ID:              acc.ID,
+			NilosAccountID:  &nilosAcc.ID,
+			Iban:            iban,
+			Bic:             bic,
+			SortCode:        sortCode,
+			AccountNumberUk: accountNumberUK,
+		}); err != nil {
+			s.logger.Error("failed to save nilos account details",
+				zap.String("user_id", user.ID.String()),
+				zap.String("currency", acc.Currency),
+				zap.Error(err),
+			)
+		} else {
+			s.logger.Info("successfully provisioned nilos virtual account",
+				zap.String("user_id", user.ID.String()),
+				zap.String("currency", acc.Currency),
+				zap.String("nilos_id", nilosAcc.ID),
+			)
+		}
+	}
 }

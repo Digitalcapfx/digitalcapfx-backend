@@ -30,7 +30,18 @@ func NewAccountService(pool *pgxpool.Pool, logger *zap.Logger) *AccountService {
 
 func (s *AccountService) ListAccounts(ctx context.Context, userID uuid.UUID) ([]db.Account, error) {
 	q := db.New(s.pool)
-	return q.GetAccountsByUserID(ctx, userID)
+	accounts, err := q.GetAccountsByUserID(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	if phone := s.userPhone(ctx, q, userID); phone != "" {
+		for i := range accounts {
+			if IsMobileMoneyCurrency(accounts[i].Currency) {
+				accounts[i].AccountNumber = phone
+			}
+		}
+	}
+	return accounts, nil
 }
 
 func (s *AccountService) GetAccount(ctx context.Context, userID uuid.UUID, currency string) (*db.Account, error) {
@@ -42,7 +53,38 @@ func (s *AccountService) GetAccount(ctx context.Context, userID uuid.UUID, curre
 	if err != nil {
 		return nil, ErrAccountNotFound
 	}
+	if IsMobileMoneyCurrency(acc.Currency) {
+		if phone := s.userPhone(ctx, q, userID); phone != "" {
+			acc.AccountNumber = phone
+		}
+	}
 	return &acc, nil
+}
+
+// userPhone returns the user's phone number (best effort).
+func (s *AccountService) userPhone(ctx context.Context, q *db.Queries, userID uuid.UUID) string {
+	u, err := q.GetUserByID(ctx, userID)
+	if err != nil {
+		return ""
+	}
+	return u.PhoneNumber
+}
+
+// IsMobileMoneyCurrency reports whether a fiat currency settles over mobile money
+// (HUB2), where the account identifier is the user's phone number rather than a
+// generated account number.
+func IsMobileMoneyCurrency(currency string) bool {
+	return currency == "XAF" || currency == "XOF"
+}
+
+// mobileMoneyAccountNumber returns the identifier to display for a fiat account:
+// the phone number for HUB2 mobile-money currencies (XAF/XOF), otherwise the
+// stored account number.
+func mobileMoneyAccountNumber(currency, dbAccountNumber, phone string) string {
+	if IsMobileMoneyCurrency(currency) && phone != "" {
+		return phone
+	}
+	return dbAccountNumber
 }
 
 type ListTransactionsInput struct {

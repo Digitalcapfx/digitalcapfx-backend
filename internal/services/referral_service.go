@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	mrand "math/rand"
 	"time"
 
 	"github.com/google/uuid"
@@ -49,9 +50,13 @@ func (s *ReferralService) GetReferralData(ctx context.Context, userID uuid.UUID)
 		return nil, err
 	}
 
+	// Existing users created before referral codes existed have none — generate
+	// and persist one on first access so every user always has a code.
 	var code string
-	if user.ReferralCode != nil {
+	if user.ReferralCode != nil && *user.ReferralCode != "" {
 		code = *user.ReferralCode
+	} else {
+		code = s.ensureReferralCode(ctx, q, user)
 	}
 
 	points, err := q.GetPointsBalance(ctx, userID)
@@ -116,4 +121,34 @@ func (s *ReferralService) GetPointsHistory(ctx context.Context, userID uuid.UUID
 		Page:    page,
 		Limit:   limit,
 	}, nil
+}
+
+// ensureReferralCode assigns and persists a unique referral code for a user who
+// doesn't have one yet. It retries on the (rare) unique-constraint collision,
+// falling back to a fully-random code after a few name-based attempts.
+func (s *ReferralService) ensureReferralCode(ctx context.Context, q *db.Queries, user db.User) string {
+	for attempt := 0; attempt < 6; attempt++ {
+		code := generateReferralCode(user.FirstName, user.LastName)
+		if attempt >= 3 {
+			code = randomReferralCode() // name-based keeps colliding — go fully random
+		}
+		if err := q.SetReferralCode(ctx, db.SetReferralCodeParams{ID: user.ID, ReferralCode: &code}); err != nil {
+			s.logger.Warn("referral code collision, retrying", zap.Int("attempt", attempt), zap.Error(err))
+			continue
+		}
+		s.logger.Info("assigned referral code", zap.String("user_id", user.ID.String()), zap.String("code", code))
+		return code
+	}
+	s.logger.Error("could not assign referral code", zap.String("user_id", user.ID.String()))
+	return ""
+}
+
+// randomReferralCode returns a collision-resistant code (no ambiguous chars).
+func randomReferralCode() string {
+	const cs = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
+	b := make([]byte, 8)
+	for i := range b {
+		b[i] = cs[mrand.Intn(len(cs))]
+	}
+	return "RF" + string(b)
 }

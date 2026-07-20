@@ -16,7 +16,7 @@ package services
 //     FX: Nilos quote (cross-currency) or none (same currency)
 //     Processor: Nilos payout transfer; webhook finalises
 //
-//  3. CaaS off-ramp (USDC → mobile money) is handled by CryptoService.
+//  3. CaaS off-ramp (iUSD, settling on-chain as USDC → mobile money) is handled by CaaSService.
 
 import (
 	"context"

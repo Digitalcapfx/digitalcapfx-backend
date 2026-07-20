@@ -42,7 +42,7 @@ type RegisterRequest struct {
 	LastName    string `json:"last_name" example:"Dupont"`
 	PIN         string `json:"pin" example:"123456"`
 	Country     string `json:"country" example:"CM"`                // ISO 3166-1 alpha-2
-	BVN         string `json:"bvn,omitempty" example:"12345678901"` // Nigerian Bank Verification Number (11 digits). REQUIRED for Nigerian customers (country NG or a +234 phone).
+	BVN         string `json:"bvn,omitempty" example:"12345678901"` // Nigerian Bank Verification Number (11 digits).
 	// Business accounts only — company-level KYB fields collected at signup.
 	CompanyLegalName       string `json:"company_legal_name,omitempty" example:"Acme SARL"`
 	CompanyRegistrationNo  string `json:"company_registration_no,omitempty" example:"RC/DLA/2020/B/1234"`
@@ -328,12 +328,13 @@ type VerifyEmailRequest struct {
 }
 
 type DeviceData struct {
-	ID         string    `json:"id" example:"550e8400-e29b-41d4-a716-446655440000"`
-	DeviceName string    `json:"device_name" example:"iPhone"`
-	DeviceIP   string    `json:"device_ip" example:"41.202.207.10"`
-	LastUsedAt time.Time `json:"last_used_at"`
-	CreatedAt  time.Time `json:"created_at"`
-	IsCurrent  bool      `json:"is_current" example:"true"`
+	ID             string    `json:"id" example:"550e8400-e29b-41d4-a716-446655440000"`
+	DeviceName     string    `json:"device_name" example:"iPhone"`
+	DeviceIP       string    `json:"device_ip" example:"41.202.207.10"`
+	DeviceLocation string    `json:"device_location" example:"Lagos, Nigeria"`
+	LastUsedAt     time.Time `json:"last_used_at"`
+	CreatedAt      time.Time `json:"created_at"`
+	IsCurrent      bool      `json:"is_current" example:"true"`
 }
 
 type DeviceListResponse struct {
@@ -346,14 +347,14 @@ type DeviceListResponse struct {
 type ProfileData struct {
 	ID              string  `json:"id"`
 	PhoneNumber     string  `json:"phone_number" example:"+237612345678"`
-	Email           *string `json:"email,omitempty" example:"alice@example.com"`
+	Email           *string `json:"email" example:"alice@example.com"`
 	FirstName       string  `json:"first_name" example:"Alice"`
 	LastName        string  `json:"last_name" example:"Dupont"`
-	Bio             *string `json:"bio,omitempty" example:"Digital finance enthusiast from Cameroon"`
-	AvatarURL       *string `json:"avatar_url,omitempty"`
-	DateOfBirth     *string `json:"date_of_birth,omitempty" example:"1995-06-15"`
-	Nationality     *string `json:"nationality,omitempty" example:"Cameroonian"`
-	BVN             *string `json:"bvn,omitempty" example:"12345678901"`
+	Bio             *string `json:"bio" example:"Digital finance enthusiast from Cameroon"`
+	AvatarURL       *string `json:"avatar_url"`
+	DateOfBirth     *string `json:"date_of_birth" example:"1995-06-15"`
+	Nationality     *string `json:"nationality" example:"Cameroonian"`
+	BVN             *string `json:"bvn" example:"12345678901"`
 	KycStatus       string  `json:"kyc_status" example:"pending"`
 	IsEmailVerified bool    `json:"is_email_verified" example:"false"`
 }
@@ -363,14 +364,13 @@ type ProfileResponse struct {
 	Data    ProfileData `json:"data"`
 }
 
+// UpdateProfileRequest — only non-sensitive fields are editable by the customer.
+// Name, phone, email and KYC-verified identity fields (date of birth, nationality,
+// BVN) are LOCKED and cannot be changed here; any such fields sent in the body are
+// ignored server-side. Identity changes go through KYC / admin review.
 type UpdateProfileRequest struct {
-	FirstName   string  `json:"first_name" example:"Alice"`
-	LastName    string  `json:"last_name" example:"Dupont"`
-	Bio         *string `json:"bio,omitempty" example:"Digital finance enthusiast"`
-	AvatarURL   *string `json:"avatar_url,omitempty"`
-	DateOfBirth *string `json:"date_of_birth,omitempty" example:"1995-06-15"`
-	Nationality *string `json:"nationality,omitempty" example:"Cameroonian"`
-	BVN         *string `json:"bvn,omitempty" example:"12345678901"`
+	Bio       *string `json:"bio,omitempty" example:"Digital finance enthusiast"`
+	AvatarURL *string `json:"avatar_url,omitempty"`
 }
 
 // ─── Exchange ─────────────────────────────────────────────────────────────────
@@ -556,3 +556,90 @@ type InviteTeamMemberRequest struct {
 type UpdateRoleRequest struct {
 	Role string `json:"role" example:"developer" enums:"manager,developer,viewer"`
 }
+
+// ─── Virtual Cards ────────────────────────────────────────────────────────────
+
+type CreateCardRequest struct {
+	FundingAccountID *string `json:"funding_account_id,omitempty" example:"550e8400-e29b-41d4-a716-446655440000"`
+	FundingWalletID  *string `json:"funding_wallet_id,omitempty" example:"550e8400-e29b-41d4-a716-446655440001"`
+	Name             string  `json:"name" example:"My Daily Card"`
+	ColorTheme       string  `json:"color_theme" example:"midnight_blue"`
+	CardArtID        string  `json:"card_art_id" example:"art_abstract_01"`
+}
+
+type UpdateCardRequest struct {
+	Name       *string `json:"name,omitempty" example:"Travel Card"`
+	ColorTheme *string `json:"color_theme,omitempty" example:"sunset_orange"`
+	Status     *string `json:"status,omitempty" example:"frozen"`
+}
+
+type VirtualCardData struct {
+	ID             string    `json:"id"`
+	Name           string    `json:"name"`
+	MaskedPan      string    `json:"masked_pan"`
+	Expiry         string    `json:"expiry"`
+	ColorTheme     string    `json:"color_theme"`
+	CardArtID      string    `json:"card_art_id"`
+	Status         string    `json:"status"`
+	CreatedAt      time.Time `json:"created_at"`
+}
+
+type VirtualCardResponse struct {
+	Success bool            `json:"success" example:"true"`
+	Data    VirtualCardData `json:"data"`
+}
+
+type VirtualCardListResponse struct {
+	Success bool              `json:"success" example:"true"`
+	Data    []VirtualCardData `json:"data"`
+}
+
+// ─── VTU & Bills ──────────────────────────────────────────────────────────────
+
+type PurchaseAirtimeRequest struct {
+	Amount   float64 `json:"amount" example:"1000"`
+	Currency string  `json:"currency" example:"XAF" enums:"XAF,XOF"`
+	Phone    string  `json:"phone" example:"+237612345678"`
+	Operator string  `json:"operator" example:"MTN"`
+}
+
+type PurchaseDataBundleRequest struct {
+	BundleID string  `json:"bundle_id" example:"MTN_DATA_1GB"`
+	Amount   float64 `json:"amount" example:"1000"`
+	Currency string  `json:"currency" example:"XAF" enums:"XAF,XOF"`
+	Phone    string  `json:"phone" example:"+237612345678"`
+	Operator string  `json:"operator" example:"MTN"`
+}
+
+type PayBillRequest struct {
+	BillerID      string  `json:"biller_id" example:"ENEO"`
+	AccountNumber string  `json:"account_number" example:"20019283"`
+	Amount        float64 `json:"amount" example:"5000"`
+	Currency      string  `json:"currency" example:"XAF" enums:"XAF,XOF"`
+}
+
+type VTUTransactionData struct {
+	ID            string    `json:"id"`
+	Amount        string    `json:"amount"`
+	Currency      string    `json:"currency"`
+	ServiceType   string    `json:"service_type" example:"airtime"`
+	Provider      string    `json:"provider" example:"hub2"`
+	TargetPhone   string    `json:"target_phone,omitempty"`
+	TargetAccount string    `json:"target_account,omitempty"`
+	Reference     string    `json:"reference"`
+	Status        string    `json:"status" example:"SUCCESSFUL"`
+	CreatedAt     time.Time `json:"created_at"`
+}
+
+type VTUTransactionResponse struct {
+	Success bool               `json:"success" example:"true"`
+	Data    VTUTransactionData `json:"data"`
+}
+
+type VTUTransactionListResponse struct {
+	Success bool                 `json:"success" example:"true"`
+	Data    []VTUTransactionData `json:"data"`
+}
+
+
+

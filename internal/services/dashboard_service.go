@@ -53,9 +53,12 @@ type FiatWallet struct {
 	Flag          string  `json:"flag"`
 	Balance       string  `json:"balance"`      // formatted string, e.g. "12,450.75"
 	BalanceRaw    float64 `json:"balance_raw"`  // raw decimal
-	BalanceUSD    float64 `json:"balance_usd"`
-	AccountNumber string  `json:"account_number"`
-	IBAN          *string `json:"iban,omitempty"`
+	BalanceUSD      float64 `json:"balance_usd"`
+	AccountNumber   string  `json:"account_number"`
+	IBAN            *string `json:"iban,omitempty"`
+	BIC             *string `json:"bic,omitempty"`
+	SortCode        *string `json:"sort_code,omitempty"`
+	AccountNumberUK *string `json:"account_number_uk,omitempty"`
 }
 
 type AssetAllocation struct {
@@ -122,8 +125,12 @@ func (s *DashboardService) GetDashboard(ctx context.Context, userID uuid.UUID) (
 			Flag:          currencyFlag(acc.Currency),
 			Balance:       formatBalance(bal, acc.Currency),
 			BalanceRaw:    bal,
-			BalanceUSD:    roundUSD(balUSD),
-			AccountNumber: acc.AccountNumber,
+			BalanceUSD:      roundUSD(balUSD),
+			AccountNumber:   acc.AccountNumber,
+			IBAN:            acc.Iban,
+			BIC:             acc.Bic,
+			SortCode:        acc.SortCode,
+			AccountNumberUK: acc.AccountNumberUk,
 		})
 		fiatTotalUSD += balUSD
 	}
@@ -296,8 +303,8 @@ func defaultFXRates() map[string]float64 {
 		"USD": 1.0, "USDC": 1.0, "USDT": 1.0,
 		"EUR": 0.91, "GBP": 0.79,
 		"XAF": 609.0, "XOF": 609.0,
-		// Crypto — approximate USD/unit rates as fallback (DB rates override these)
-		"BTC": 0.000015, "ETH": 0.00033,
+		// Crypto — approximate crypto-units-per-USD fallbacks (DB rates override these)
+		"BTC": 0.000015, "ETH": 0.00033, "BSC": 0.0017,
 		"SOL": 0.0065, "LTC": 0.012, "TRX": 8.0,
 		"POL": 0.58, "BCH": 0.0034, "XRP": 1.82,
 	}

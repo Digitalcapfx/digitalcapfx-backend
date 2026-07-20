@@ -23,7 +23,7 @@ func NewExchangeHandler(svc *services.Services) *ExchangeHandler {
 //
 //	@Summary      Live exchange rate
 //	@Description  Returns the live FX rate for 1 unit of the source currency converted to the target currency. Rate is sourced from Nilos (green dot = live); falls back to internal rates if Nilos is unavailable.
-//	@Tags         exchange
+//	@Tags         Fiat - Nilos
 //	@Produce      json
 //	@Security     BearerAuth
 //	@Param        from  query     string  true  "Source currency (USD, EUR, GBP, XAF, XOF)"
@@ -64,7 +64,7 @@ func (h *ExchangeHandler) GetRate(w http.ResponseWriter, r *http.Request) {
 //
 //	@Summary      Exchange quote
 //	@Description  Returns a locked FX quote for a specific amount. The quote_id can be passed to POST /exchange/execute to guarantee the displayed rate. Quotes expire quickly — execute immediately after confirming.
-//	@Tags         exchange
+//	@Tags         Fiat - Nilos
 //	@Accept       json
 //	@Produce      json
 //	@Security     BearerAuth
@@ -104,7 +104,7 @@ func (h *ExchangeHandler) GetQuote(w http.ResponseWriter, r *http.Request) {
 //
 //	@Summary      Execute exchange
 //	@Description  Converts fiat currency between the user's own accounts using a Nilos swap. The from and to accounts must both exist. Optionally pass a quote_id to lock the rate shown in the preview; otherwise the swap executes at the current market rate.
-//	@Tags         exchange
+//	@Tags         Fiat - Nilos
 //	@Accept       json
 //	@Produce      json
 //	@Security     BearerAuth
@@ -161,7 +161,7 @@ func (h *ExchangeHandler) Execute(w http.ResponseWriter, r *http.Request) {
 //
 //	@Summary      Exchange history
 //	@Description  Returns the user's fiat exchange history with aggregate stats (total exchanges, volume, fees paid) and transactions grouped as THIS WEEK / LAST WEEK / EARLIER. Each row shows from/to currencies, amounts, rate used, and status.
-//	@Tags         exchange
+//	@Tags         Fiat - Nilos
 //	@Produce      json
 //	@Security     BearerAuth
 //	@Param        page   query     int  false  "Page (default 1)"

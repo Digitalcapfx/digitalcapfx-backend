@@ -41,6 +41,10 @@ const (
 	PermFeesView   = "fees:view"
 	PermFeesManage = "fees:manage"
 
+	// Currency rates (buy / sell / standard per currency)
+	PermRatesView   = "rates:view"
+	PermRatesManage = "rates:manage"
+
 	// Staff management
 	PermStaffView    = "staff:view"
 	PermStaffInvite  = "staff:invite"
@@ -141,6 +145,13 @@ var permissionCatalogue = []PermissionGroup{
 		Permissions: []PermissionMeta{
 			{PermFeesView, "View fees", "View fee configuration.", "fees", "view"},
 			{PermFeesManage, "Manage fees", "Edit fee configuration.", "fees", "manage"},
+		},
+	},
+	{
+		Resource: "rates", Label: "Currency Rates", Description: "Buy/sell/standard currency rates.", Wildcard: "rates:*",
+		Permissions: []PermissionMeta{
+			{PermRatesView, "View currency rates", "View buy/sell/standard currency rates.", "rates", "view"},
+			{PermRatesManage, "Manage currency rates", "Set buy/sell/standard currency rates.", "rates", "manage"},
 		},
 	},
 	{

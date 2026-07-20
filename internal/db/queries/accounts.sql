@@ -48,6 +48,8 @@ UPDATE accounts
 SET nilos_account_id = $2,
     iban = $3,
     bic = $4,
+    sort_code = $5,
+    account_number_uk = $6,
     updated_at = NOW()
 WHERE id = $1;
 

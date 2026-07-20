@@ -405,6 +405,110 @@ const docTemplate = `{
                 }
             }
         },
+        "/admin/currency-rates": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Admin view of all currency buy/sell/standard rates. Requires the rates:view permission.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin"
+                ],
+                "summary": "List currency rates (admin)",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/db.CurrencyRate"
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/currency-rates/{currency}": {
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Creates or updates the standard, buy and sell rate for a currency. Buy low / sell high for margin; standard is the display rate. Requires the rates:manage permission.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin"
+                ],
+                "summary": "Set a currency's rates (admin)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Currency code (USD, EUR, GBP, XAF, XOF, NGN)",
+                        "name": "currency",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Standard / buy / sell rates (per 1 USD)",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.SetCurrencyRateRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/db.CurrencyRate"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/admin/dashboard": {
             "get": {
                 "security": [
@@ -2448,6 +2552,117 @@ const docTemplate = `{
                 }
             }
         },
+        "/cards": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Cards"
+                ],
+                "summary": "List virtual cards",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.VirtualCardListResponse"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Cards"
+                ],
+                "summary": "Create virtual card",
+                "parameters": [
+                    {
+                        "description": "Card creation details",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.CreateCardRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.VirtualCardResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/cards/{id}": {
+            "patch": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Cards"
+                ],
+                "summary": "Update virtual card",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Card ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Update payload",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.UpdateCardRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.VirtualCardResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/crypto/balances": {
             "get": {
                 "security": [
@@ -2455,14 +2670,14 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Returns the USDC balance of the caller's ERC-4337 Smart Contract Wallet from the CaaS service.",
+                "description": "Returns the caller's Instant USD (iUSD) balance from Rach CaaS. iUSD settles on-chain as USDC inside the EIP-4337 Smart Contract Wallet, but is always shown to the customer as iUSD. This is separate from any USDT/USDC held in the Rach WaaS crypto wallets.",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
-                    "crypto"
+                    "CaaS - Instant USD (iUSD)"
                 ],
-                "summary": "Get stablecoin balances",
+                "summary": "Get iUSD balance",
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -2523,7 +2738,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Step 4–5 of the Instant USD Account flow. Initiates a HUB2 Mobile Money collection: the customer receives a push-to-pay prompt on their phone. After they approve, HUB2 fires a webhook which triggers DigitalFX to instruct Rach CaaS to convert the XOF/XAF to USDC/USDT and credit the customer's ERC-4337 Smart Contract Wallet. The customer sees their updated balance via GET /crypto/balances once Rach CaaS confirms the fiat and completes the OTC conversion.",
+                "description": "Funds the customer's Instant USD (iUSD) account. Initiates a HUB2 Mobile Money collection: the customer receives a push-to-pay prompt on their phone. After they approve, HUB2 fires a webhook which triggers Rach CaaS to convert the XOF/XAF to on-chain USDC and credit the customer's EIP-4337 Smart Contract Wallet — reflected to the customer as iUSD. Poll GET /crypto/balances for the updated iUSD balance once CaaS confirms the fiat and completes the conversion.",
                 "consumes": [
                     "application/json"
                 ],
@@ -2531,9 +2746,9 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "crypto"
+                    "CaaS - Instant USD (iUSD)"
                 ],
-                "summary": "Fund Instant USD Account via Mobile Money",
+                "summary": "Fund iUSD account via Mobile Money",
                 "parameters": [
                     {
                         "description": "Funding request",
@@ -2580,7 +2795,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Transfers stablecoins (USDT or USDC) from the caller to another DigitalFX user identified by phone number. An FX quote is obtained first, then the CaaS P2P transfer is executed. Amount is in USD-equivalent decimal (e.g. \"50.00\").",
+                "description": "Transfers Instant USD (iUSD) from the caller to another DigitalFX user identified by phone number, via Rach CaaS (settles on-chain as USDC between the two EIP-4337 wallets). Amount is USD-equivalent decimal (e.g. \"50.00\"). Note: the ` + "`" + `token` + "`" + ` field selects the on-chain settlement asset (USDC/USDT) but the customer-facing unit is iUSD. This is the CaaS P2P rail, distinct from WaaS on-chain crypto transfers.",
                 "consumes": [
                     "application/json"
                 ],
@@ -2588,9 +2803,9 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "crypto"
+                    "CaaS - Instant USD (iUSD)"
                 ],
-                "summary": "Send USDT or USDC to another user",
+                "summary": "Send iUSD to another user (Phone Send)",
                 "parameters": [
                     {
                         "description": "Transfer details",
@@ -2637,14 +2852,14 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Returns a paginated list of crypto (USDT/USDC) transactions for the authenticated user.",
+                "description": "Returns a paginated list of the user's Instant USD (iUSD / CaaS) transactions — funding, Phone Send transfers, and off-ramp withdrawals. These are CaaS-rail movements, not WaaS on-chain crypto history (see /wallets/crypto/{network}/transactions for that).",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
-                    "crypto"
+                    "CaaS - Instant USD (iUSD)"
                 ],
-                "summary": "List crypto transactions",
+                "summary": "List iUSD (CaaS) transactions",
                 "parameters": [
                     {
                         "type": "integer",
@@ -2688,14 +2903,14 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Returns a single crypto transaction by its UUID.",
+                "description": "Returns a single Instant USD (iUSD / CaaS) transaction by its UUID.",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
-                    "crypto"
+                    "CaaS - Instant USD (iUSD)"
                 ],
-                "summary": "Get a crypto transaction",
+                "summary": "Get an iUSD (CaaS) transaction",
                 "parameters": [
                     {
                         "type": "string",
@@ -2740,14 +2955,14 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Returns the caller's ERC-4337 Smart Contract Wallet (SCW), provisioning it on the CaaS service if this is the first call. The wallet is identified by the user's phone number.",
+                "description": "Returns the caller's Instant USD (iUSD) wallet — an EIP-4337 Smart Contract Wallet (SCW) provisioned on Rach CaaS, keyed by the user's phone number (provisioned on first call). This is the CaaS rail (instant dollars that settle on-chain as USDC), NOT the Rach WaaS HD crypto wallets. Customer-facing unit is always iUSD.",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
-                    "crypto"
+                    "CaaS - Instant USD (iUSD)"
                 ],
-                "summary": "Get or create ERC-4337 abstraction wallet",
+                "summary": "Get or create the user's iUSD (CaaS) wallet",
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -2777,7 +2992,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Initiates a stablecoin (USDC/USDT) off-ramp withdrawal from the user's ERC-4337 Smart Contract Wallet to their Mobile Money number.",
+                "description": "Off-ramps Instant USD (iUSD) from the user's EIP-4337 Smart Contract Wallet back to fiat on their Mobile Money number, via Rach CaaS (settles the on-chain USDC and pays out local currency). The ` + "`" + `token` + "`" + ` field is the on-chain settlement asset; the customer balance is iUSD.",
                 "consumes": [
                     "application/json"
                 ],
@@ -2785,9 +3000,9 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "crypto"
+                    "CaaS - Instant USD (iUSD)"
                 ],
-                "summary": "Initiate stablecoin off-ramp withdrawal",
+                "summary": "Withdraw iUSD to Mobile Money (off-ramp)",
                 "parameters": [
                     {
                         "description": "Withdrawal details",
@@ -2846,7 +3061,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "type": "object"
+                            "$ref": "#/definitions/services.DashboardData"
                         }
                     },
                     "401": {
@@ -2885,7 +3100,7 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "exchange"
+                    "Fiat - Nilos"
                 ],
                 "summary": "Execute exchange",
                 "parameters": [
@@ -2940,7 +3155,7 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "exchange"
+                    "Fiat - Nilos"
                 ],
                 "summary": "Exchange history",
                 "parameters": [
@@ -2989,7 +3204,7 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "exchange"
+                    "Fiat - Nilos"
                 ],
                 "summary": "Exchange quote",
                 "parameters": [
@@ -3038,7 +3253,7 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "exchange"
+                    "Fiat - Nilos"
                 ],
                 "summary": "Live exchange rate",
                 "parameters": [
@@ -3218,6 +3433,43 @@ const docTemplate = `{
                 }
             }
         },
+        "/kyc/init": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Creates or resumes a KYC session (e.g. for Sumsub). The returned token is used with the provider SDK.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "kyc"
+                ],
+                "summary": "Start or Resume KYC verification",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.MetaMapInitResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/kyc/metamap/init": {
             "post": {
                 "security": [
@@ -3292,6 +3544,74 @@ const docTemplate = `{
                 }
             }
         },
+        "/market/prices": {
+            "get": {
+                "description": "Returns current cached prices for all tracked cryptocurrencies.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Market"
+                ],
+                "summary": "Get market prices",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/services.CoinMarket"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/market/prices/{symbol}": {
+            "get": {
+                "description": "Returns current cached price for a specific cryptocurrency symbol.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Market"
+                ],
+                "summary": "Get price by symbol",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Coin symbol (e.g. btc, eth)",
+                        "name": "symbol",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/services.CoinMarket"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/market/ws": {
+            "get": {
+                "description": "Streams real-time market prices. Clients must connect via ws:// or wss://.",
+                "tags": [
+                    "Market"
+                ],
+                "summary": "Connect to market data websocket",
+                "responses": {}
+            }
+        },
         "/notifications": {
             "get": {
                 "security": [
@@ -3350,7 +3670,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Stores the mobile device's FCM registration token so the user receives push notifications. Call after login / on app start whenever the token is obtained or refreshed. Idempotent.",
+                "description": "Registers this device's Firebase Cloud Messaging (FCM) registration token so the authenticated user receives push notifications. This is the ONLY setup call the mobile app needs — the backend handles all sending automatically (project digitalcap-fx-501314, FCM v1 / HTTP API; no legacy server key required on the client).\n\n**When to call:** (1) right after a successful login, (2) on every app start, and (3) whenever Firebase issues a new token via onTokenRefresh. It is idempotent — it upserts by token, and if a token previously belonged to another user it is reassigned to the current user. No need to unregister the old token first on refresh.\n\n**platform:** one of ` + "`" + `ios` + "`" + `, ` + "`" + `android` + "`" + `, ` + "`" + `web` + "`" + ` (omitted → stored as ` + "`" + `unknown` + "`" + `).\n\n**What the device receives:** a standard FCM message = a ` + "`" + `notification` + "`" + ` block (` + "`" + `title` + "`" + `, ` + "`" + `body` + "`" + `) for the system tray PLUS a ` + "`" + `data` + "`" + ` map for in-app routing. ` + "`" + `data` + "`" + ` ALWAYS contains ` + "`" + `type` + "`" + ` (the event), and event-specific extra keys. Route/deep-link on ` + "`" + `data.type` + "`" + `. Known values: ` + "`" + `login_detected` + "`" + `, ` + "`" + `welcome` + "`" + `, ` + "`" + `kyc_submitted` + "`" + `, ` + "`" + `kyc_approved` + "`" + `, ` + "`" + `kyc_rejected` + "`" + `, ` + "`" + `transfer_sent` + "`" + `, ` + "`" + `transfer_received` + "`" + `, ` + "`" + `deposit_received` + "`" + `, ` + "`" + `deposit_confirmed` + "`" + `, ` + "`" + `withdrawal_processed` + "`" + `, ` + "`" + `crypto_sent` + "`" + `, ` + "`" + `crypto_received` + "`" + `, ` + "`" + `exchange_completed` + "`" + `, ` + "`" + `market_alert` + "`" + ` (extra: ` + "`" + `symbol` + "`" + `), ` + "`" + `test` + "`" + `. CaaS / Instant-USD credits arrive as ` + "`" + `type=deposit_confirmed` + "`" + ` with ` + "`" + `symbol=iUSD` + "`" + `, ` + "`" + `tx_hash` + "`" + `, ` + "`" + `reference` + "`" + `, ` + "`" + `source=caas` + "`" + `.\n\n**Token hygiene:** the server auto-prunes tokens that FCM reports as unregistered/invalid, so always re-register on token refresh to stay reachable. Call DELETE /notifications/devices on logout.",
                 "consumes": [
                     "application/json"
                 ],
@@ -3399,7 +3719,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Removes the device's FCM token (call on logout or when the user disables push).",
+                "description": "Removes this device's FCM token so it stops receiving push. Call on logout, or when the user turns push off in settings. Only removes the token if it belongs to the authenticated user. Send the same ` + "`" + `token` + "`" + ` string that was registered.",
                 "consumes": [
                     "application/json"
                 ],
@@ -3475,7 +3795,10 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Sends a test push to all of the authenticated user's registered devices — for the mobile team to verify delivery end-to-end.",
+                "description": "Sends a test push (` + "`" + `data.type = \"test\"` + "`" + `) to all of the authenticated user's registered devices so the mobile team can verify end-to-end delivery. Register a device via POST /notifications/devices first — this returns 400 \"no registered devices for this user\" if none are registered, or 400 if push is not configured on the environment. Send with an empty JSON body ` + "`" + `{}` + "`" + ` (a bodyless POST is rejected by the gateway with 411).",
+                "consumes": [
+                    "application/json"
+                ],
                 "produces": [
                     "application/json"
                 ],
@@ -3624,7 +3947,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Updates the authenticated user's profile fields: name, bio, avatar URL, date of birth, and nationality.",
+                "description": "Updates the authenticated user's editable profile fields: bio and avatar URL ONLY. Name, phone, email and KYC-verified identity fields (date of birth, nationality, BVN) are LOCKED — they cannot be changed here and are ignored if sent. Identity corrections go through KYC / admin review.",
                 "consumes": [
                     "application/json"
                 ],
@@ -3637,7 +3960,7 @@ const docTemplate = `{
                 "summary": "Update profile",
                 "parameters": [
                     {
-                        "description": "Profile fields to update",
+                        "description": "Editable profile fields (bio, avatar_url)",
                         "name": "body",
                         "in": "body",
                         "required": true,
@@ -3749,6 +4072,92 @@ const docTemplate = `{
                     },
                     "401": {
                         "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/rates": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns the buy, sell and standard rate for every supported currency (EUR, GBP, USD, XAF, XOF, NGN). Rates are units of that currency per 1 USD. Use ` + "`" + `standard_rate` + "`" + ` to display a customer's balance in another currency; use ` + "`" + `buy_rate` + "`" + ` / ` + "`" + `sell_rate` + "`" + ` when the customer sells to / buys from the platform.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "rates"
+                ],
+                "summary": "List currency rates",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/db.CurrencyRate"
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/rates/{currency}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns the buy, sell and standard rate for a single currency.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "rates"
+                ],
+                "summary": "Get a currency's rates",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Currency code (USD, EUR, GBP, XAF, XOF, NGN)",
+                        "name": "currency",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/db.CurrencyRate"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
                         "schema": {
                             "$ref": "#/definitions/handlers.ErrorResponse"
                         }
@@ -4901,7 +5310,7 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "transfers"
+                    "Fiat - Nilos"
                 ],
                 "summary": "Exchange currency",
                 "responses": {
@@ -4935,7 +5344,7 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "transfers"
+                    "Mobile Money - HUB2"
                 ],
                 "summary": "Mobile Money payment via HUB2",
                 "parameters": [
@@ -4992,7 +5401,7 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "transfers"
+                    "Fiat - Nilos"
                 ],
                 "summary": "Internal fiat transfer",
                 "parameters": [
@@ -5144,6 +5553,150 @@ const docTemplate = `{
                 }
             }
         },
+        "/vtu/airtime": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "VTU"
+                ],
+                "summary": "Purchase Airtime",
+                "parameters": [
+                    {
+                        "description": "Airtime details",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.PurchaseAirtimeRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.VTUTransactionResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/vtu/bills/pay": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "VTU"
+                ],
+                "summary": "Pay Utility Bill",
+                "parameters": [
+                    {
+                        "description": "Bill details",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.PayBillRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.VTUTransactionResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/vtu/data": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "VTU"
+                ],
+                "summary": "Purchase Data Bundle",
+                "parameters": [
+                    {
+                        "description": "Data details",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.PurchaseDataBundleRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.VTUTransactionResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/vtu/transactions": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "VTU"
+                ],
+                "summary": "List VTU transactions",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.VTUTransactionListResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/wallets": {
             "get": {
                 "security": [
@@ -5156,7 +5709,7 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "wallets"
+                    "WaaS - Crypto Wallets"
                 ],
                 "summary": "List HD wallets",
                 "responses": {
@@ -5194,7 +5747,7 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "wallets"
+                    "WaaS - Crypto Wallets"
                 ],
                 "summary": "Create HD wallet for a network",
                 "parameters": [
@@ -5236,6 +5789,51 @@ const docTemplate = `{
                 }
             }
         },
+        "/wallets/addresses": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns every derived on-chain address for the caller across all networks, each with its live per-currency balances (native coin + on-chain stablecoins). Pass ?refresh=true to force a live on-chain balance refresh (slower, always accurate).",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "WaaS - Crypto Wallets"
+                ],
+                "summary": "List WaaS addresses \u0026 balances",
+                "parameters": [
+                    {
+                        "type": "boolean",
+                        "description": "Force a live on-chain balance refresh",
+                        "name": "refresh",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/payments.ListCustomerAddressesResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/wallets/crypto/{network}": {
             "get": {
                 "security": [
@@ -5243,14 +5841,14 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Returns the wallet header (live balance, receive address, actions) for a WaaS crypto wallet. Balance is fetched live from the Payments API.",
+                "description": "Returns the Rach WaaS wallet for a network: ` + "`" + `wallet` + "`" + ` is the native coin (e.g. POL) and ` + "`" + `tokens[]` + "`" + ` lists the on-chain stablecoins (USDT/USDC/…) held on that SAME address — so opening the Polygon wallet returns POL plus its USDT/USDC together. Each item carries ` + "`" + `provider:\"waas\"` + "`" + `. Balances are fetched live from the Payments API. Distinct from CaaS iUSD (see /crypto/*).",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
-                    "wallets"
+                    "WaaS - Crypto Wallets"
                 ],
-                "summary": "Crypto wallet detail",
+                "summary": "Crypto wallet detail (WaaS)",
                 "parameters": [
                     {
                         "type": "string",
@@ -5295,7 +5893,7 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "wallets"
+                    "WaaS - Crypto Wallets"
                 ],
                 "summary": "Crypto wallet transaction history",
                 "parameters": [
@@ -5351,7 +5949,7 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "wallets"
+                    "Mobile Money - HUB2"
                 ],
                 "summary": "Initiate Mobile Money deposit",
                 "parameters": [
@@ -5393,6 +5991,120 @@ const docTemplate = `{
                 }
             }
         },
+        "/wallets/estimate-gas": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Estimates the network fee for an EVM transfer (BSC, ETH, POL). Amount is in wei.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "WaaS - Crypto Wallets"
+                ],
+                "summary": "Estimate on-chain gas (WaaS)",
+                "parameters": [
+                    {
+                        "description": "Gas estimate request",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.EstimateGasRequestBody"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/payments.GasEstimate"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/wallets/export-key": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Exports the private key for one of the caller's derived WaaS addresses. HIGHLY SENSITIVE — grants full control of that address. Index must match the derivation index used when the address was created (default 0). Gate behind step-up auth before surfacing in any UI.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "WaaS - Crypto Wallets"
+                ],
+                "summary": "Export WaaS private key (SENSITIVE)",
+                "parameters": [
+                    {
+                        "description": "Network + derivation index",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ExportKeyRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/payments.ExportPrivateKeyResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/wallets/fiat/{currency}": {
             "get": {
                 "security": [
@@ -5400,12 +6112,12 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Returns the wallet header (balance, account number, actions) for a specific fiat currency.",
+                "description": "Returns the wallet header (balance, account number, actions) for a specific fiat currency. Fiat is backed by Nilos (foreign currencies) or HUB2 (XAF/XOF mobile money).",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
-                    "wallets"
+                    "Fiat - Nilos"
                 ],
                 "summary": "Fiat wallet detail",
                 "parameters": [
@@ -5452,7 +6164,7 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "wallets"
+                    "Fiat - Nilos"
                 ],
                 "summary": "Fiat wallet transaction history",
                 "parameters": [
@@ -5525,12 +6237,12 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Returns the Phone Send card (USDC balance + recent contacts) plus the unified wallet list (fiat + stablecoins + crypto). Filter with ?type=fiat|stablecoin|crypto.",
+                "description": "Combined view across ALL rails: the Phone Send card (iUSD balance + recent contacts) plus the unified wallet list — fiat (Nilos/HUB2), CaaS iUSD, and WaaS crypto + on-chain stablecoins. Every item carries a ` + "`" + `provider` + "`" + ` field (caas|waas|hub2|nilos). Filter with ?type=fiat|stablecoin|crypto.",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
-                    "wallets"
+                    "Wallets - Overview"
                 ],
                 "summary": "Wallets overview",
                 "parameters": [
@@ -5563,6 +6275,43 @@ const docTemplate = `{
                 }
             }
         },
+        "/wallets/seed": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns the BIP-39 mnemonic for the caller's Rach WaaS HD wallet. HIGHLY SENSITIVE — anyone with this phrase controls ALL of the user's crypto. Intended for self-custody export; gate behind step-up auth (PIN/biometric/2FA) before surfacing in any UI.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "WaaS - Crypto Wallets"
+                ],
+                "summary": "Reveal WaaS seed phrase (SENSITIVE)",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/payments.GetSeedPhraseResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/wallets/stablecoin/{symbol}": {
             "get": {
                 "security": [
@@ -5570,14 +6319,14 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Returns the wallet header for a stablecoin (USDC). Balance is fetched live from Rach CaaS.",
+                "description": "Returns the wallet header for the CaaS Instant USD (iUSD) stablecoin. Balance is fetched live from Rach CaaS (settles on-chain as USDC, shown as iUSD). This is the CaaS rail; for WaaS on-chain USDT/USDC see /wallets/crypto/{network}.",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
-                    "wallets"
+                    "CaaS - Instant USD (iUSD)"
                 ],
-                "summary": "Stablecoin wallet detail",
+                "summary": "iUSD wallet detail (CaaS stablecoin)",
                 "parameters": [
                     {
                         "type": "string",
@@ -5617,14 +6366,14 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Returns CaaS P2P send/receive history for the USDC stablecoin wallet. Maps to the same data as GET /crypto/transactions.",
+                "description": "Returns CaaS P2P send/receive history for the Instant USD (iUSD) wallet. Maps to the same data as GET /crypto/transactions.",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
-                    "wallets"
+                    "CaaS - Instant USD (iUSD)"
                 ],
-                "summary": "Stablecoin transaction history",
+                "summary": "iUSD transaction history (CaaS)",
                 "parameters": [
                     {
                         "type": "string",
@@ -5670,12 +6419,12 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Returns all addable assets (crypto networks + stablecoins) with has_wallet=true if the user has already provisioned that wallet. Used for the + Add flow.",
+                "description": "Returns all addable assets (WaaS crypto networks + CaaS iUSD) with has_wallet=true if the user has already provisioned that wallet, and a ` + "`" + `provider` + "`" + ` field (waas|caas). Used for the + Add flow.",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
-                    "wallets"
+                    "Wallets - Overview"
                 ],
                 "summary": "Supported assets",
                 "responses": {
@@ -5713,7 +6462,7 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "wallets"
+                    "WaaS - Crypto Wallets"
                 ],
                 "summary": "Execute a WaaS token swap",
                 "parameters": [
@@ -5767,7 +6516,7 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "wallets"
+                    "WaaS - Crypto Wallets"
                 ],
                 "summary": "Get WaaS swap history",
                 "parameters": [
@@ -5818,7 +6567,7 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "wallets"
+                    "WaaS - Crypto Wallets"
                 ],
                 "summary": "Get a WaaS token swap quote",
                 "parameters": [
@@ -5886,6 +6635,132 @@ const docTemplate = `{
                 }
             }
         },
+        "/wallets/transactions": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns the caller's on-chain transaction history from Rach WaaS, filterable by network, currency and status. This is real blockchain history, distinct from the CaaS iUSD ledger.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "WaaS - Crypto Wallets"
+                ],
+                "summary": "WaaS on-chain transactions",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Page (default 1)",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Results per page (default 20, max 100)",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Filter by network (BTC, ETH, BSC, POL, TRX, SOL, LTC, BCH, XRP)",
+                        "name": "network",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Filter by currency (POL, ETH, USDT, USDC, …)",
+                        "name": "currency",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Filter by status (pending, confirmed, failed)",
+                        "name": "status",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/payments.GetTransactionsResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/wallets/transfer": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Broadcasts an on-chain transfer of a native coin or on-chain token from the caller's Rach WaaS HD wallet to an external address. Amount is in the SMALLEST on-chain unit (wei / satoshi / lamport / sun / drop). Currency is the coin/token symbol (POL, ETH, BNB, USDT, USDC, …). This is the WaaS rail — distinct from CaaS iUSD Phone Send.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "WaaS - Crypto Wallets"
+                ],
+                "summary": "Send crypto on-chain (WaaS)",
+                "parameters": [
+                    {
+                        "description": "Transfer details",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.TransferCryptoRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/payments.TransferResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/wallets/withdraw": {
             "post": {
                 "security": [
@@ -5901,7 +6776,7 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "wallets"
+                    "Mobile Money - HUB2"
                 ],
                 "summary": "Initiate Mobile Money withdrawal",
                 "parameters": [
@@ -5955,7 +6830,7 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "wallets"
+                    "WaaS - Crypto Wallets"
                 ],
                 "summary": "Get deposit address",
                 "parameters": [
@@ -5997,7 +6872,7 @@ const docTemplate = `{
         },
         "/webhooks/caas": {
             "post": {
-                "description": "Receives account/settlement events from Rach CaaS (instant USD account). Verified via HMAC-SHA256 over the raw body in the X-Webhook-Signature header, using the CaaS webhook secret. On a credit/deposit event the owning user is notified.",
+                "description": "Receiver for Rach CaaS account/settlement events (funding, on-chain credit, P2P transfer, off-ramp). Follows the standard Rach webhook signing — header ` + "`" + `X-Webhook-Signature` + "`" + ` = hex HMAC-SHA256 of the raw request body, keyed with the CaaS webhook secret (CAAS_WEBHOOK_SECRET), which is SEPARATE from the WaaS secret. Verification also tolerates alternate header names and base64 as a hardening fallback. On a credit/deposit event the owning user (resolved by phone) is notified, always labeled iUSD (never USDC). Always returns 200 on business-logic issues so the provider does not retry.",
                 "consumes": [
                     "application/json"
                 ],
@@ -6007,11 +6882,11 @@ const docTemplate = `{
                 "tags": [
                     "webhooks"
                 ],
-                "summary": "Rach CaaS Webhook",
+                "summary": "Rach CaaS Webhook (Instant USD / iUSD)",
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "HMAC-SHA256 signature (hex)",
+                        "description": "hex HMAC-SHA256(rawBody, CaaS secret)",
                         "name": "X-Webhook-Signature",
                         "in": "header",
                         "required": true
@@ -6155,7 +7030,7 @@ const docTemplate = `{
         },
         "/webhooks/payments": {
             "post": {
-                "description": "Handles transaction updates (detected/confirmed deposits) pushed by the Payments WaaS microservice.",
+                "description": "Receiver for Rach WaaS on-chain deposit events. Fires ` + "`" + `wallet.deposit.detected` + "`" + ` (seen on-chain, not credited) and ` + "`" + `wallet.deposit.confirmed` + "`" + ` (block-depth/settlement threshold met). On a confirmed event the owning user (resolved by derived address) is notified and the deposit is mirrored best-effort into their local ledger; the WaaS balance API remains authoritative. Signature: header ` + "`" + `X-Webhook-Signature` + "`" + ` = hex HMAC-SHA256 of the raw request body, keyed with the WaaS webhook secret (PAYMENTS_WEBHOOK_SECRET). Always returns 200 on business-logic issues to avoid provider retries.",
                 "consumes": [
                     "application/json"
                 ],
@@ -6165,14 +7040,20 @@ const docTemplate = `{
                 "tags": [
                     "webhooks"
                 ],
-                "summary": "Rach WaaS Webhook",
+                "summary": "Rach WaaS Webhook (crypto deposits)",
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "HMAC-SHA256 signature: hex",
+                        "description": "hex HMAC-SHA256(rawBody, secret)",
                         "name": "X-Webhook-Signature",
                         "in": "header",
                         "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Event name (e.g. wallet.deposit)",
+                        "name": "X-Webhook-Event",
+                        "in": "header"
                     },
                     {
                         "description": "Webhook payload",
@@ -6196,6 +7077,12 @@ const docTemplate = `{
                         "schema": {
                             "$ref": "#/definitions/handlers.ErrorResponse"
                         }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
                     }
                 }
             }
@@ -6212,7 +7099,7 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "withdrawals"
+                    "Fiat - Nilos"
                 ],
                 "summary": "List fiat withdrawals",
                 "parameters": [
@@ -6252,7 +7139,7 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "withdrawals"
+                    "Fiat - Nilos"
                 ],
                 "summary": "Initiate fiat withdrawal",
                 "parameters": [
@@ -6306,7 +7193,7 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "withdrawals"
+                    "Fiat - Nilos"
                 ],
                 "summary": "List saved beneficiaries",
                 "responses": {
@@ -6335,7 +7222,7 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "withdrawals"
+                    "Fiat - Nilos"
                 ],
                 "summary": "Save a new beneficiary",
                 "parameters": [
@@ -6376,7 +7263,7 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "withdrawals"
+                    "Fiat - Nilos"
                 ],
                 "summary": "Delete a saved beneficiary",
                 "parameters": [
@@ -6419,7 +7306,7 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "withdrawals"
+                    "Fiat - Nilos"
                 ],
                 "summary": "Preview fiat withdrawal",
                 "parameters": [
@@ -6466,7 +7353,7 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "withdrawals"
+                    "Fiat - Nilos"
                 ],
                 "summary": "Get a fiat withdrawal by ID",
                 "parameters": [
@@ -6496,6 +7383,51 @@ const docTemplate = `{
         }
     },
     "definitions": {
+        "db.ActivityItem": {
+            "type": "object",
+            "properties": {
+                "amount": {
+                    "description": "absolute decimal string",
+                    "type": "string"
+                },
+                "amount_sign": {
+                    "description": "\"+\" | \"-\"",
+                    "type": "string"
+                },
+                "asset": {
+                    "description": "\"BTC\", \"USD\", \"USDC\", \"ETH\"",
+                    "type": "string"
+                },
+                "counter_name": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "days_ago": {
+                    "type": "integer"
+                },
+                "description": {
+                    "description": "\"Received BTC\", \"Sent USD\", etc.",
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "source": {
+                    "description": "\"fiat\" | \"crypto\" | \"caas\"",
+                    "type": "string"
+                },
+                "status": {
+                    "description": "\"completed\" | \"pending\" | \"failed\"",
+                    "type": "string"
+                },
+                "type": {
+                    "description": "\"credit\" | \"debit\" | \"exchange\"",
+                    "type": "string"
+                }
+            }
+        },
         "db.CaasWithdrawal": {
             "type": "object",
             "properties": {
@@ -6533,6 +7465,26 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "user_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "db.CurrencyRate": {
+            "type": "object",
+            "properties": {
+                "buy_rate": {
+                    "type": "number"
+                },
+                "currency": {
+                    "type": "string"
+                },
+                "sell_rate": {
+                    "type": "number"
+                },
+                "standard_rate": {
+                    "type": "number"
+                },
+                "updated_at": {
                     "type": "string"
                 }
             }
@@ -6834,6 +7786,31 @@ const docTemplate = `{
                 }
             }
         },
+        "handlers.CreateCardRequest": {
+            "type": "object",
+            "properties": {
+                "card_art_id": {
+                    "type": "string",
+                    "example": "art_abstract_01"
+                },
+                "color_theme": {
+                    "type": "string",
+                    "example": "midnight_blue"
+                },
+                "funding_account_id": {
+                    "type": "string",
+                    "example": "550e8400-e29b-41d4-a716-446655440000"
+                },
+                "funding_wallet_id": {
+                    "type": "string",
+                    "example": "550e8400-e29b-41d4-a716-446655440001"
+                },
+                "name": {
+                    "type": "string",
+                    "example": "My Daily Card"
+                }
+            }
+        },
         "handlers.CreateTicketRequest": {
             "type": "object",
             "properties": {
@@ -6988,6 +7965,10 @@ const docTemplate = `{
                     "type": "string",
                     "example": "41.202.207.10"
                 },
+                "device_location": {
+                    "type": "string",
+                    "example": "Lagos, Nigeria"
+                },
                 "device_name": {
                     "type": "string",
                     "example": "iPhone"
@@ -7048,6 +8029,31 @@ const docTemplate = `{
                 "success": {
                     "type": "boolean",
                     "example": false
+                }
+            }
+        },
+        "handlers.EstimateGasRequestBody": {
+            "type": "object",
+            "properties": {
+                "amount": {
+                    "type": "string",
+                    "example": "1000000"
+                },
+                "currency": {
+                    "type": "string",
+                    "example": "USDT"
+                },
+                "from_address": {
+                    "type": "string",
+                    "example": "0xabc..."
+                },
+                "network": {
+                    "type": "string",
+                    "example": "POL"
+                },
+                "to_address": {
+                    "type": "string",
+                    "example": "0xdef..."
                 }
             }
         },
@@ -7155,6 +8161,18 @@ const docTemplate = `{
                 },
                 "to_token": {
                     "type": "string"
+                }
+            }
+        },
+        "handlers.ExportKeyRequest": {
+            "type": "object",
+            "properties": {
+                "index": {
+                    "type": "integer"
+                },
+                "network": {
+                    "type": "string",
+                    "example": "POL"
                 }
             }
         },
@@ -7663,6 +8681,31 @@ const docTemplate = `{
                 }
             }
         },
+        "handlers.PayBillRequest": {
+            "type": "object",
+            "properties": {
+                "account_number": {
+                    "type": "string",
+                    "example": "20019283"
+                },
+                "amount": {
+                    "type": "number",
+                    "example": 5000
+                },
+                "biller_id": {
+                    "type": "string",
+                    "example": "ENEO"
+                },
+                "currency": {
+                    "type": "string",
+                    "enum": [
+                        "XAF",
+                        "XOF"
+                    ],
+                    "example": "XAF"
+                }
+            }
+        },
         "handlers.PaymentsWebhookData": {
             "type": "object",
             "properties": {
@@ -7672,10 +8715,19 @@ const docTemplate = `{
                 "amount": {
                     "type": "string"
                 },
+                "confirmations": {
+                    "type": "integer"
+                },
+                "confirmed_at": {
+                    "type": "string"
+                },
                 "currency": {
                     "type": "string"
                 },
                 "customer_id": {
+                    "type": "string"
+                },
+                "detected_at": {
                     "type": "string"
                 },
                 "network": {
@@ -7766,6 +8818,60 @@ const docTemplate = `{
                 }
             }
         },
+        "handlers.PurchaseAirtimeRequest": {
+            "type": "object",
+            "properties": {
+                "amount": {
+                    "type": "number",
+                    "example": 1000
+                },
+                "currency": {
+                    "type": "string",
+                    "enum": [
+                        "XAF",
+                        "XOF"
+                    ],
+                    "example": "XAF"
+                },
+                "operator": {
+                    "type": "string",
+                    "example": "MTN"
+                },
+                "phone": {
+                    "type": "string",
+                    "example": "+237612345678"
+                }
+            }
+        },
+        "handlers.PurchaseDataBundleRequest": {
+            "type": "object",
+            "properties": {
+                "amount": {
+                    "type": "number",
+                    "example": 1000
+                },
+                "bundle_id": {
+                    "type": "string",
+                    "example": "MTN_DATA_1GB"
+                },
+                "currency": {
+                    "type": "string",
+                    "enum": [
+                        "XAF",
+                        "XOF"
+                    ],
+                    "example": "XAF"
+                },
+                "operator": {
+                    "type": "string",
+                    "example": "MTN"
+                },
+                "phone": {
+                    "type": "string",
+                    "example": "+237612345678"
+                }
+            }
+        },
         "handlers.RefreshTokenRequest": {
             "type": "object",
             "properties": {
@@ -7777,13 +8883,22 @@ const docTemplate = `{
         },
         "handlers.RegisterDeviceRequest": {
             "type": "object",
+            "required": [
+                "token"
+            ],
             "properties": {
                 "platform": {
-                    "description": "ios | android | web",
+                    "description": "Platform the token belongs to. Optional — defaults to \"unknown\".",
                     "type": "string",
+                    "enum": [
+                        "ios",
+                        "android",
+                        "web"
+                    ],
                     "example": "android"
                 },
                 "token": {
+                    "description": "Token is the Firebase Cloud Messaging registration token obtained on the\ndevice (Android/iOS/Web) via the Firebase SDK. Required.",
                     "type": "string",
                     "example": "fcm-registration-token"
                 }
@@ -7806,7 +8921,7 @@ const docTemplate = `{
                     "example": "https://acme.example.com"
                 },
                 "bvn": {
-                    "description": "Nigerian Bank Verification Number (11 digits). REQUIRED for Nigerian customers (country NG or a +234 phone).",
+                    "description": "Nigerian Bank Verification Number (11 digits).",
                     "type": "string",
                     "example": "12345678901"
                 },
@@ -8000,6 +9115,23 @@ const docTemplate = `{
                 "account_type": {
                     "description": "individual | business",
                     "type": "string"
+                }
+            }
+        },
+        "handlers.SetCurrencyRateRequest": {
+            "type": "object",
+            "properties": {
+                "buy_rate": {
+                    "type": "number",
+                    "example": 615
+                },
+                "sell_rate": {
+                    "type": "number",
+                    "example": 603
+                },
+                "standard_rate": {
+                    "type": "number",
+                    "example": 609
                 }
             }
         },
@@ -8215,6 +9347,48 @@ const docTemplate = `{
                 }
             }
         },
+        "handlers.TransferCryptoRequest": {
+            "type": "object",
+            "properties": {
+                "amount": {
+                    "description": "smallest on-chain unit (wei/sat/lamport/sun/drop)",
+                    "type": "string",
+                    "example": "1000000"
+                },
+                "currency": {
+                    "type": "string",
+                    "example": "USDT"
+                },
+                "index": {
+                    "type": "integer"
+                },
+                "network": {
+                    "type": "string",
+                    "example": "POL"
+                },
+                "to_address": {
+                    "type": "string",
+                    "example": "0x1234abcd..."
+                }
+            }
+        },
+        "handlers.UpdateCardRequest": {
+            "type": "object",
+            "properties": {
+                "color_theme": {
+                    "type": "string",
+                    "example": "sunset_orange"
+                },
+                "name": {
+                    "type": "string",
+                    "example": "Travel Card"
+                },
+                "status": {
+                    "type": "string",
+                    "example": "frozen"
+                }
+            }
+        },
         "handlers.UpdatePreferencesRequest": {
             "type": "object",
             "properties": {
@@ -8256,26 +9430,6 @@ const docTemplate = `{
                 "bio": {
                     "type": "string",
                     "example": "Digital finance enthusiast"
-                },
-                "bvn": {
-                    "type": "string",
-                    "example": "12345678901"
-                },
-                "date_of_birth": {
-                    "type": "string",
-                    "example": "1995-06-15"
-                },
-                "first_name": {
-                    "type": "string",
-                    "example": "Alice"
-                },
-                "last_name": {
-                    "type": "string",
-                    "example": "Dupont"
-                },
-                "nationality": {
-                    "type": "string",
-                    "example": "Cameroonian"
                 }
             }
         },
@@ -8347,6 +9501,71 @@ const docTemplate = `{
                 }
             }
         },
+        "handlers.VTUTransactionData": {
+            "type": "object",
+            "properties": {
+                "amount": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "currency": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "provider": {
+                    "type": "string",
+                    "example": "hub2"
+                },
+                "reference": {
+                    "type": "string"
+                },
+                "service_type": {
+                    "type": "string",
+                    "example": "airtime"
+                },
+                "status": {
+                    "type": "string",
+                    "example": "SUCCESSFUL"
+                },
+                "target_account": {
+                    "type": "string"
+                },
+                "target_phone": {
+                    "type": "string"
+                }
+            }
+        },
+        "handlers.VTUTransactionListResponse": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/handlers.VTUTransactionData"
+                    }
+                },
+                "success": {
+                    "type": "boolean",
+                    "example": true
+                }
+            }
+        },
+        "handlers.VTUTransactionResponse": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "$ref": "#/definitions/handlers.VTUTransactionData"
+                },
+                "success": {
+                    "type": "boolean",
+                    "example": true
+                }
+            }
+        },
         "handlers.VerifyEmailRequest": {
             "type": "object",
             "properties": {
@@ -8366,6 +9585,62 @@ const docTemplate = `{
                 "phone": {
                     "type": "string",
                     "example": "+237612345678"
+                }
+            }
+        },
+        "handlers.VirtualCardData": {
+            "type": "object",
+            "properties": {
+                "card_art_id": {
+                    "type": "string"
+                },
+                "color_theme": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "expiry": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "masked_pan": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                }
+            }
+        },
+        "handlers.VirtualCardListResponse": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/handlers.VirtualCardData"
+                    }
+                },
+                "success": {
+                    "type": "boolean",
+                    "example": true
+                }
+            }
+        },
+        "handlers.VirtualCardResponse": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "$ref": "#/definitions/handlers.VirtualCardData"
+                },
+                "success": {
+                    "type": "boolean",
+                    "example": true
                 }
             }
         },
@@ -8517,6 +9792,70 @@ const docTemplate = `{
                 }
             }
         },
+        "payments.ExportPrivateKeyResponse": {
+            "type": "object",
+            "properties": {
+                "address": {
+                    "type": "string"
+                },
+                "network": {
+                    "type": "string"
+                },
+                "private_key": {
+                    "type": "string"
+                }
+            }
+        },
+        "payments.GasEstimate": {
+            "type": "object",
+            "properties": {
+                "currency": {
+                    "type": "string"
+                },
+                "estimated_fee": {
+                    "description": "raw units (wei / sun / lamports)",
+                    "type": "string"
+                },
+                "fast_fee": {
+                    "description": "1.5× gas price",
+                    "type": "string"
+                },
+                "fee_in_native": {
+                    "description": "human-readable (ETH / BNB / MATIC)",
+                    "type": "string"
+                },
+                "gas_limit": {
+                    "type": "integer"
+                },
+                "gas_price": {
+                    "type": "string"
+                },
+                "network": {
+                    "type": "string"
+                },
+                "slow_fee": {
+                    "description": "0.8× gas price",
+                    "type": "string"
+                }
+            }
+        },
+        "payments.GetSeedPhraseResponse": {
+            "type": "object",
+            "properties": {
+                "customer_id": {
+                    "type": "string"
+                },
+                "mnemonic": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "word_count": {
+                    "type": "integer"
+                }
+            }
+        },
         "payments.GetSwapHistoryResponse": {
             "type": "object",
             "properties": {
@@ -8531,6 +9870,56 @@ const docTemplate = `{
                     "items": {
                         "$ref": "#/definitions/payments.SwapRecord"
                     }
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "payments.GetTransactionsResponse": {
+            "type": "object",
+            "properties": {
+                "customer_id": {
+                    "type": "string"
+                },
+                "limit": {
+                    "type": "integer"
+                },
+                "page": {
+                    "type": "integer"
+                },
+                "total": {
+                    "type": "integer"
+                },
+                "transactions": {
+                    "description": "raw — shape varies per chain",
+                    "type": "array",
+                    "items": {
+                        "type": "array",
+                        "items": {
+                            "type": "integer",
+                            "format": "int32"
+                        }
+                    }
+                }
+            }
+        },
+        "payments.ListCustomerAddressesResponse": {
+            "type": "object",
+            "properties": {
+                "addresses": {
+                    "description": "DerivedAddress + Balances preloaded",
+                    "type": "array",
+                    "items": {
+                        "type": "array",
+                        "items": {
+                            "type": "integer",
+                            "format": "int32"
+                        }
+                    }
+                },
+                "customer_id": {
+                    "type": "string"
                 },
                 "total": {
                     "type": "integer"
@@ -8677,6 +10066,38 @@ const docTemplate = `{
                 }
             }
         },
+        "payments.TransferResponse": {
+            "type": "object",
+            "properties": {
+                "amount": {
+                    "type": "string"
+                },
+                "currency": {
+                    "type": "string"
+                },
+                "from_address": {
+                    "type": "string"
+                },
+                "gas_fee": {
+                    "type": "string"
+                },
+                "network": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "timestamp": {
+                    "type": "string"
+                },
+                "to_address": {
+                    "type": "string"
+                },
+                "tx_hash": {
+                    "type": "string"
+                }
+            }
+        },
         "services.AccountLimits": {
             "type": "object",
             "properties": {
@@ -8720,6 +10141,26 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "per_transaction_usd": {
+                    "type": "number"
+                }
+            }
+        },
+        "services.AssetAllocation": {
+            "type": "object",
+            "properties": {
+                "crypto_pct": {
+                    "type": "number"
+                },
+                "crypto_usd": {
+                    "type": "number"
+                },
+                "fiat_pct": {
+                    "type": "number"
+                },
+                "fiat_usd": {
+                    "type": "number"
+                },
+                "total_usd": {
                     "type": "number"
                 }
             }
@@ -8813,6 +10254,112 @@ const docTemplate = `{
                 }
             }
         },
+        "services.CardInfo": {
+            "type": "object",
+            "properties": {
+                "card_network": {
+                    "type": "string"
+                },
+                "currency": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "last_four": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                }
+            }
+        },
+        "services.CoinMarket": {
+            "type": "object",
+            "properties": {
+                "ath": {
+                    "type": "number"
+                },
+                "ath_change_percentage": {
+                    "type": "number"
+                },
+                "circulating_supply": {
+                    "type": "number"
+                },
+                "current_price": {
+                    "type": "number",
+                    "example": 62409
+                },
+                "high_24h": {
+                    "type": "number"
+                },
+                "id": {
+                    "type": "string",
+                    "example": "bitcoin"
+                },
+                "image": {
+                    "type": "string",
+                    "example": "https://cdn.rach.finance/coins/bitcoin.png"
+                },
+                "last_updated": {
+                    "type": "string"
+                },
+                "low_24h": {
+                    "type": "number"
+                },
+                "market_cap": {
+                    "type": "number"
+                },
+                "market_cap_rank": {
+                    "type": "integer"
+                },
+                "max_supply": {
+                    "type": "number"
+                },
+                "name": {
+                    "type": "string",
+                    "example": "Bitcoin"
+                },
+                "price_change_24h": {
+                    "type": "number"
+                },
+                "price_change_percentage_1h_in_currency": {
+                    "type": "number",
+                    "example": 0.34
+                },
+                "price_change_percentage_24h": {
+                    "type": "number",
+                    "example": 2.15
+                },
+                "price_change_percentage_7d_in_currency": {
+                    "type": "number"
+                },
+                "symbol": {
+                    "type": "string",
+                    "example": "btc"
+                },
+                "total_supply": {
+                    "type": "number"
+                },
+                "total_volume": {
+                    "type": "number"
+                }
+            }
+        },
+        "services.ContactItem": {
+            "type": "object",
+            "properties": {
+                "initials": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "phone_number": {
+                    "type": "string"
+                }
+            }
+        },
         "services.CurrencyBalance": {
             "type": "object",
             "properties": {
@@ -8845,6 +10392,86 @@ const docTemplate = `{
                 "volume_usd": {
                     "description": "USD-normalised",
                     "type": "number"
+                }
+            }
+        },
+        "services.DashboardData": {
+            "type": "object",
+            "properties": {
+                "asset_allocation": {
+                    "$ref": "#/definitions/services.AssetAllocation"
+                },
+                "card": {
+                    "$ref": "#/definitions/services.CardInfo"
+                },
+                "crypto_balance_usdc": {
+                    "description": "CaaS phone-send balance",
+                    "type": "number"
+                },
+                "fiat_wallets": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/services.FiatWallet"
+                    }
+                },
+                "recent_activity": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/db.ActivityItem"
+                    }
+                },
+                "recent_contacts": {
+                    "description": "for Phone Send quick-pick",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/services.ContactItem"
+                    }
+                },
+                "this_month": {
+                    "$ref": "#/definitions/services.MonthSummary"
+                }
+            }
+        },
+        "services.FiatWallet": {
+            "type": "object",
+            "properties": {
+                "account_id": {
+                    "type": "string"
+                },
+                "account_number": {
+                    "type": "string"
+                },
+                "account_number_uk": {
+                    "type": "string"
+                },
+                "balance": {
+                    "description": "formatted string, e.g. \"12,450.75\"",
+                    "type": "string"
+                },
+                "balance_raw": {
+                    "description": "raw decimal",
+                    "type": "number"
+                },
+                "balance_usd": {
+                    "type": "number"
+                },
+                "bic": {
+                    "type": "string"
+                },
+                "currency": {
+                    "type": "string"
+                },
+                "flag": {
+                    "type": "string"
+                },
+                "iban": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "sort_code": {
+                    "type": "string"
                 }
             }
         },
@@ -8934,6 +10561,28 @@ const docTemplate = `{
                 },
                 "total_formatted": {
                     "type": "string"
+                }
+            }
+        },
+        "services.MonthSummary": {
+            "type": "object",
+            "properties": {
+                "income_usd": {
+                    "type": "number"
+                },
+                "label": {
+                    "description": "\"June 2026\"",
+                    "type": "string"
+                },
+                "net_flow_usd": {
+                    "description": "income - spending",
+                    "type": "number"
+                },
+                "spending_usd": {
+                    "type": "number"
+                },
+                "tx_count": {
+                    "type": "integer"
                 }
             }
         },
