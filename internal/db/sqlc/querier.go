@@ -74,6 +74,7 @@ type Querier interface {
 	EnableStaffMember(ctx context.Context, id uuid.UUID) error
 	FreezeAccount(ctx context.Context, id uuid.UUID) error
 	GetAccountByID(ctx context.Context, id uuid.UUID) (Account, error)
+	GetAccountByNombaAccountNumber(ctx context.Context, nombaBankAccountNumber *string) (Account, error)
 	GetAccountByUserAndCurrency(ctx context.Context, arg GetAccountByUserAndCurrencyParams) (Account, error)
 	GetAccountForUpdate(ctx context.Context, id uuid.UUID) (Account, error)
 	GetAccountWithNilos(ctx context.Context, id uuid.UUID) (GetAccountWithNilosRow, error)
@@ -104,6 +105,7 @@ type Querier interface {
 	GetHub2PaymentByReference(ctx context.Context, hub2Reference string) (Hub2Payment, error)
 	GetHub2PaymentByReferenceForFunding(ctx context.Context, hub2Reference string) (Hub2Payment, error)
 	GetKYCDocumentsByUserID(ctx context.Context, userID uuid.UUID) ([]KycDocument, error)
+	GetKYCIntake(ctx context.Context, userID uuid.UUID) (KycIntake, error)
 	// Most recent time a code of this purpose was sent to an email — powers the
 	// resend cooldown.
 	GetLatestEmailOTPSentAt(ctx context.Context, arg GetLatestEmailOTPSentAtParams) (time.Time, error)
@@ -205,6 +207,7 @@ type Querier interface {
 	UpdateMerchantStaffRole(ctx context.Context, arg UpdateMerchantStaffRoleParams) error
 	UpdateMetamapVerificationStatus(ctx context.Context, arg UpdateMetamapVerificationStatusParams) (MetamapVerification, error)
 	UpdateNilosAccountDetails(ctx context.Context, arg UpdateNilosAccountDetailsParams) error
+	UpdateNombaAccountDetails(ctx context.Context, arg UpdateNombaAccountDetailsParams) error
 	UpdateSessionLastUsed(ctx context.Context, id uuid.UUID) error
 	UpdateSessionRefreshTokenHash(ctx context.Context, arg UpdateSessionRefreshTokenHashParams) error
 	UpdateStaffLastLogin(ctx context.Context, id uuid.UUID) error
@@ -219,6 +222,7 @@ type Querier interface {
 	UpdateVTUTransactionStatus(ctx context.Context, arg UpdateVTUTransactionStatusParams) (VtuTransaction, error)
 	UpdateVirtualCard(ctx context.Context, arg UpdateVirtualCardParams) (VirtualCard, error)
 	UpsertDeviceToken(ctx context.Context, arg UpsertDeviceTokenParams) error
+	UpsertKYCIntake(ctx context.Context, arg UpsertKYCIntakeParams) (KycIntake, error)
 	UpsertPlatformLimit(ctx context.Context, arg UpsertPlatformLimitParams) (PlatformLimit, error)
 	UpsertUserLimitOverride(ctx context.Context, arg UpsertUserLimitOverrideParams) (UserLimitOverride, error)
 }

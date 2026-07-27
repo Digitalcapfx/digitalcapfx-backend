@@ -49,8 +49,8 @@ type WalletItem struct {
 // Phone Send moves Instant USD (iUSD) over the CaaS rail.
 type PhoneSendCard struct {
 	Balance          float64       `json:"balance"`
-	BalanceFormatted string        `json:"balance_formatted"` // "15,000.00 iUSD"
-	Token            string        `json:"token"`             // "iUSD"
+	BalanceFormatted string        `json:"balance_formatted"` // "15,000.00 USDC"
+	Token            string        `json:"token"`             // "USDC"
 	RecentContacts   []ContactItem `json:"recent_contacts"`
 }
 
@@ -209,13 +209,13 @@ func (s *WalletOverviewService) GetOverview(ctx context.Context, userID uuid.UUI
 			}
 			totalUSD += caasUSDC
 			wallets = append(wallets, WalletItem{
-				Symbol:           IUSDSymbol,
-				Name:             IUSDName,
+				Symbol:           StablecoinSymbol,
+				Name:             StablecoinName,
 				Type:             "stablecoin",
 				Provider:         "caas",
 				Balance:          fmt.Sprintf("%.2f", caasUSDC),
 				BalanceRaw:       caasUSDC,
-				FormattedBalance: fmt.Sprintf("%s %s", formatNumber(caasUSDC, 2), IUSDSymbol),
+				FormattedBalance: fmt.Sprintf("%s %s", formatNumber(caasUSDC, 2), StablecoinSymbol),
 				Address:          addr,
 				BalanceUSD:       roundUSD(caasUSDC),
 				HasWallet:        true,
@@ -292,8 +292,8 @@ func (s *WalletOverviewService) GetOverview(ctx context.Context, userID uuid.UUI
 
 	phoneSend := PhoneSendCard{
 		Balance:          caasUSDC,
-		BalanceFormatted: fmt.Sprintf("%s %s", formatNumber(caasUSDC, 2), IUSDSymbol),
-		Token:            IUSDSymbol,
+		BalanceFormatted: fmt.Sprintf("%s %s", formatNumber(caasUSDC, 2), StablecoinSymbol),
+		Token:            StablecoinSymbol,
 		RecentContacts:   contacts,
 	}
 
@@ -591,9 +591,10 @@ func (s *WalletOverviewService) GetStablecoinDetail(ctx context.Context, userID 
 		return nil, ErrUserNotFound
 	}
 
-	// iUSD (formerly shown as USDC) is the only supported CaaS stablecoin.
+	// USDC (name "Stablecoin", formerly branded iUSD) is the only supported CaaS
+	// stablecoin. "IUSD" is still accepted for backward compatibility.
 	sym := strings.ToUpper(symbol)
-	if sym != "IUSD" && sym != "USDC" {
+	if sym != "USDC" && sym != "IUSD" {
 		return nil, fmt.Errorf("unsupported stablecoin: %s", symbol)
 	}
 
@@ -610,13 +611,13 @@ func (s *WalletOverviewService) GetStablecoinDetail(ctx context.Context, userID 
 
 	return &WalletDetailResponse{
 		Wallet: WalletItem{
-			Symbol:           IUSDSymbol,
-			Name:             IUSDName,
+			Symbol:           StablecoinSymbol,
+			Name:             StablecoinName,
 			Type:             "stablecoin",
 			Provider:         "caas",
 			Balance:          fmt.Sprintf("%.2f", balFloat),
 			BalanceRaw:       balFloat,
-			FormattedBalance: fmt.Sprintf("%s %s", formatNumber(balFloat, 2), IUSDSymbol),
+			FormattedBalance: fmt.Sprintf("%s %s", formatNumber(balFloat, 2), StablecoinSymbol),
 			Address:          addr,
 			BalanceUSD:       roundUSD(balFloat),
 			HasWallet:        true,
@@ -649,7 +650,7 @@ func (s *WalletOverviewService) GetSupportedAssets(ctx context.Context, userID u
 		{Symbol: "BCH", Name: "Bitcoin Cash", Network: "BCH", Type: "crypto", Provider: "waas"},
 		{Symbol: "XRP", Name: "XRP", Network: "XRP", Type: "crypto", Provider: "waas"},
 		// Rach CaaS — Instant USD (EIP-4337 SCW), a different rail from WaaS.
-		{Symbol: IUSDSymbol, Name: IUSDName, Network: "EIP-4337", Type: "stablecoin", Provider: "caas"},
+		{Symbol: StablecoinSymbol, Name: StablecoinName, Network: "EIP-4337", Type: "stablecoin", Provider: "caas"},
 	}
 
 	for i, a := range assets {

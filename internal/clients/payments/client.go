@@ -228,7 +228,7 @@ type GetTransactionsParams struct {
 // GetTransactionsResponse wraps the paginated transaction list.
 type GetTransactionsResponse struct {
 	CustomerID   string            `json:"customer_id"`
-	Transactions []json.RawMessage `json:"transactions"` // raw — shape varies per chain
+	Transactions []json.RawMessage `json:"transactions" swaggertype:"array,object"` // raw — shape varies per chain
 	Page         int               `json:"page"`
 	Limit        int               `json:"limit"`
 	Total        int               `json:"total"`
@@ -239,7 +239,7 @@ type GetTransactionsResponse struct {
 // ListCustomerAddressesResponse is returned by GET /api/v1/wallet/:customerID/addresses.
 type ListCustomerAddressesResponse struct {
 	CustomerID string            `json:"customer_id"`
-	Addresses  []json.RawMessage `json:"addresses"` // DerivedAddress + Balances preloaded
+	Addresses  []json.RawMessage `json:"addresses" swaggertype:"array,object"` // DerivedAddress + Balances preloaded
 	Total      int               `json:"total"`
 }
 
@@ -266,7 +266,7 @@ type BusinessAddress struct {
 	Monitored      bool              `json:"monitored"`
 	TotalReceived  string            `json:"total_received"`
 	CreatedAt      time.Time         `json:"created_at"`
-	Balances       []json.RawMessage `json:"balances"`
+	Balances       []json.RawMessage `json:"balances" swaggertype:"array,object"`
 }
 
 // ListBusinessAddressesResponse wraps the paginated address list.
@@ -288,7 +288,7 @@ type ListCustomersParams struct {
 
 // ListCustomersResponse wraps the paginated customer list.
 type ListCustomersResponse struct {
-	Customers []json.RawMessage `json:"customers"` // CustomerWallet records
+	Customers []json.RawMessage `json:"customers" swaggertype:"array,object"` // CustomerWallet records
 	Total     int               `json:"total"`
 	Page      int               `json:"page"`
 	Limit     int               `json:"limit"`

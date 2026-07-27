@@ -14,6 +14,7 @@ import (
 	"github.com/rachfinance/digitalfx/internal/clients/hub2"
 	"github.com/rachfinance/digitalfx/internal/clients/metamap"
 	"github.com/rachfinance/digitalfx/internal/clients/nilos"
+	"github.com/rachfinance/digitalfx/internal/clients/nomba"
 	"github.com/rachfinance/digitalfx/internal/clients/payments"
 	"github.com/rachfinance/digitalfx/internal/config"
 	"github.com/rachfinance/digitalfx/internal/pkg/email"
@@ -65,6 +66,7 @@ func NewServer(cfg *config.Config) (*Server, error) {
 		cfg.MetaMap.FlowID,
 	)
 	nilosClient := nilos.New(cfg.Nilos.APIKey, cfg.Nilos.APISecret, nilos.WithBaseURL(cfg.Nilos.BaseURL))
+	nombaClient := nomba.New(cfg.Nomba.ClientID, cfg.Nomba.ClientSecret, cfg.Nomba.AccountID, nomba.WithBaseURL(cfg.Nomba.BaseURL))
 
 	// SMS client (Brevo transactional SMS REST API v3).
 	// smsClient is nil when no API key is configured (dev / test environments).
@@ -74,7 +76,7 @@ func NewServer(cfg *config.Config) (*Server, error) {
 	}
 
 	// Service layer
-	svc := services.New(pool, rdb, paymentsClient, caasClient, hub2Client, emailClient, smsClient, metamapClient, nilosClient, cfg, logger)
+	svc := services.New(pool, rdb, paymentsClient, caasClient, hub2Client, emailClient, smsClient, metamapClient, nilosClient, nombaClient, cfg, logger)
 
 	// Founder bootstrap: promote configured OWNER_PHONES to the "owner" role.
 	svc.Auth.EnsureOwners(context.Background(), cfg.OwnerPhones)

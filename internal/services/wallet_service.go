@@ -148,39 +148,6 @@ func (s *WalletService) InitiateDeposit(ctx context.Context, in DepositInput) (s
 	return resp.Reference, nil
 }
 
-// GetSwapQuote requests a rate quote for swapping between tokens on WaaS.
-func (s *WalletService) GetSwapQuote(ctx context.Context, fromChain, toChain, fromToken, toToken, amountIn string) (*payments.SwapQuoteResponse, error) {
-	return s.paymentsClient.GetSwapQuote(ctx, payments.GetSwapQuoteParams{
-		FromChain: fromChain,
-		ToChain:   toChain,
-		FromToken: fromToken,
-		ToToken:   toToken,
-		AmountIn:  amountIn,
-	})
-}
-
-// ExecuteSwap triggers a swap transaction from the customer WaaS wallet.
-func (s *WalletService) ExecuteSwap(ctx context.Context, userID uuid.UUID, fromChain, toChain, fromToken, toToken, amountIn, amountOutMin string) (*payments.ExecuteSwapResponse, error) {
-	customerID := userID.String()
-	return s.paymentsClient.ExecuteSwap(ctx, customerID, payments.ExecuteSwapRequest{
-		FromChain:    fromChain,
-		ToChain:      toChain,
-		FromToken:    fromToken,
-		ToToken:      toToken,
-		AmountIn:     amountIn,
-		AmountOutMin: amountOutMin,
-	})
-}
-
-// GetSwapHistory returns a customer's swap transaction history logs.
-func (s *WalletService) GetSwapHistory(ctx context.Context, userID uuid.UUID, page, limit int) (*payments.GetSwapHistoryResponse, error) {
-	customerID := userID.String()
-	return s.paymentsClient.GetSwapHistory(ctx, customerID, payments.GetSwapHistoryParams{
-		Page:  page,
-		Limit: limit,
-	})
-}
-
 // GetWaasWallet retrieves a user's derived wallet details from the local DB.
 func (s *WalletService) GetWaasWallet(ctx context.Context, id, userID uuid.UUID) (db.WaasWallet, error) {
 	q := db.New(s.pool)

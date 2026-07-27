@@ -11,6 +11,7 @@ import (
 	"github.com/rachfinance/digitalfx/internal/clients/hub2"
 	"github.com/rachfinance/digitalfx/internal/clients/metamap"
 	"github.com/rachfinance/digitalfx/internal/clients/nilos"
+	"github.com/rachfinance/digitalfx/internal/clients/nomba"
 	"github.com/rachfinance/digitalfx/internal/clients/payments"
 	"github.com/rachfinance/digitalfx/internal/clients/sumsub"
 	"github.com/rachfinance/digitalfx/internal/config"
@@ -24,8 +25,9 @@ type Services struct {
 	Auth           *AuthService
 	Account        *AccountService
 	Wallet         *WalletService
-	CaaS           *CaaSService // Instant USD (iUSD) — EIP-4337 SCW rail
+	CaaS           *CaaSService // Stablecoin (USDC) — EIP-4337 SCW rail
 	KYC            *KYCService
+	Nomba          *NombaService // Nigerian NGN rails (virtual accounts + payouts)
 	HUB2           *HUB2Service
 	Dashboard      *DashboardService
 	Notifications  *NotificationService
@@ -60,6 +62,7 @@ func New(
 	smsClient *sms.Client,
 	metamapClient *metamap.Client,
 	nilosClient *nilos.Client,
+	nombaClient *nomba.Client,
 	cfg *config.Config,
 	logger *zap.Logger,
 ) *Services {
@@ -80,7 +83,7 @@ func New(
 	notif := NewNotificationService(pool, fcm, logger)
 	hub2Svc := NewHUB2Service(pool, hub2Client, caasClient, logger)
 	limitsSvc := NewLimitsService(pool, DefaultLimitsResolver(), logger)
-	withdrawalSvc := NewWithdrawalService(pool, hub2Client, nilosClient, notif, limitsSvc, logger)
+	withdrawalSvc := NewWithdrawalService(pool, hub2Client, nilosClient, nombaClient, notif, limitsSvc, logger)
 	hub2Svc.SetWithdrawalService(withdrawalSvc)
 
 	// KYC provider is selected via KYC_PROVIDER ("metamap" default | "sumsub").
@@ -95,7 +98,8 @@ func New(
 		Account:        NewAccountService(pool, logger),
 		Wallet:         NewWalletService(pool, paymentsClient, hub2Client, logger),
 		CaaS:           NewCaaSService(pool, caasClient, hub2Client, logger),
-		KYC:            NewKYCService(pool, cfg, logger, kycProvider, emailClient, notif, nilosClient),
+		KYC:            NewKYCService(pool, cfg, logger, kycProvider, emailClient, notif, nilosClient, nombaClient),
+		Nomba:          NewNombaService(pool, nombaClient, notif, cfg.Nomba.WebhookSecret, logger),
 		HUB2:           hub2Svc,
 		Dashboard:      NewDashboardService(pool, nilosClient, paymentsClient, caasClient, logger),
 		Notifications:  notif,

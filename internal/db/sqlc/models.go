@@ -13,21 +13,26 @@ import (
 )
 
 type Account struct {
-	ID               uuid.UUID      `json:"id"`
-	UserID           uuid.UUID      `json:"user_id"`
-	Currency         string         `json:"currency"`
-	Balance          pgtype.Numeric `json:"balance"`
-	AvailableBalance pgtype.Numeric `json:"available_balance"`
-	AccountNumber    string         `json:"account_number"`
-	Status           string         `json:"status"`
-	CreatedAt        time.Time      `json:"created_at"`
-	UpdatedAt        time.Time      `json:"updated_at"`
-	NilosAccountID   *string        `json:"nilos_account_id"`
-	NilosCustomerID  *string        `json:"nilos_customer_id"`
-	Iban             *string        `json:"iban"`
-	Bic              *string        `json:"bic"`
-	SortCode         *string        `json:"sort_code"`
-	AccountNumberUk  *string        `json:"account_number_uk"`
+	ID                     uuid.UUID      `json:"id"`
+	UserID                 uuid.UUID      `json:"user_id"`
+	Currency               string         `json:"currency"`
+	Balance                pgtype.Numeric `json:"balance"`
+	AvailableBalance       pgtype.Numeric `json:"available_balance"`
+	AccountNumber          string         `json:"account_number"`
+	Status                 string         `json:"status"`
+	CreatedAt              time.Time      `json:"created_at"`
+	UpdatedAt              time.Time      `json:"updated_at"`
+	NilosAccountID         *string        `json:"nilos_account_id"`
+	NilosCustomerID        *string        `json:"nilos_customer_id"`
+	Iban                   *string        `json:"iban"`
+	Bic                    *string        `json:"bic"`
+	SortCode               *string        `json:"sort_code"`
+	AccountNumberUk        *string        `json:"account_number_uk"`
+	NombaAccountRef        *string        `json:"nomba_account_ref"`
+	NombaAccountHolderID   *string        `json:"nomba_account_holder_id"`
+	NombaBankName          *string        `json:"nomba_bank_name"`
+	NombaBankAccountNumber *string        `json:"nomba_bank_account_number"`
+	NombaBankAccountName   *string        `json:"nomba_bank_account_name"`
 }
 
 type AdminAuditLog struct {
@@ -176,6 +181,10 @@ type CryptoTransaction struct {
 	LocalCurrency   *string    `json:"local_currency"`
 }
 
+// NOTE: CurrencyRate is intentionally in the hand-written currency_rates.sql.go
+// (float64 via ::float8), not here. sqlc re-adds a conflicting pgtype.Numeric
+// version on every generate — delete it after each `sqlc generate`.
+
 type DeviceToken struct {
 	ID        uuid.UUID `json:"id"`
 	UserID    uuid.UUID `json:"user_id"`
@@ -291,6 +300,33 @@ type KycDocument struct {
 	RejectionReason *string   `json:"rejection_reason"`
 	CreatedAt       time.Time `json:"created_at"`
 	UpdatedAt       time.Time `json:"updated_at"`
+}
+
+type KycIntake struct {
+	UserID           uuid.UUID  `json:"user_id"`
+	AccountType      string     `json:"account_type"`
+	LegalFirstName   *string    `json:"legal_first_name"`
+	LegalLastName    *string    `json:"legal_last_name"`
+	DateOfBirth      *string    `json:"date_of_birth"`
+	Nationality      *string    `json:"nationality"`
+	Bvn              *string    `json:"bvn"`
+	AddressLine1     *string    `json:"address_line1"`
+	AddressLine2     *string    `json:"address_line2"`
+	City             *string    `json:"city"`
+	State            *string    `json:"state"`
+	PostalCode       *string    `json:"postal_code"`
+	Country          *string    `json:"country"`
+	Occupation       *string    `json:"occupation"`
+	SourceOfFunds    *string    `json:"source_of_funds"`
+	PurposeOfAccount *string    `json:"purpose_of_account"`
+	Status           string     `json:"status"`
+	SubmittedAt      *time.Time `json:"submitted_at"`
+	CreatedAt        time.Time  `json:"created_at"`
+	UpdatedAt        time.Time  `json:"updated_at"`
+	IsImporter       *bool      `json:"is_importer"`
+	Counterparties   []byte     `json:"counterparties"`
+	ContactEmail     *string    `json:"contact_email"`
+	ContactPhone     *string    `json:"contact_phone"`
 }
 
 type MerchantStaff struct {

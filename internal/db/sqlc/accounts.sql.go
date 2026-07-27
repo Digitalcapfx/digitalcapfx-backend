@@ -15,7 +15,7 @@ import (
 const createAccount = `-- name: CreateAccount :one
 INSERT INTO accounts (user_id, currency, account_number)
 VALUES ($1, $2, $3)
-RETURNING id, user_id, currency, balance, available_balance, account_number, status, created_at, updated_at, nilos_account_id, nilos_customer_id, iban, bic, sort_code, account_number_uk
+RETURNING id, user_id, currency, balance, available_balance, account_number, status, created_at, updated_at, nilos_account_id, nilos_customer_id, iban, bic, sort_code, account_number_uk, nomba_account_ref, nomba_account_holder_id, nomba_bank_name, nomba_bank_account_number, nomba_bank_account_name
 `
 
 type CreateAccountParams struct {
@@ -43,6 +43,11 @@ func (q *Queries) CreateAccount(ctx context.Context, arg CreateAccountParams) (A
 		&i.Bic,
 		&i.SortCode,
 		&i.AccountNumberUk,
+		&i.NombaAccountRef,
+		&i.NombaAccountHolderID,
+		&i.NombaBankName,
+		&i.NombaBankAccountNumber,
+		&i.NombaBankAccountName,
 	)
 	return i, err
 }
@@ -53,7 +58,7 @@ SET balance           = balance + $2,
     available_balance = available_balance + $2,
     updated_at        = NOW()
 WHERE id = $1
-RETURNING id, user_id, currency, balance, available_balance, account_number, status, created_at, updated_at, nilos_account_id, nilos_customer_id, iban, bic, sort_code, account_number_uk
+RETURNING id, user_id, currency, balance, available_balance, account_number, status, created_at, updated_at, nilos_account_id, nilos_customer_id, iban, bic, sort_code, account_number_uk, nomba_account_ref, nomba_account_holder_id, nomba_bank_name, nomba_bank_account_number, nomba_bank_account_name
 `
 
 type CreditAccountParams struct {
@@ -80,6 +85,11 @@ func (q *Queries) CreditAccount(ctx context.Context, arg CreditAccountParams) (A
 		&i.Bic,
 		&i.SortCode,
 		&i.AccountNumberUk,
+		&i.NombaAccountRef,
+		&i.NombaAccountHolderID,
+		&i.NombaBankName,
+		&i.NombaBankAccountNumber,
+		&i.NombaBankAccountName,
 	)
 	return i, err
 }
@@ -90,7 +100,7 @@ SET balance           = balance - $2,
     available_balance = available_balance - $2,
     updated_at        = NOW()
 WHERE id = $1 AND available_balance >= $2
-RETURNING id, user_id, currency, balance, available_balance, account_number, status, created_at, updated_at, nilos_account_id, nilos_customer_id, iban, bic, sort_code, account_number_uk
+RETURNING id, user_id, currency, balance, available_balance, account_number, status, created_at, updated_at, nilos_account_id, nilos_customer_id, iban, bic, sort_code, account_number_uk, nomba_account_ref, nomba_account_holder_id, nomba_bank_name, nomba_bank_account_number, nomba_bank_account_name
 `
 
 type DebitAccountParams struct {
@@ -117,6 +127,11 @@ func (q *Queries) DebitAccount(ctx context.Context, arg DebitAccountParams) (Acc
 		&i.Bic,
 		&i.SortCode,
 		&i.AccountNumberUk,
+		&i.NombaAccountRef,
+		&i.NombaAccountHolderID,
+		&i.NombaBankName,
+		&i.NombaBankAccountNumber,
+		&i.NombaBankAccountName,
 	)
 	return i, err
 }
@@ -133,7 +148,7 @@ func (q *Queries) FreezeAccount(ctx context.Context, id uuid.UUID) error {
 }
 
 const getAccountByID = `-- name: GetAccountByID :one
-SELECT id, user_id, currency, balance, available_balance, account_number, status, created_at, updated_at, nilos_account_id, nilos_customer_id, iban, bic, sort_code, account_number_uk FROM accounts WHERE id = $1 LIMIT 1
+SELECT id, user_id, currency, balance, available_balance, account_number, status, created_at, updated_at, nilos_account_id, nilos_customer_id, iban, bic, sort_code, account_number_uk, nomba_account_ref, nomba_account_holder_id, nomba_bank_name, nomba_bank_account_number, nomba_bank_account_name FROM accounts WHERE id = $1 LIMIT 1
 `
 
 func (q *Queries) GetAccountByID(ctx context.Context, id uuid.UUID) (Account, error) {
@@ -155,12 +170,51 @@ func (q *Queries) GetAccountByID(ctx context.Context, id uuid.UUID) (Account, er
 		&i.Bic,
 		&i.SortCode,
 		&i.AccountNumberUk,
+		&i.NombaAccountRef,
+		&i.NombaAccountHolderID,
+		&i.NombaBankName,
+		&i.NombaBankAccountNumber,
+		&i.NombaBankAccountName,
+	)
+	return i, err
+}
+
+const getAccountByNombaAccountNumber = `-- name: GetAccountByNombaAccountNumber :one
+SELECT id, user_id, currency, balance, available_balance, account_number, status, created_at, updated_at, nilos_account_id, nilos_customer_id, iban, bic, sort_code, account_number_uk, nomba_account_ref, nomba_account_holder_id, nomba_bank_name, nomba_bank_account_number, nomba_bank_account_name FROM accounts
+WHERE nomba_bank_account_number = $1
+LIMIT 1
+`
+
+func (q *Queries) GetAccountByNombaAccountNumber(ctx context.Context, nombaBankAccountNumber *string) (Account, error) {
+	row := q.db.QueryRow(ctx, getAccountByNombaAccountNumber, nombaBankAccountNumber)
+	var i Account
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.Currency,
+		&i.Balance,
+		&i.AvailableBalance,
+		&i.AccountNumber,
+		&i.Status,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.NilosAccountID,
+		&i.NilosCustomerID,
+		&i.Iban,
+		&i.Bic,
+		&i.SortCode,
+		&i.AccountNumberUk,
+		&i.NombaAccountRef,
+		&i.NombaAccountHolderID,
+		&i.NombaBankName,
+		&i.NombaBankAccountNumber,
+		&i.NombaBankAccountName,
 	)
 	return i, err
 }
 
 const getAccountByUserAndCurrency = `-- name: GetAccountByUserAndCurrency :one
-SELECT id, user_id, currency, balance, available_balance, account_number, status, created_at, updated_at, nilos_account_id, nilos_customer_id, iban, bic, sort_code, account_number_uk FROM accounts
+SELECT id, user_id, currency, balance, available_balance, account_number, status, created_at, updated_at, nilos_account_id, nilos_customer_id, iban, bic, sort_code, account_number_uk, nomba_account_ref, nomba_account_holder_id, nomba_bank_name, nomba_bank_account_number, nomba_bank_account_name FROM accounts
 WHERE user_id = $1 AND currency = $2
 LIMIT 1
 `
@@ -189,12 +243,17 @@ func (q *Queries) GetAccountByUserAndCurrency(ctx context.Context, arg GetAccoun
 		&i.Bic,
 		&i.SortCode,
 		&i.AccountNumberUk,
+		&i.NombaAccountRef,
+		&i.NombaAccountHolderID,
+		&i.NombaBankName,
+		&i.NombaBankAccountNumber,
+		&i.NombaBankAccountName,
 	)
 	return i, err
 }
 
 const getAccountForUpdate = `-- name: GetAccountForUpdate :one
-SELECT id, user_id, currency, balance, available_balance, account_number, status, created_at, updated_at, nilos_account_id, nilos_customer_id, iban, bic, sort_code, account_number_uk FROM accounts
+SELECT id, user_id, currency, balance, available_balance, account_number, status, created_at, updated_at, nilos_account_id, nilos_customer_id, iban, bic, sort_code, account_number_uk, nomba_account_ref, nomba_account_holder_id, nomba_bank_name, nomba_bank_account_number, nomba_bank_account_name FROM accounts
 WHERE id = $1
 LIMIT 1
 FOR UPDATE
@@ -219,12 +278,17 @@ func (q *Queries) GetAccountForUpdate(ctx context.Context, id uuid.UUID) (Accoun
 		&i.Bic,
 		&i.SortCode,
 		&i.AccountNumberUk,
+		&i.NombaAccountRef,
+		&i.NombaAccountHolderID,
+		&i.NombaBankName,
+		&i.NombaBankAccountNumber,
+		&i.NombaBankAccountName,
 	)
 	return i, err
 }
 
 const getAccountsByUserID = `-- name: GetAccountsByUserID :many
-SELECT id, user_id, currency, balance, available_balance, account_number, status, created_at, updated_at, nilos_account_id, nilos_customer_id, iban, bic, sort_code, account_number_uk FROM accounts
+SELECT id, user_id, currency, balance, available_balance, account_number, status, created_at, updated_at, nilos_account_id, nilos_customer_id, iban, bic, sort_code, account_number_uk, nomba_account_ref, nomba_account_holder_id, nomba_bank_name, nomba_bank_account_number, nomba_bank_account_name FROM accounts
 WHERE user_id = $1
 ORDER BY currency
 `
@@ -254,6 +318,11 @@ func (q *Queries) GetAccountsByUserID(ctx context.Context, userID uuid.UUID) ([]
 			&i.Bic,
 			&i.SortCode,
 			&i.AccountNumberUk,
+			&i.NombaAccountRef,
+			&i.NombaAccountHolderID,
+			&i.NombaBankName,
+			&i.NombaBankAccountNumber,
+			&i.NombaBankAccountName,
 		); err != nil {
 			return nil, err
 		}
@@ -293,6 +362,38 @@ func (q *Queries) UpdateNilosAccountDetails(ctx context.Context, arg UpdateNilos
 		arg.Bic,
 		arg.SortCode,
 		arg.AccountNumberUk,
+	)
+	return err
+}
+
+const updateNombaAccountDetails = `-- name: UpdateNombaAccountDetails :exec
+UPDATE accounts
+SET nomba_account_ref         = $2,
+    nomba_account_holder_id   = $3,
+    nomba_bank_name           = $4,
+    nomba_bank_account_number = $5,
+    nomba_bank_account_name   = $6,
+    updated_at                = NOW()
+WHERE id = $1
+`
+
+type UpdateNombaAccountDetailsParams struct {
+	ID                     uuid.UUID `json:"id"`
+	NombaAccountRef        *string   `json:"nomba_account_ref"`
+	NombaAccountHolderID   *string   `json:"nomba_account_holder_id"`
+	NombaBankName          *string   `json:"nomba_bank_name"`
+	NombaBankAccountNumber *string   `json:"nomba_bank_account_number"`
+	NombaBankAccountName   *string   `json:"nomba_bank_account_name"`
+}
+
+func (q *Queries) UpdateNombaAccountDetails(ctx context.Context, arg UpdateNombaAccountDetailsParams) error {
+	_, err := q.db.Exec(ctx, updateNombaAccountDetails,
+		arg.ID,
+		arg.NombaAccountRef,
+		arg.NombaAccountHolderID,
+		arg.NombaBankName,
+		arg.NombaBankAccountNumber,
+		arg.NombaBankAccountName,
 	)
 	return err
 }

@@ -168,132 +168,6 @@ func (h *WalletHandler) InitiateDeposit(w http.ResponseWriter, r *http.Request) 
 	response.Created(w, map[string]string{"hub2_reference": ref})
 }
 
-// GetSwapQuote godoc
-//
-//	@Summary      Get a WaaS token swap quote
-//	@Description  Returns a rate quote for swapping tokens across chains using WaaS swap.
-//	@Tags         WaaS - Crypto Wallets
-//	@Produce      json
-//	@Security     BearerAuth
-//	@Param        from_chain  query     string  true  "Source chain"
-//	@Param        to_chain    query     string  true  "Destination chain"
-//	@Param        from_token  query     string  true  "Source token"
-//	@Param        to_token    query     string  true  "Destination token"
-//	@Param        amount_in   query     string  true  "Amount in base units"
-//	@Success      200         {object}  payments.SwapQuoteResponse
-//	@Failure      400         {object}  ErrorResponse
-//	@Failure      401         {object}  ErrorResponse
-//	@Failure      500         {object}  ErrorResponse
-//	@Router       /wallets/swap/quote [get]
-func (h *WalletHandler) GetSwapQuote(w http.ResponseWriter, r *http.Request) {
-	fromChain := r.URL.Query().Get("from_chain")
-	toChain := r.URL.Query().Get("to_chain")
-	fromToken := r.URL.Query().Get("from_token")
-	toToken := r.URL.Query().Get("to_token")
-	amountIn := r.URL.Query().Get("amount_in")
-
-	if fromChain == "" || toChain == "" || fromToken == "" || toToken == "" || amountIn == "" {
-		response.BadRequest(w, "VALIDATION_ERROR", "from_chain, to_chain, from_token, to_token, and amount_in are required")
-		return
-	}
-
-	quote, err := h.svc.Wallet.GetSwapQuote(r.Context(), fromChain, toChain, fromToken, toToken, amountIn)
-	if err != nil {
-		response.InternalError(w)
-		return
-	}
-
-	response.OK(w, quote)
-}
-
-// ExecuteSwapRequest is the incoming payload for ExecuteSwap
-type ExecuteSwapRequest struct {
-	FromChain    string `json:"from_chain"`
-	ToChain      string `json:"to_chain"`
-	FromToken    string `json:"from_token"`
-	ToToken      string `json:"to_token"`
-	AmountIn     string `json:"amount_in"`
-	AmountOutMin string `json:"amount_out_min"`
-}
-
-// ExecuteSwap godoc
-//
-//	@Summary      Execute a WaaS token swap
-//	@Description  Broadcasts a swap transaction from the caller's WaaS wallet using a previously quoted route.
-//	@Tags         WaaS - Crypto Wallets
-//	@Accept       json
-//	@Produce      json
-//	@Security     BearerAuth
-//	@Param        body  body      ExecuteSwapRequest  true  "Swap details"
-//	@Success      201   {object}  payments.ExecuteSwapResponse
-//	@Failure      400   {object}  ErrorResponse
-//	@Failure      401   {object}  ErrorResponse
-//	@Failure      500   {object}  ErrorResponse
-//	@Router       /wallets/swap/execute [post]
-func (h *WalletHandler) ExecuteSwap(w http.ResponseWriter, r *http.Request) {
-	userID, ok := middleware.UserIDFromContext(r.Context())
-	if !ok {
-		response.Unauthorized(w, "unauthorized")
-		return
-	}
-
-	var body ExecuteSwapRequest
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		response.BadRequest(w, "VALIDATION_ERROR", "invalid request body")
-		return
-	}
-	if body.FromChain == "" || body.ToChain == "" || body.FromToken == "" || body.ToToken == "" || body.AmountIn == "" {
-		response.BadRequest(w, "VALIDATION_ERROR", "from_chain, to_chain, from_token, to_token, and amount_in are required")
-		return
-	}
-
-	result, err := h.svc.Wallet.ExecuteSwap(r.Context(), userID, body.FromChain, body.ToChain, body.FromToken, body.ToToken, body.AmountIn, body.AmountOutMin)
-	if err != nil {
-		response.InternalError(w)
-		return
-	}
-
-	response.Created(w, result)
-}
-
-// GetSwapHistory godoc
-//
-//	@Summary      Get WaaS swap history
-//	@Description  Returns the caller's paginated swap transaction history.
-//	@Tags         WaaS - Crypto Wallets
-//	@Produce      json
-//	@Security     BearerAuth
-//	@Param        page   query     int  false  "Page number (default 1)"
-//	@Param        limit  query     int  false  "Results per page (default 20)"
-//	@Success      200    {object}  payments.GetSwapHistoryResponse
-//	@Failure      401    {object}  ErrorResponse
-//	@Failure      500    {object}  ErrorResponse
-//	@Router       /wallets/swap/history [get]
-func (h *WalletHandler) GetSwapHistory(w http.ResponseWriter, r *http.Request) {
-	userID, ok := middleware.UserIDFromContext(r.Context())
-	if !ok {
-		response.Unauthorized(w, "unauthorized")
-		return
-	}
-
-	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
-	if page < 1 {
-		page = 1
-	}
-	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
-	if limit < 1 || limit > 100 {
-		limit = 20
-	}
-
-	history, err := h.svc.Wallet.GetSwapHistory(r.Context(), userID, page, limit)
-	if err != nil {
-		response.InternalError(w)
-		return
-	}
-
-	response.OK(w, history)
-}
-
 // InitiateWithdrawal godoc
 //
 //	@Summary      Initiate Mobile Money withdrawal
@@ -355,7 +229,7 @@ type TransferCryptoRequest struct {
 // TransferCrypto godoc
 //
 //	@Summary      Send crypto on-chain (WaaS)
-//	@Description  Broadcasts an on-chain transfer of a native coin or on-chain token from the caller's Rach WaaS HD wallet to an external address. Amount is in the SMALLEST on-chain unit (wei / satoshi / lamport / sun / drop). Currency is the coin/token symbol (POL, ETH, BNB, USDT, USDC, …). This is the WaaS rail — distinct from CaaS iUSD Phone Send.
+//	@Description  Broadcasts an on-chain transfer of a native coin or on-chain token from the caller's Rach WaaS HD wallet to an external address. Amount is in the SMALLEST on-chain unit (wei / satoshi / lamport / sun / drop). Currency is the coin/token symbol (POL, ETH, BNB, USDT, USDC, …). This is the WaaS rail — distinct from CaaS USDC Phone Send.
 //	@Tags         WaaS - Crypto Wallets
 //	@Accept       json
 //	@Produce      json
@@ -419,7 +293,7 @@ func (h *WalletHandler) ListAddresses(w http.ResponseWriter, r *http.Request) {
 // GetWaasTransactions godoc
 //
 //	@Summary      WaaS on-chain transactions
-//	@Description  Returns the caller's on-chain transaction history from Rach WaaS, filterable by network, currency and status. This is real blockchain history, distinct from the CaaS iUSD ledger.
+//	@Description  Returns the caller's on-chain transaction history from Rach WaaS, filterable by network, currency and status. This is real blockchain history, distinct from the CaaS USDC ledger.
 //	@Tags         WaaS - Crypto Wallets
 //	@Produce      json
 //	@Security     BearerAuth

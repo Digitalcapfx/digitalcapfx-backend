@@ -2670,14 +2670,14 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Returns the caller's Instant USD (iUSD) balance from Rach CaaS. iUSD settles on-chain as USDC inside the EIP-4337 Smart Contract Wallet, but is always shown to the customer as iUSD. This is separate from any USDT/USDC held in the Rach WaaS crypto wallets.",
+                "description": "Returns the caller's Stablecoin (USDC) balance from Rach CaaS. It settles on-chain as USDC inside the EIP-4337 Smart Contract Wallet. This is separate from any USDT/USDC held in the Rach WaaS crypto wallets.",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
-                    "CaaS - Instant USD (iUSD)"
+                    "CaaS - Stablecoin (USDC)"
                 ],
-                "summary": "Get iUSD balance",
+                "summary": "Get USDC balance",
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -2738,7 +2738,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Funds the customer's Instant USD (iUSD) account. Initiates a HUB2 Mobile Money collection: the customer receives a push-to-pay prompt on their phone. After they approve, HUB2 fires a webhook which triggers Rach CaaS to convert the XOF/XAF to on-chain USDC and credit the customer's EIP-4337 Smart Contract Wallet — reflected to the customer as iUSD. Poll GET /crypto/balances for the updated iUSD balance once CaaS confirms the fiat and completes the conversion.",
+                "description": "Funds the customer's Stablecoin (USDC) account. Initiates a HUB2 Mobile Money collection: the customer receives a push-to-pay prompt on their phone. After they approve, HUB2 fires a webhook which triggers Rach CaaS to convert the XOF/XAF to on-chain USDC and credit the customer's EIP-4337 Smart Contract Wallet — reflected to the customer as USDC. Poll GET /crypto/balances for the updated USDC balance once CaaS confirms the fiat and completes the conversion.",
                 "consumes": [
                     "application/json"
                 ],
@@ -2746,9 +2746,9 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "CaaS - Instant USD (iUSD)"
+                    "CaaS - Stablecoin (USDC)"
                 ],
-                "summary": "Fund iUSD account via Mobile Money",
+                "summary": "Fund USDC account via Mobile Money",
                 "parameters": [
                     {
                         "description": "Funding request",
@@ -2795,7 +2795,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Transfers Instant USD (iUSD) from the caller to another DigitalFX user identified by phone number, via Rach CaaS (settles on-chain as USDC between the two EIP-4337 wallets). Amount is USD-equivalent decimal (e.g. \"50.00\"). Note: the ` + "`" + `token` + "`" + ` field selects the on-chain settlement asset (USDC/USDT) but the customer-facing unit is iUSD. This is the CaaS P2P rail, distinct from WaaS on-chain crypto transfers.",
+                "description": "Transfers Stablecoin (USDC) from the caller to another DigitalFX user identified by phone number, via Rach CaaS (settles on-chain as USDC between the two EIP-4337 wallets). Amount is USD-equivalent decimal (e.g. \"50.00\"). Note: the ` + "`" + `token` + "`" + ` field selects the on-chain settlement asset (USDC/USDT) but the customer-facing unit is USDC. This is the CaaS P2P rail, distinct from WaaS on-chain crypto transfers.",
                 "consumes": [
                     "application/json"
                 ],
@@ -2803,9 +2803,9 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "CaaS - Instant USD (iUSD)"
+                    "CaaS - Stablecoin (USDC)"
                 ],
-                "summary": "Send iUSD to another user (Phone Send)",
+                "summary": "Send USDC to another user (Phone Send)",
                 "parameters": [
                     {
                         "description": "Transfer details",
@@ -2852,14 +2852,14 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Returns a paginated list of the user's Instant USD (iUSD / CaaS) transactions — funding, Phone Send transfers, and off-ramp withdrawals. These are CaaS-rail movements, not WaaS on-chain crypto history (see /wallets/crypto/{network}/transactions for that).",
+                "description": "Returns a paginated list of the user's Stablecoin (USDC / CaaS) transactions — funding, Phone Send transfers, and off-ramp withdrawals. These are CaaS-rail movements, not WaaS on-chain crypto history (see /wallets/crypto/{network}/transactions for that).",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
-                    "CaaS - Instant USD (iUSD)"
+                    "CaaS - Stablecoin (USDC)"
                 ],
-                "summary": "List iUSD (CaaS) transactions",
+                "summary": "List USDC (CaaS) transactions",
                 "parameters": [
                     {
                         "type": "integer",
@@ -2903,14 +2903,14 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Returns a single Instant USD (iUSD / CaaS) transaction by its UUID.",
+                "description": "Returns a single Stablecoin (USDC / CaaS) transaction by its UUID.",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
-                    "CaaS - Instant USD (iUSD)"
+                    "CaaS - Stablecoin (USDC)"
                 ],
-                "summary": "Get an iUSD (CaaS) transaction",
+                "summary": "Get an USDC (CaaS) transaction",
                 "parameters": [
                     {
                         "type": "string",
@@ -2955,14 +2955,14 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Returns the caller's Instant USD (iUSD) wallet — an EIP-4337 Smart Contract Wallet (SCW) provisioned on Rach CaaS, keyed by the user's phone number (provisioned on first call). This is the CaaS rail (instant dollars that settle on-chain as USDC), NOT the Rach WaaS HD crypto wallets. Customer-facing unit is always iUSD.",
+                "description": "Returns the caller's Stablecoin (USDC) wallet — an EIP-4337 Smart Contract Wallet (SCW) provisioned on Rach CaaS, keyed by the user's phone number (provisioned on first call). This is the CaaS rail (instant dollars that settle on-chain as USDC), NOT the Rach WaaS HD crypto wallets. Customer-facing unit is always USDC.",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
-                    "CaaS - Instant USD (iUSD)"
+                    "CaaS - Stablecoin (USDC)"
                 ],
-                "summary": "Get or create the user's iUSD (CaaS) wallet",
+                "summary": "Get or create the user's USDC (CaaS) wallet",
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -2992,7 +2992,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Off-ramps Instant USD (iUSD) from the user's EIP-4337 Smart Contract Wallet back to fiat on their Mobile Money number, via Rach CaaS (settles the on-chain USDC and pays out local currency). The ` + "`" + `token` + "`" + ` field is the on-chain settlement asset; the customer balance is iUSD.",
+                "description": "Off-ramps Stablecoin (USDC) from the user's EIP-4337 Smart Contract Wallet back to fiat on their Mobile Money number, via Rach CaaS (settles the on-chain USDC and pays out local currency). The ` + "`" + `token` + "`" + ` field is the on-chain settlement asset; the customer balance is USDC.",
                 "consumes": [
                     "application/json"
                 ],
@@ -3000,9 +3000,9 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "CaaS - Instant USD (iUSD)"
+                    "CaaS - Stablecoin (USDC)"
                 ],
-                "summary": "Withdraw iUSD to Mobile Money (off-ramp)",
+                "summary": "Withdraw USDC to Mobile Money (off-ramp)",
                 "parameters": [
                     {
                         "description": "Withdrawal details",
@@ -3383,7 +3383,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Records a KYC document for manual review. The doc_url should be a GCS signed URL or object path obtained from the client-side upload flow.",
+                "description": "Records a KYC/KYB document for review. ` + "`" + `doc_url` + "`" + ` is a GCS signed URL or object path from the client-side upload flow. ` + "`" + `doc_type` + "`" + ` is one of the enumerated kinds — for business accounts these are the Nilos merchant-onboarding documents (Certificate of Incorporation, Director/Shareholder registers, MEMART, proof of company address/activity, business bank statement, plus importer \u0026 UBO/director items). Call GET /kyc/requirements first: its ` + "`" + `documents[]` + "`" + ` tells you exactly which doc_types apply to this account and whether each is required.",
                 "consumes": [
                     "application/json"
                 ],
@@ -3440,19 +3440,19 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Creates or resumes a KYC session (e.g. for Sumsub). The returned token is used with the provider SDK.",
+                "description": "Creates or resumes a KYC verification session for the authenticated user with the configured provider (Sumsub, level ` + "`" + `id-and-liveness` + "`" + `). Returns a short-lived ` + "`" + `token` + "`" + ` (~30 min) to hand to the Sumsub Web/Mobile SDK to launch the ID + liveness flow, plus the ` + "`" + `flow` + "`" + ` (level) name. The final result is delivered asynchronously to ` + "`" + `POST /webhooks/kyc` + "`" + ` and, unless an admin overrides, applied automatically.",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
                     "kyc"
                 ],
-                "summary": "Start or Resume KYC verification",
+                "summary": "Start or resume KYC verification",
                 "responses": {
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/handlers.MetaMapInitResponse"
+                            "$ref": "#/definitions/handlers.KYCInitResponse"
                         }
                     },
                     "401": {
@@ -3463,6 +3463,57 @@ const docTemplate = `{
                     },
                     "500": {
                         "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/kyc/intake": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Submits the DigitalFX KYC intake fields (see GET /kyc/requirements). Validates the fields required for the user's account type, stores them, mirrors the BVN onto the account so the Naira (NGN) account can be provisioned, and marks the intake completed. After this succeeds, POST /kyc/init will return a Sumsub SDK token.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "kyc"
+                ],
+                "summary": "Submit KYC intake",
+                "parameters": [
+                    {
+                        "description": "Intake fields",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.SubmitIntakeRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.KYCIntakeResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
                         "schema": {
                             "$ref": "#/definitions/handlers.ErrorResponse"
                         }
@@ -3500,6 +3551,37 @@ const docTemplate = `{
                     },
                     "500": {
                         "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/kyc/requirements": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns everything DigitalFX collects on its own form BEFORE the Sumsub identity dialog is launched. For individuals this is identity + address fields (Nilos) plus BVN (Nomba, for the Naira account); ID + liveness are handled by Sumsub afterwards. For business (KYB) accounts it additionally returns the full Nilos merchant-onboarding ` + "`" + `documents` + "`" + ` checklist (Certificate of Incorporation, Director/Shareholder registers, MEMART, proof of address/activity, bank statement, plus importer \u0026 EUR/GBP-NRE conditional items) — upload each via POST /kyc/documents with the matching doc_type. ` + "`" + `completed` + "`" + ` indicates whether intake was already submitted. Only after POST /kyc/intake does POST /kyc/init return a Sumsub token.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "kyc"
+                ],
+                "summary": "Get KYC intake fields",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/services.IntakeRequirements"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
                         "schema": {
                             "$ref": "#/definitions/handlers.ErrorResponse"
                         }
@@ -3612,6 +3694,102 @@ const docTemplate = `{
                 "responses": {}
             }
         },
+        "/nomba/banks": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns the supported Nigerian bank codes and names. Use the ` + "`" + `code` + "`" + ` as ` + "`" + `bank_code` + "`" + ` when resolving an account or initiating an NGN bank transfer/withdrawal. Cache client-side — the list rarely changes.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Fiat - NGN (Nomba)"
+                ],
+                "summary": "List Nigerian banks (Nomba)",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.NombaBanksResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "503": {
+                        "description": "Service Unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/nomba/resolve-account": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Name-enquiry against a Nigerian bank account — returns the account holder name so the sender can confirm the recipient BEFORE transferring. This is the account check used during an NGN transfer. Provide ` + "`" + `account_number` + "`" + ` (10 digits) and ` + "`" + `bank_code` + "`" + ` (from GET /nomba/banks).",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Fiat - NGN (Nomba)"
+                ],
+                "summary": "Resolve (check) a Nigerian bank account",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "10-digit account number",
+                        "name": "account_number",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Bank code from GET /nomba/banks",
+                        "name": "bank_code",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.NombaResolveAccountResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "503": {
+                        "description": "Service Unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/notifications": {
             "get": {
                 "security": [
@@ -3670,7 +3848,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Registers this device's Firebase Cloud Messaging (FCM) registration token so the authenticated user receives push notifications. This is the ONLY setup call the mobile app needs — the backend handles all sending automatically (project digitalcap-fx-501314, FCM v1 / HTTP API; no legacy server key required on the client).\n\n**When to call:** (1) right after a successful login, (2) on every app start, and (3) whenever Firebase issues a new token via onTokenRefresh. It is idempotent — it upserts by token, and if a token previously belonged to another user it is reassigned to the current user. No need to unregister the old token first on refresh.\n\n**platform:** one of ` + "`" + `ios` + "`" + `, ` + "`" + `android` + "`" + `, ` + "`" + `web` + "`" + ` (omitted → stored as ` + "`" + `unknown` + "`" + `).\n\n**What the device receives:** a standard FCM message = a ` + "`" + `notification` + "`" + ` block (` + "`" + `title` + "`" + `, ` + "`" + `body` + "`" + `) for the system tray PLUS a ` + "`" + `data` + "`" + ` map for in-app routing. ` + "`" + `data` + "`" + ` ALWAYS contains ` + "`" + `type` + "`" + ` (the event), and event-specific extra keys. Route/deep-link on ` + "`" + `data.type` + "`" + `. Known values: ` + "`" + `login_detected` + "`" + `, ` + "`" + `welcome` + "`" + `, ` + "`" + `kyc_submitted` + "`" + `, ` + "`" + `kyc_approved` + "`" + `, ` + "`" + `kyc_rejected` + "`" + `, ` + "`" + `transfer_sent` + "`" + `, ` + "`" + `transfer_received` + "`" + `, ` + "`" + `deposit_received` + "`" + `, ` + "`" + `deposit_confirmed` + "`" + `, ` + "`" + `withdrawal_processed` + "`" + `, ` + "`" + `crypto_sent` + "`" + `, ` + "`" + `crypto_received` + "`" + `, ` + "`" + `exchange_completed` + "`" + `, ` + "`" + `market_alert` + "`" + ` (extra: ` + "`" + `symbol` + "`" + `), ` + "`" + `test` + "`" + `. CaaS / Instant-USD credits arrive as ` + "`" + `type=deposit_confirmed` + "`" + ` with ` + "`" + `symbol=iUSD` + "`" + `, ` + "`" + `tx_hash` + "`" + `, ` + "`" + `reference` + "`" + `, ` + "`" + `source=caas` + "`" + `.\n\n**Token hygiene:** the server auto-prunes tokens that FCM reports as unregistered/invalid, so always re-register on token refresh to stay reachable. Call DELETE /notifications/devices on logout.",
+                "description": "Registers this device's Firebase Cloud Messaging (FCM) registration token so the authenticated user receives push notifications. This is the ONLY setup call the mobile app needs — the backend handles all sending automatically (project digitalcap-fx-501314, FCM v1 / HTTP API; no legacy server key required on the client).\n\n**When to call:** (1) right after a successful login, (2) on every app start, and (3) whenever Firebase issues a new token via onTokenRefresh. It is idempotent — it upserts by token, and if a token previously belonged to another user it is reassigned to the current user. No need to unregister the old token first on refresh.\n\n**platform:** one of ` + "`" + `ios` + "`" + `, ` + "`" + `android` + "`" + `, ` + "`" + `web` + "`" + ` (omitted → stored as ` + "`" + `unknown` + "`" + `).\n\n**What the device receives:** a standard FCM message = a ` + "`" + `notification` + "`" + ` block (` + "`" + `title` + "`" + `, ` + "`" + `body` + "`" + `) for the system tray PLUS a ` + "`" + `data` + "`" + ` map for in-app routing. ` + "`" + `data` + "`" + ` ALWAYS contains ` + "`" + `type` + "`" + ` (the event), and event-specific extra keys. Route/deep-link on ` + "`" + `data.type` + "`" + `. Known values: ` + "`" + `login_detected` + "`" + `, ` + "`" + `welcome` + "`" + `, ` + "`" + `kyc_submitted` + "`" + `, ` + "`" + `kyc_approved` + "`" + `, ` + "`" + `kyc_rejected` + "`" + `, ` + "`" + `transfer_sent` + "`" + `, ` + "`" + `transfer_received` + "`" + `, ` + "`" + `deposit_received` + "`" + `, ` + "`" + `deposit_confirmed` + "`" + `, ` + "`" + `withdrawal_processed` + "`" + `, ` + "`" + `crypto_sent` + "`" + `, ` + "`" + `crypto_received` + "`" + `, ` + "`" + `exchange_completed` + "`" + `, ` + "`" + `market_alert` + "`" + ` (extra: ` + "`" + `symbol` + "`" + `), ` + "`" + `test` + "`" + `. CaaS stablecoin credits arrive as ` + "`" + `type=deposit_confirmed` + "`" + ` with ` + "`" + `symbol=USDC` + "`" + `, ` + "`" + `tx_hash` + "`" + `, ` + "`" + `reference` + "`" + `, ` + "`" + `source=caas` + "`" + `.\n\n**Token hygiene:** the server auto-prunes tokens that FCM reports as unregistered/invalid, so always re-register on token refresh to stay reachable. Call DELETE /notifications/devices on logout.",
                 "consumes": [
                     "application/json"
                 ],
@@ -5841,7 +6019,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Returns the Rach WaaS wallet for a network: ` + "`" + `wallet` + "`" + ` is the native coin (e.g. POL) and ` + "`" + `tokens[]` + "`" + ` lists the on-chain stablecoins (USDT/USDC/…) held on that SAME address — so opening the Polygon wallet returns POL plus its USDT/USDC together. Each item carries ` + "`" + `provider:\"waas\"` + "`" + `. Balances are fetched live from the Payments API. Distinct from CaaS iUSD (see /crypto/*).",
+                "description": "Returns the Rach WaaS wallet for a network: ` + "`" + `wallet` + "`" + ` is the native coin (e.g. POL) and ` + "`" + `tokens[]` + "`" + ` lists the on-chain stablecoins (USDT/USDC/…) held on that SAME address — so opening the Polygon wallet returns POL plus its USDT/USDC together. Each item carries ` + "`" + `provider:\"waas\"` + "`" + `. Balances are fetched live from the Payments API. Distinct from CaaS USDC (see /crypto/*).",
                 "produces": [
                     "application/json"
                 ],
@@ -6237,7 +6415,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Combined view across ALL rails: the Phone Send card (iUSD balance + recent contacts) plus the unified wallet list — fiat (Nilos/HUB2), CaaS iUSD, and WaaS crypto + on-chain stablecoins. Every item carries a ` + "`" + `provider` + "`" + ` field (caas|waas|hub2|nilos). Filter with ?type=fiat|stablecoin|crypto.",
+                "description": "Combined view across ALL rails: the Phone Send card (USDC balance + recent contacts) plus the unified wallet list — fiat (Nilos/HUB2), CaaS USDC, and WaaS crypto + on-chain stablecoins. Every item carries a ` + "`" + `provider` + "`" + ` field (caas|waas|hub2|nilos). Filter with ?type=fiat|stablecoin|crypto.",
                 "produces": [
                     "application/json"
                 ],
@@ -6319,14 +6497,14 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Returns the wallet header for the CaaS Instant USD (iUSD) stablecoin. Balance is fetched live from Rach CaaS (settles on-chain as USDC, shown as iUSD). This is the CaaS rail; for WaaS on-chain USDT/USDC see /wallets/crypto/{network}.",
+                "description": "Returns the wallet header for the CaaS Stablecoin (USDC) stablecoin. Balance is fetched live from Rach CaaS (settles on-chain as USDC, shown as USDC). This is the CaaS rail; for WaaS on-chain USDT/USDC see /wallets/crypto/{network}.",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
-                    "CaaS - Instant USD (iUSD)"
+                    "CaaS - Stablecoin (USDC)"
                 ],
-                "summary": "iUSD wallet detail (CaaS stablecoin)",
+                "summary": "USDC wallet detail (CaaS stablecoin)",
                 "parameters": [
                     {
                         "type": "string",
@@ -6366,14 +6544,14 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Returns CaaS P2P send/receive history for the Instant USD (iUSD) wallet. Maps to the same data as GET /crypto/transactions.",
+                "description": "Returns CaaS P2P send/receive history for the Stablecoin (USDC) wallet. Maps to the same data as GET /crypto/transactions.",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
-                    "CaaS - Instant USD (iUSD)"
+                    "CaaS - Stablecoin (USDC)"
                 ],
-                "summary": "iUSD transaction history (CaaS)",
+                "summary": "USDC transaction history (CaaS)",
                 "parameters": [
                     {
                         "type": "string",
@@ -6419,7 +6597,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Returns all addable assets (WaaS crypto networks + CaaS iUSD) with has_wallet=true if the user has already provisioned that wallet, and a ` + "`" + `provider` + "`" + ` field (waas|caas). Used for the + Add flow.",
+                "description": "Returns all addable assets (WaaS crypto networks + CaaS USDC) with has_wallet=true if the user has already provisioned that wallet, and a ` + "`" + `provider` + "`" + ` field (waas|caas). Used for the + Add flow.",
                 "produces": [
                     "application/json"
                 ],
@@ -6447,194 +6625,6 @@ const docTemplate = `{
                 }
             }
         },
-        "/wallets/swap/execute": {
-            "post": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Broadcasts a swap transaction from the caller's WaaS wallet using a previously quoted route.",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "WaaS - Crypto Wallets"
-                ],
-                "summary": "Execute a WaaS token swap",
-                "parameters": [
-                    {
-                        "description": "Swap details",
-                        "name": "body",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/handlers.ExecuteSwapRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "201": {
-                        "description": "Created",
-                        "schema": {
-                            "$ref": "#/definitions/payments.ExecuteSwapResponse"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/handlers.ErrorResponse"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/handlers.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/handlers.ErrorResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/wallets/swap/history": {
-            "get": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Returns the caller's paginated swap transaction history.",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "WaaS - Crypto Wallets"
-                ],
-                "summary": "Get WaaS swap history",
-                "parameters": [
-                    {
-                        "type": "integer",
-                        "description": "Page number (default 1)",
-                        "name": "page",
-                        "in": "query"
-                    },
-                    {
-                        "type": "integer",
-                        "description": "Results per page (default 20)",
-                        "name": "limit",
-                        "in": "query"
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/payments.GetSwapHistoryResponse"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/handlers.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/handlers.ErrorResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/wallets/swap/quote": {
-            "get": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Returns a rate quote for swapping tokens across chains using WaaS swap.",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "WaaS - Crypto Wallets"
-                ],
-                "summary": "Get a WaaS token swap quote",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Source chain",
-                        "name": "from_chain",
-                        "in": "query",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "Destination chain",
-                        "name": "to_chain",
-                        "in": "query",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "Source token",
-                        "name": "from_token",
-                        "in": "query",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "Destination token",
-                        "name": "to_token",
-                        "in": "query",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "Amount in base units",
-                        "name": "amount_in",
-                        "in": "query",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/payments.SwapQuoteResponse"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/handlers.ErrorResponse"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/handlers.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/handlers.ErrorResponse"
-                        }
-                    }
-                }
-            }
-        },
         "/wallets/transactions": {
             "get": {
                 "security": [
@@ -6642,7 +6632,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Returns the caller's on-chain transaction history from Rach WaaS, filterable by network, currency and status. This is real blockchain history, distinct from the CaaS iUSD ledger.",
+                "description": "Returns the caller's on-chain transaction history from Rach WaaS, filterable by network, currency and status. This is real blockchain history, distinct from the CaaS USDC ledger.",
                 "produces": [
                     "application/json"
                 ],
@@ -6711,7 +6701,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Broadcasts an on-chain transfer of a native coin or on-chain token from the caller's Rach WaaS HD wallet to an external address. Amount is in the SMALLEST on-chain unit (wei / satoshi / lamport / sun / drop). Currency is the coin/token symbol (POL, ETH, BNB, USDT, USDC, …). This is the WaaS rail — distinct from CaaS iUSD Phone Send.",
+                "description": "Broadcasts an on-chain transfer of a native coin or on-chain token from the caller's Rach WaaS HD wallet to an external address. Amount is in the SMALLEST on-chain unit (wei / satoshi / lamport / sun / drop). Currency is the coin/token symbol (POL, ETH, BNB, USDT, USDC, …). This is the WaaS rail — distinct from CaaS USDC Phone Send.",
                 "consumes": [
                     "application/json"
                 ],
@@ -6872,7 +6862,7 @@ const docTemplate = `{
         },
         "/webhooks/caas": {
             "post": {
-                "description": "Receiver for Rach CaaS account/settlement events (funding, on-chain credit, P2P transfer, off-ramp). Follows the standard Rach webhook signing — header ` + "`" + `X-Webhook-Signature` + "`" + ` = hex HMAC-SHA256 of the raw request body, keyed with the CaaS webhook secret (CAAS_WEBHOOK_SECRET), which is SEPARATE from the WaaS secret. Verification also tolerates alternate header names and base64 as a hardening fallback. On a credit/deposit event the owning user (resolved by phone) is notified, always labeled iUSD (never USDC). Always returns 200 on business-logic issues so the provider does not retry.",
+                "description": "Receiver for Rach CaaS account/settlement events (funding, on-chain credit, P2P transfer, off-ramp). Follows the standard Rach webhook signing — header ` + "`" + `X-Webhook-Signature` + "`" + ` = hex HMAC-SHA256 of the raw request body, keyed with the CaaS webhook secret (CAAS_WEBHOOK_SECRET), which is SEPARATE from the WaaS secret. Verification also tolerates alternate header names and base64 as a hardening fallback. On a credit/deposit event the owning user (resolved by phone) is notified, always labeled USDC (name \"Stablecoin\"). Always returns 200 on business-logic issues so the provider does not retry.",
                 "consumes": [
                     "application/json"
                 ],
@@ -6882,7 +6872,7 @@ const docTemplate = `{
                 "tags": [
                     "webhooks"
                 ],
-                "summary": "Rach CaaS Webhook (Instant USD / iUSD)",
+                "summary": "Rach CaaS Webhook (Stablecoin / USDC)",
                 "parameters": [
                     {
                         "type": "string",
@@ -6978,7 +6968,7 @@ const docTemplate = `{
         },
         "/webhooks/kyc": {
             "post": {
-                "description": "Receives verification result events from the configured KYC provider (Sumsub). The provider's decision is recorded and, unless an admin has taken manual control, applied to the user's KYC status (hybrid auto-approval). Signature is verified inside the provider.",
+                "description": "Receives verification result events from Sumsub (e.g. ` + "`" + `applicantReviewed` + "`" + `). Verified via HMAC over the raw request body using the Sumsub webhook secret — the digest is read from the ` + "`" + `X-Payload-Digest` + "`" + ` header and its algorithm from ` + "`" + `X-Payload-Digest-Alg` + "`" + ` (` + "`" + `HMAC_SHA1_HEX` + "`" + ` | ` + "`" + `HMAC_SHA256_HEX` + "`" + ` | ` + "`" + `HMAC_SHA512_HEX` + "`" + `; defaults to SHA-256). On a ` + "`" + `GREEN` + "`" + ` review the user is auto-approved; other results are rejected — unless an admin has taken manual control, which always wins (hybrid KYC). Always acknowledges with 200 to prevent provider retries.",
                 "consumes": [
                     "application/json"
                 ],
@@ -6989,6 +6979,21 @@ const docTemplate = `{
                     "webhooks"
                 ],
                 "summary": "KYC provider webhook (Sumsub)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "HMAC digest (hex) of the raw request body",
+                        "name": "X-Payload-Digest",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Digest algorithm: HMAC_SHA1_HEX | HMAC_SHA256_HEX | HMAC_SHA512_HEX (default SHA-256)",
+                        "name": "X-Payload-Digest-Alg",
+                        "in": "header"
+                    }
+                ],
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -7021,6 +7026,52 @@ const docTemplate = `{
                     },
                     "400": {
                         "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/webhooks/nomba": {
+            "post": {
+                "description": "Receiver for Nomba account/transfer events. On ` + "`" + `payment_success` + "`" + ` (a virtual-account credit) the owning DigitalFX Naira account is credited by the alias account number and the customer is notified. Signature is verified against NOMBA_WEBHOOK_SECRET using the ` + "`" + `nomba-signature` + "`" + ` header (HmacSHA256 of the documented field string). Payout events are logged. Returns 200 on business-logic issues so Nomba does not retry; 401 only on signature mismatch.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "webhooks"
+                ],
+                "summary": "Nomba Webhook (NGN virtual accounts + payouts)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Base64 HMAC-SHA256 signature",
+                        "name": "nomba-signature",
+                        "in": "header"
+                    },
+                    {
+                        "description": "Nomba webhook payload (event_type: payment_success | payment_failed | payment_reversal | payout_success | payout_failed | payout_refund)",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/nomba.WebhookEvent"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.MessageResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
                         "schema": {
                             "$ref": "#/definitions/handlers.ErrorResponse"
                         }
@@ -7131,7 +7182,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Initiates a withdrawal from the user's Nilos-backed fiat account",
+                "description": "Initiates a withdrawal from the user's fiat account to a mobile money number (XAF/XOF via HUB2) or an external bank account. Bank payouts route by currency: EUR/GBP settle via Nilos (SEPA/SWIFT/FPS); NGN settles via Nomba. For an NGN transfer set source_currency \"NGN\" and provide account_number + bank_code (get bank_code from GET /nomba/banks, and verify the holder name first via GET /nomba/resolve-account). The business FX rate is applied for cross-currency withdrawals. Status starts as \"processing\".",
                 "consumes": [
                     "application/json"
                 ],
@@ -7786,6 +7837,20 @@ const docTemplate = `{
                 }
             }
         },
+        "handlers.CounterpartyInput": {
+            "type": "object",
+            "properties": {
+                "country": {
+                    "type": "string"
+                },
+                "purpose": {
+                    "type": "string"
+                },
+                "relationship": {
+                    "type": "string"
+                }
+            }
+        },
         "handlers.CreateCardRequest": {
             "type": "object",
             "properties": {
@@ -8141,29 +8206,6 @@ const docTemplate = `{
                 }
             }
         },
-        "handlers.ExecuteSwapRequest": {
-            "type": "object",
-            "properties": {
-                "amount_in": {
-                    "type": "string"
-                },
-                "amount_out_min": {
-                    "type": "string"
-                },
-                "from_chain": {
-                    "type": "string"
-                },
-                "from_token": {
-                    "type": "string"
-                },
-                "to_chain": {
-                    "type": "string"
-                },
-                "to_token": {
-                    "type": "string"
-                }
-            }
-        },
         "handlers.ExportKeyRequest": {
             "type": "object",
             "properties": {
@@ -8360,6 +8402,10 @@ const docTemplate = `{
                 "account_number": {
                     "type": "string"
                 },
+                "bank_code": {
+                    "description": "Nigerian NGN transfers (Nomba) — from GET /nomba/banks",
+                    "type": "string"
+                },
                 "bank_name": {
                     "description": "Bank",
                     "type": "string"
@@ -8535,15 +8581,26 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "doc_type": {
-                    "description": "DocType one of: national_id | passport | selfie | proof_of_address",
+                    "description": "DocType is the kind of document. Individual KYC: national_id | passport |\nselfie | proof_of_address. Business (KYB, Nilos merchant onboarding):\ncertificate_of_incorporation | director_register | shareholder_register |\narticles_of_association | proof_of_address | proof_of_address_ubo |\nproof_of_company_activity | business_bank_statement | proof_of_imports |\nid_document | idv_liveness | proof_of_wealth. Which ones apply (and whether\nrequired) is returned by GET /kyc/requirements documents[].",
                     "type": "string",
                     "enum": [
                         "national_id",
                         "passport",
                         "selfie",
-                        "proof_of_address"
+                        "proof_of_address",
+                        "proof_of_address_ubo",
+                        "certificate_of_incorporation",
+                        "director_register",
+                        "shareholder_register",
+                        "articles_of_association",
+                        "proof_of_company_activity",
+                        "business_bank_statement",
+                        "proof_of_imports",
+                        "id_document",
+                        "idv_liveness",
+                        "proof_of_wealth"
                     ],
-                    "example": "national_id"
+                    "example": "certificate_of_incorporation"
                 },
                 "doc_url": {
                     "description": "DocURL is the GCS object path or signed URL returned by the upload endpoint",
@@ -8561,6 +8618,37 @@ const docTemplate = `{
                 "success": {
                     "type": "boolean",
                     "example": true
+                }
+            }
+        },
+        "handlers.KYCInitResponse": {
+            "type": "object",
+            "properties": {
+                "flow": {
+                    "description": "provider level / flow name",
+                    "type": "string",
+                    "example": "id-and-liveness"
+                },
+                "token": {
+                    "description": "short-lived provider SDK token (~30 min)",
+                    "type": "string",
+                    "example": "_act-sbx-jwt-eyJhbGci..."
+                }
+            }
+        },
+        "handlers.KYCIntakeResponse": {
+            "type": "object",
+            "properties": {
+                "message": {
+                    "type": "string",
+                    "example": "KYC intake completed. You can now start identity verification via POST /kyc/init."
+                },
+                "status": {
+                    "type": "string",
+                    "example": "completed"
+                },
+                "submitted_at": {
+                    "type": "string"
                 }
             }
         },
@@ -8657,6 +8745,28 @@ const docTemplate = `{
                 "success": {
                     "type": "boolean",
                     "example": true
+                }
+            }
+        },
+        "handlers.NombaBanksResponse": {
+            "type": "object",
+            "properties": {
+                "banks": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/nomba.Bank"
+                    }
+                }
+            }
+        },
+        "handlers.NombaResolveAccountResponse": {
+            "type": "object",
+            "properties": {
+                "account_name": {
+                    "type": "string"
+                },
+                "account_number": {
+                    "type": "string"
                 }
             }
         },
@@ -9155,6 +9265,70 @@ const docTemplate = `{
                 },
                 "per_transaction_usd": {
                     "type": "number"
+                }
+            }
+        },
+        "handlers.SubmitIntakeRequest": {
+            "type": "object",
+            "properties": {
+                "address_line1": {
+                    "type": "string"
+                },
+                "address_line2": {
+                    "type": "string"
+                },
+                "bvn": {
+                    "type": "string"
+                },
+                "city": {
+                    "type": "string"
+                },
+                "contact_email": {
+                    "type": "string"
+                },
+                "contact_phone": {
+                    "type": "string"
+                },
+                "country": {
+                    "type": "string"
+                },
+                "date_of_birth": {
+                    "description": "YYYY-MM-DD",
+                    "type": "string"
+                },
+                "is_importer": {
+                    "description": "Business (KYB) extras.",
+                    "type": "boolean"
+                },
+                "legal_first_name": {
+                    "type": "string"
+                },
+                "legal_last_name": {
+                    "type": "string"
+                },
+                "nationality": {
+                    "type": "string"
+                },
+                "occupation": {
+                    "type": "string"
+                },
+                "postal_code": {
+                    "type": "string"
+                },
+                "purpose_of_account": {
+                    "type": "string"
+                },
+                "source_of_funds": {
+                    "type": "string"
+                },
+                "state": {
+                    "type": "string"
+                },
+                "top_3_counterparties": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/handlers.CounterpartyInput"
+                    }
                 }
             }
         },
@@ -9781,6 +9955,91 @@ const docTemplate = `{
                 }
             }
         },
+        "nomba.Bank": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                }
+            }
+        },
+        "nomba.WebhookEvent": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "type": "object",
+                    "properties": {
+                        "customer": {
+                            "type": "object",
+                            "properties": {
+                                "accountNumber": {
+                                    "type": "string"
+                                },
+                                "bankCode": {
+                                    "type": "string"
+                                },
+                                "senderName": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "merchant": {
+                            "type": "object",
+                            "properties": {
+                                "userId": {
+                                    "type": "string"
+                                },
+                                "walletBalance": {
+                                    "type": "number"
+                                },
+                                "walletId": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "transaction": {
+                            "type": "object",
+                            "properties": {
+                                "aliasAccountNumber": {
+                                    "description": "The virtual (alias) account number that was credited — this is how\nwe map an inbound NGN credit back to the owning DigitalFX account.",
+                                    "type": "string"
+                                },
+                                "id": {
+                                    "type": "string"
+                                },
+                                "merchantTxRef": {
+                                    "type": "string"
+                                },
+                                "responseCode": {
+                                    "type": "string"
+                                },
+                                "time": {
+                                    "type": "string"
+                                },
+                                "transactionAmount": {
+                                    "type": "number"
+                                },
+                                "transactionId": {
+                                    "type": "string"
+                                },
+                                "type": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    }
+                },
+                "event_type": {
+                    "type": "string"
+                },
+                "requestId": {
+                    "type": "string"
+                }
+            }
+        },
         "payments.ExecuteSwapResponse": {
             "type": "object",
             "properties": {
@@ -9895,11 +10154,7 @@ const docTemplate = `{
                     "description": "raw — shape varies per chain",
                     "type": "array",
                     "items": {
-                        "type": "array",
-                        "items": {
-                            "type": "integer",
-                            "format": "int32"
-                        }
+                        "type": "object"
                     }
                 }
             }
@@ -9911,11 +10166,7 @@ const docTemplate = `{
                     "description": "DerivedAddress + Balances preloaded",
                     "type": "array",
                     "items": {
-                        "type": "array",
-                        "items": {
-                            "type": "integer",
-                            "format": "int32"
-                        }
+                        "type": "object"
                     }
                 },
                 "customer_id": {
@@ -10432,6 +10683,35 @@ const docTemplate = `{
                 }
             }
         },
+        "services.DocumentSpec": {
+            "type": "object",
+            "properties": {
+                "applies_to": {
+                    "description": "all | importers | eur_gbp_nre",
+                    "type": "string"
+                },
+                "help": {
+                    "type": "string"
+                },
+                "key": {
+                    "type": "string"
+                },
+                "label": {
+                    "type": "string"
+                },
+                "max_age_months": {
+                    "description": "freshness requirement, if any",
+                    "type": "integer"
+                },
+                "required": {
+                    "type": "boolean"
+                },
+                "scope": {
+                    "description": "company | director_ubo",
+                    "type": "string"
+                }
+            }
+        },
         "services.FiatWallet": {
             "type": "object",
             "properties": {
@@ -10561,6 +10841,62 @@ const docTemplate = `{
                 },
                 "total_formatted": {
                     "type": "string"
+                }
+            }
+        },
+        "services.IntakeFieldSpec": {
+            "type": "object",
+            "properties": {
+                "help": {
+                    "type": "string"
+                },
+                "key": {
+                    "type": "string"
+                },
+                "label": {
+                    "type": "string"
+                },
+                "options": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "required": {
+                    "type": "boolean"
+                },
+                "type": {
+                    "description": "text | date | select | country | boolean | counterparties",
+                    "type": "string"
+                }
+            }
+        },
+        "services.IntakeRequirements": {
+            "type": "object",
+            "properties": {
+                "account_type": {
+                    "type": "string"
+                },
+                "completed": {
+                    "type": "boolean"
+                },
+                "documents": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/services.DocumentSpec"
+                    }
+                },
+                "fields": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/services.IntakeFieldSpec"
+                    }
+                },
+                "notes": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
                 }
             }
         },

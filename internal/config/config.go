@@ -41,6 +41,7 @@ type Config struct {
 	KYCProvider string // "metamap" (default) | "sumsub"
 	Google      GoogleConfig
 	Nilos       NilosConfig
+	Nomba       NombaConfig
 	// OwnerPhones lists the phone numbers that should be promoted to the "owner"
 	// staff role on startup (comma-separated OWNER_PHONES env). This is the only
 	// way the founder account is designated — set at deploy time only.
@@ -157,6 +158,19 @@ type NilosConfig struct {
 	APISecret string // signing secret for HMAC-SHA256
 }
 
+// NombaConfig holds credentials for the Nomba API (Nigerian NGN rails: virtual
+// accounts + bank transfers). Auth is OAuth2 client-credentials; every request
+// also carries the parent business account UUID (AccountID) in the accountId
+// header. WebhookSecret is the signing key set when creating the webhook on the
+// Nomba dashboard (used to verify inbound payment/payout events).
+type NombaConfig struct {
+	BaseURL       string
+	ClientID      string
+	ClientSecret  string
+	AccountID     string
+	WebhookSecret string
+}
+
 func Load() (*Config, error) {
 	_ = godotenv.Load()
 
@@ -236,6 +250,12 @@ func Load() (*Config, error) {
 	cfg.Nilos.BaseURL = getEnv("NILOS_BASE_URL", "https://app-demo.nilos.io")
 	cfg.Nilos.APIKey = getEnv("NILOS_API_KEY", "")
 	cfg.Nilos.APISecret = getEnv("NILOS_API_SECRET", "")
+
+	cfg.Nomba.BaseURL = getEnv("NOMBA_BASE_URL", "https://api.nomba.com")
+	cfg.Nomba.ClientID = getEnv("NOMBA_CLIENT_ID", "")
+	cfg.Nomba.ClientSecret = getEnv("NOMBA_CLIENT_SECRET", "")
+	cfg.Nomba.AccountID = getEnv("NOMBA_ACCOUNT_ID", "")
+	cfg.Nomba.WebhookSecret = getEnv("NOMBA_WEBHOOK_SECRET", "")
 
 	if len(errs) > 0 {
 		return nil, fmt.Errorf("config errors:\n  %s", joinErrors(errs))

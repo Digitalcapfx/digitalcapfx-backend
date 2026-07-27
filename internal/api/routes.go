@@ -67,6 +67,8 @@ func newRouter(cfg *config.Config, svc *services.Services, pool *pgxpool.Pool, l
 	ratesH := handlers.NewRatesHandler(svc)
 	paymentsWebhookH := handlers.NewPaymentsWebhookHandler(svc, cfg.PaymentsAPI.WebhookSecret, logger)
 	caasWebhookH := handlers.NewCaasWebhookHandler(svc, cfg.CaaS.WebhookSecret, logger)
+	nombaWebhookH := handlers.NewNombaWebhookHandler(svc, logger)
+	nombaH := handlers.NewNombaHandler(svc)
 
 	kycRequired := middleware.KYCRequired(pool)
 
@@ -82,6 +84,7 @@ func newRouter(cfg *config.Config, svc *services.Services, pool *pgxpool.Pool, l
 	r.Post("/webhooks/kyc", kycH.ProviderWebhook)
 	r.Post("/webhooks/payments", paymentsWebhookH.Receive)
 	r.Post("/webhooks/caas", caasWebhookH.Receive)
+	r.Post("/webhooks/nomba", nombaWebhookH.Receive)
 
 	// Swagger UI
 	r.Get("/swagger/*", httpSwagger.Handler(
@@ -151,9 +154,11 @@ func newRouter(cfg *config.Config, svc *services.Services, pool *pgxpool.Pool, l
 			// KYC (status + doc upload available pre-approval; metamap init too)
 			r.Route("/kyc", func(r chi.Router) {
 				r.Get("/status", kycH.GetStatus)
+				r.Get("/requirements", kycH.IntakeRequirements) // fields to collect before Sumsub
+				r.Post("/intake", kycH.SubmitIntake)            // submit our own KYC fields first
 				r.Get("/documents", kycH.ListDocuments)
 				r.Post("/documents", kycH.UploadDocument)
-				r.Post("/init", kycH.Initiate) // Generic KYC (Sumsub)
+				r.Post("/init", kycH.Initiate) // Generic KYC (Sumsub) — gated on intake
 				r.Post("/metamap/init", kycH.InitiateMetaMap)
 			})
 
@@ -229,9 +234,13 @@ func newRouter(cfg *config.Config, svc *services.Services, pool *pgxpool.Pool, l
 					r.Post("/export-key", walletH.ExportPrivateKey)   // sensitive
 					r.Post("/deposit", walletH.InitiateDeposit)       // HUB2 mobile money
 					r.Post("/withdraw", walletH.InitiateWithdrawal)   // HUB2 mobile money
-					r.Get("/swap/quote", walletH.GetSwapQuote)
-					r.Post("/swap/execute", walletH.ExecuteSwap)
-					r.Get("/swap/history", walletH.GetSwapHistory)
+					// Legacy aliases → the unified Rach crypto swap handler.
+					// Kept for backward compatibility (existing mobile clients);
+					// /swap/* is the canonical, documented surface. Both accept the
+					// old base-unit `amount_in` and the new human `amount`/symbols.
+					r.Get("/swap/quote", swapH.GetQuote)
+					r.Post("/swap/execute", swapH.Execute)
+					r.Get("/swap/history", swapH.GetHistory)
 				})
 
 				// Rach unified swap (symbols, human amounts, best-price routing).
@@ -256,6 +265,13 @@ func newRouter(cfg *config.Config, svc *services.Services, pool *pgxpool.Pool, l
 					r.Post("/hub2", transferH.Hub2Payment)
 					r.Post("/exchange", transferH.ExchangeCurrency)
 				})
+
+				// ── Nigerian NGN helpers (Nomba) ────────────────────────────
+				// Bank list + account name-enquiry (the "account check" done
+				// before an NGN transfer). The transfer itself goes through the
+				// fiat withdrawal flow (POST /withdrawals with source NGN + bank_code).
+				r.Get("/nomba/banks", nombaH.ListBanks)
+				r.Get("/nomba/resolve-account", nombaH.ResolveAccount)
 
 				// Dashboard + activity feed + insights
 				r.Get("/dashboard", dashboardH.GetDashboard)

@@ -272,6 +272,15 @@ definitions:
       event:
         type: string
     type: object
+  handlers.CounterpartyInput:
+    properties:
+      country:
+        type: string
+      purpose:
+        type: string
+      relationship:
+        type: string
+    type: object
   handlers.CreateCardRequest:
     properties:
       card_art_id:
@@ -533,21 +542,6 @@ definitions:
         example: EUR
         type: string
     type: object
-  handlers.ExecuteSwapRequest:
-    properties:
-      amount_in:
-        type: string
-      amount_out_min:
-        type: string
-      from_chain:
-        type: string
-      from_token:
-        type: string
-      to_chain:
-        type: string
-      to_token:
-        type: string
-    type: object
   handlers.ExportKeyRequest:
     properties:
       index:
@@ -690,6 +684,9 @@ definitions:
     properties:
       account_number:
         type: string
+      bank_code:
+        description: Nigerian NGN transfers (Nomba) — from GET /nomba/banks
+        type: string
       bank_name:
         description: Bank
         type: string
@@ -812,13 +809,31 @@ definitions:
   handlers.KYCDocumentRequest:
     properties:
       doc_type:
-        description: 'DocType one of: national_id | passport | selfie | proof_of_address'
+        description: |-
+          DocType is the kind of document. Individual KYC: national_id | passport |
+          selfie | proof_of_address. Business (KYB, Nilos merchant onboarding):
+          certificate_of_incorporation | director_register | shareholder_register |
+          articles_of_association | proof_of_address | proof_of_address_ubo |
+          proof_of_company_activity | business_bank_statement | proof_of_imports |
+          id_document | idv_liveness | proof_of_wealth. Which ones apply (and whether
+          required) is returned by GET /kyc/requirements documents[].
         enum:
         - national_id
         - passport
         - selfie
         - proof_of_address
-        example: national_id
+        - proof_of_address_ubo
+        - certificate_of_incorporation
+        - director_register
+        - shareholder_register
+        - articles_of_association
+        - proof_of_company_activity
+        - business_bank_statement
+        - proof_of_imports
+        - id_document
+        - idv_liveness
+        - proof_of_wealth
+        example: certificate_of_incorporation
         type: string
       doc_url:
         description: DocURL is the GCS object path or signed URL returned by the upload
@@ -833,6 +848,29 @@ definitions:
       success:
         example: true
         type: boolean
+    type: object
+  handlers.KYCInitResponse:
+    properties:
+      flow:
+        description: provider level / flow name
+        example: id-and-liveness
+        type: string
+      token:
+        description: short-lived provider SDK token (~30 min)
+        example: _act-sbx-jwt-eyJhbGci...
+        type: string
+    type: object
+  handlers.KYCIntakeResponse:
+    properties:
+      message:
+        example: KYC intake completed. You can now start identity verification via
+          POST /kyc/init.
+        type: string
+      status:
+        example: completed
+        type: string
+      submitted_at:
+        type: string
     type: object
   handlers.KYCStatusData:
     properties:
@@ -899,6 +937,20 @@ definitions:
       success:
         example: true
         type: boolean
+    type: object
+  handlers.NombaBanksResponse:
+    properties:
+      banks:
+        items:
+          $ref: '#/definitions/nomba.Bank'
+        type: array
+    type: object
+  handlers.NombaResolveAccountResponse:
+    properties:
+      account_name:
+        type: string
+      account_number:
+        type: string
     type: object
   handlers.PaginationMeta:
     properties:
@@ -1251,6 +1303,49 @@ definitions:
         type: string
       per_transaction_usd:
         type: number
+    type: object
+  handlers.SubmitIntakeRequest:
+    properties:
+      address_line1:
+        type: string
+      address_line2:
+        type: string
+      bvn:
+        type: string
+      city:
+        type: string
+      contact_email:
+        type: string
+      contact_phone:
+        type: string
+      country:
+        type: string
+      date_of_birth:
+        description: YYYY-MM-DD
+        type: string
+      is_importer:
+        description: Business (KYB) extras.
+        type: boolean
+      legal_first_name:
+        type: string
+      legal_last_name:
+        type: string
+      nationality:
+        type: string
+      occupation:
+        type: string
+      postal_code:
+        type: string
+      purpose_of_account:
+        type: string
+      source_of_funds:
+        type: string
+      state:
+        type: string
+      top_3_counterparties:
+        items:
+          $ref: '#/definitions/handlers.CounterpartyInput'
+        type: array
     type: object
   handlers.SwapExecuteRequest:
     properties:
@@ -1687,6 +1782,63 @@ definitions:
         example: "+237612345678"
         type: string
     type: object
+  nomba.Bank:
+    properties:
+      code:
+        type: string
+      name:
+        type: string
+    type: object
+  nomba.WebhookEvent:
+    properties:
+      data:
+        properties:
+          customer:
+            properties:
+              accountNumber:
+                type: string
+              bankCode:
+                type: string
+              senderName:
+                type: string
+            type: object
+          merchant:
+            properties:
+              userId:
+                type: string
+              walletBalance:
+                type: number
+              walletId:
+                type: string
+            type: object
+          transaction:
+            properties:
+              aliasAccountNumber:
+                description: |-
+                  The virtual (alias) account number that was credited — this is how
+                  we map an inbound NGN credit back to the owning DigitalFX account.
+                type: string
+              id:
+                type: string
+              merchantTxRef:
+                type: string
+              responseCode:
+                type: string
+              time:
+                type: string
+              transactionAmount:
+                type: number
+              transactionId:
+                type: string
+              type:
+                type: string
+            type: object
+        type: object
+      event_type:
+        type: string
+      requestId:
+        type: string
+    type: object
   payments.ExecuteSwapResponse:
     properties:
       status:
@@ -1763,10 +1915,7 @@ definitions:
       transactions:
         description: raw — shape varies per chain
         items:
-          items:
-            format: int32
-            type: integer
-          type: array
+          type: object
         type: array
     type: object
   payments.ListCustomerAddressesResponse:
@@ -1774,10 +1923,7 @@ definitions:
       addresses:
         description: DerivedAddress + Balances preloaded
         items:
-          items:
-            format: int32
-            type: integer
-          type: array
+          type: object
         type: array
       customer_id:
         type: string
@@ -2122,6 +2268,26 @@ definitions:
       this_month:
         $ref: '#/definitions/services.MonthSummary'
     type: object
+  services.DocumentSpec:
+    properties:
+      applies_to:
+        description: all | importers | eur_gbp_nre
+        type: string
+      help:
+        type: string
+      key:
+        type: string
+      label:
+        type: string
+      max_age_months:
+        description: freshness requirement, if any
+        type: integer
+      required:
+        type: boolean
+      scope:
+        description: company | director_ubo
+        type: string
+    type: object
   services.FiatWallet:
     properties:
       account_id:
@@ -2210,6 +2376,43 @@ definitions:
         type: number
       total_formatted:
         type: string
+    type: object
+  services.IntakeFieldSpec:
+    properties:
+      help:
+        type: string
+      key:
+        type: string
+      label:
+        type: string
+      options:
+        items:
+          type: string
+        type: array
+      required:
+        type: boolean
+      type:
+        description: text | date | select | country | boolean | counterparties
+        type: string
+    type: object
+  services.IntakeRequirements:
+    properties:
+      account_type:
+        type: string
+      completed:
+        type: boolean
+      documents:
+        items:
+          $ref: '#/definitions/services.DocumentSpec'
+        type: array
+      fields:
+        items:
+          $ref: '#/definitions/services.IntakeFieldSpec'
+        type: array
+      notes:
+        items:
+          type: string
+        type: array
     type: object
   services.MonthSummary:
     properties:
@@ -4097,10 +4300,9 @@ paths:
       - Cards
   /crypto/balances:
     get:
-      description: Returns the caller's Instant USD (iUSD) balance from Rach CaaS.
-        iUSD settles on-chain as USDC inside the EIP-4337 Smart Contract Wallet, but
-        is always shown to the customer as iUSD. This is separate from any USDT/USDC
-        held in the Rach WaaS crypto wallets.
+      description: Returns the caller's Stablecoin (USDC) balance from Rach CaaS.
+        It settles on-chain as USDC inside the EIP-4337 Smart Contract Wallet. This
+        is separate from any USDT/USDC held in the Rach WaaS crypto wallets.
       produces:
       - application/json
       responses:
@@ -4118,9 +4320,9 @@ paths:
             $ref: '#/definitions/handlers.ErrorResponse'
       security:
       - BearerAuth: []
-      summary: Get iUSD balance
+      summary: Get USDC balance
       tags:
-      - CaaS - Instant USD (iUSD)
+      - CaaS - Stablecoin (USDC)
   /crypto/contacts:
     get:
       description: Returns the 8 most recent recipients of CaaS phone-to-phone stablecoin
@@ -4146,12 +4348,12 @@ paths:
     post:
       consumes:
       - application/json
-      description: 'Funds the customer''s Instant USD (iUSD) account. Initiates a
-        HUB2 Mobile Money collection: the customer receives a push-to-pay prompt on
-        their phone. After they approve, HUB2 fires a webhook which triggers Rach
-        CaaS to convert the XOF/XAF to on-chain USDC and credit the customer''s EIP-4337
-        Smart Contract Wallet — reflected to the customer as iUSD. Poll GET /crypto/balances
-        for the updated iUSD balance once CaaS confirms the fiat and completes the
+      description: 'Funds the customer''s Stablecoin (USDC) account. Initiates a HUB2
+        Mobile Money collection: the customer receives a push-to-pay prompt on their
+        phone. After they approve, HUB2 fires a webhook which triggers Rach CaaS to
+        convert the XOF/XAF to on-chain USDC and credit the customer''s EIP-4337 Smart
+        Contract Wallet — reflected to the customer as USDC. Poll GET /crypto/balances
+        for the updated USDC balance once CaaS confirms the fiat and completes the
         conversion.'
       parameters:
       - description: Funding request
@@ -4182,18 +4384,18 @@ paths:
             $ref: '#/definitions/handlers.ErrorResponse'
       security:
       - BearerAuth: []
-      summary: Fund iUSD account via Mobile Money
+      summary: Fund USDC account via Mobile Money
       tags:
-      - CaaS - Instant USD (iUSD)
+      - CaaS - Stablecoin (USDC)
   /crypto/send:
     post:
       consumes:
       - application/json
-      description: 'Transfers Instant USD (iUSD) from the caller to another DigitalFX
+      description: 'Transfers Stablecoin (USDC) from the caller to another DigitalFX
         user identified by phone number, via Rach CaaS (settles on-chain as USDC between
         the two EIP-4337 wallets). Amount is USD-equivalent decimal (e.g. "50.00").
         Note: the `token` field selects the on-chain settlement asset (USDC/USDT)
-        but the customer-facing unit is iUSD. This is the CaaS P2P rail, distinct
+        but the customer-facing unit is USDC. This is the CaaS P2P rail, distinct
         from WaaS on-chain crypto transfers.'
       parameters:
       - description: Transfer details
@@ -4223,12 +4425,12 @@ paths:
             $ref: '#/definitions/handlers.ErrorResponse'
       security:
       - BearerAuth: []
-      summary: Send iUSD to another user (Phone Send)
+      summary: Send USDC to another user (Phone Send)
       tags:
-      - CaaS - Instant USD (iUSD)
+      - CaaS - Stablecoin (USDC)
   /crypto/transactions:
     get:
-      description: Returns a paginated list of the user's Instant USD (iUSD / CaaS)
+      description: Returns a paginated list of the user's Stablecoin (USDC / CaaS)
         transactions — funding, Phone Send transfers, and off-ramp withdrawals. These
         are CaaS-rail movements, not WaaS on-chain crypto history (see /wallets/crypto/{network}/transactions
         for that).
@@ -4258,12 +4460,12 @@ paths:
             $ref: '#/definitions/handlers.ErrorResponse'
       security:
       - BearerAuth: []
-      summary: List iUSD (CaaS) transactions
+      summary: List USDC (CaaS) transactions
       tags:
-      - CaaS - Instant USD (iUSD)
+      - CaaS - Stablecoin (USDC)
   /crypto/transactions/{id}:
     get:
-      description: Returns a single Instant USD (iUSD / CaaS) transaction by its UUID.
+      description: Returns a single Stablecoin (USDC / CaaS) transaction by its UUID.
       parameters:
       - description: Transaction UUID
         in: path
@@ -4291,16 +4493,16 @@ paths:
             $ref: '#/definitions/handlers.ErrorResponse'
       security:
       - BearerAuth: []
-      summary: Get an iUSD (CaaS) transaction
+      summary: Get an USDC (CaaS) transaction
       tags:
-      - CaaS - Instant USD (iUSD)
+      - CaaS - Stablecoin (USDC)
   /crypto/wallet:
     get:
-      description: Returns the caller's Instant USD (iUSD) wallet — an EIP-4337 Smart
+      description: Returns the caller's Stablecoin (USDC) wallet — an EIP-4337 Smart
         Contract Wallet (SCW) provisioned on Rach CaaS, keyed by the user's phone
         number (provisioned on first call). This is the CaaS rail (instant dollars
         that settle on-chain as USDC), NOT the Rach WaaS HD crypto wallets. Customer-facing
-        unit is always iUSD.
+        unit is always USDC.
       produces:
       - application/json
       responses:
@@ -4318,17 +4520,17 @@ paths:
             $ref: '#/definitions/handlers.ErrorResponse'
       security:
       - BearerAuth: []
-      summary: Get or create the user's iUSD (CaaS) wallet
+      summary: Get or create the user's USDC (CaaS) wallet
       tags:
-      - CaaS - Instant USD (iUSD)
+      - CaaS - Stablecoin (USDC)
   /crypto/withdraw:
     post:
       consumes:
       - application/json
-      description: Off-ramps Instant USD (iUSD) from the user's EIP-4337 Smart Contract
+      description: Off-ramps Stablecoin (USDC) from the user's EIP-4337 Smart Contract
         Wallet back to fiat on their Mobile Money number, via Rach CaaS (settles the
         on-chain USDC and pays out local currency). The `token` field is the on-chain
-        settlement asset; the customer balance is iUSD.
+        settlement asset; the customer balance is USDC.
       parameters:
       - description: Withdrawal details
         in: body
@@ -4357,9 +4559,9 @@ paths:
             $ref: '#/definitions/handlers.ErrorResponse'
       security:
       - BearerAuth: []
-      summary: Withdraw iUSD to Mobile Money (off-ramp)
+      summary: Withdraw USDC to Mobile Money (off-ramp)
       tags:
-      - CaaS - Instant USD (iUSD)
+      - CaaS - Stablecoin (USDC)
   /dashboard:
     get:
       description: Single aggregate endpoint for the home screen. Returns asset allocation
@@ -4594,8 +4796,14 @@ paths:
     post:
       consumes:
       - application/json
-      description: Records a KYC document for manual review. The doc_url should be
-        a GCS signed URL or object path obtained from the client-side upload flow.
+      description: 'Records a KYC/KYB document for review. `doc_url` is a GCS signed
+        URL or object path from the client-side upload flow. `doc_type` is one of
+        the enumerated kinds — for business accounts these are the Nilos merchant-onboarding
+        documents (Certificate of Incorporation, Director/Shareholder registers, MEMART,
+        proof of company address/activity, business bank statement, plus importer
+        & UBO/director items). Call GET /kyc/requirements first: its `documents[]`
+        tells you exactly which doc_types apply to this account and whether each is
+        required.'
       parameters:
       - description: Document metadata
         in: body
@@ -4629,15 +4837,19 @@ paths:
       - kyc
   /kyc/init:
     post:
-      description: Creates or resumes a KYC session (e.g. for Sumsub). The returned
-        token is used with the provider SDK.
+      description: Creates or resumes a KYC verification session for the authenticated
+        user with the configured provider (Sumsub, level `id-and-liveness`). Returns
+        a short-lived `token` (~30 min) to hand to the Sumsub Web/Mobile SDK to launch
+        the ID + liveness flow, plus the `flow` (level) name. The final result is
+        delivered asynchronously to `POST /webhooks/kyc` and, unless an admin overrides,
+        applied automatically.
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/handlers.MetaMapInitResponse'
+            $ref: '#/definitions/handlers.KYCInitResponse'
         "401":
           description: Unauthorized
           schema:
@@ -4648,7 +4860,43 @@ paths:
             $ref: '#/definitions/handlers.ErrorResponse'
       security:
       - BearerAuth: []
-      summary: Start or Resume KYC verification
+      summary: Start or resume KYC verification
+      tags:
+      - kyc
+  /kyc/intake:
+    post:
+      consumes:
+      - application/json
+      description: Submits the DigitalFX KYC intake fields (see GET /kyc/requirements).
+        Validates the fields required for the user's account type, stores them, mirrors
+        the BVN onto the account so the Naira (NGN) account can be provisioned, and
+        marks the intake completed. After this succeeds, POST /kyc/init will return
+        a Sumsub SDK token.
+      parameters:
+      - description: Intake fields
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.SubmitIntakeRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.KYCIntakeResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Submit KYC intake
       tags:
       - kyc
   /kyc/metamap/init:
@@ -4674,6 +4922,34 @@ paths:
       security:
       - BearerAuth: []
       summary: Start MetaMap identity verification
+      tags:
+      - kyc
+  /kyc/requirements:
+    get:
+      description: Returns everything DigitalFX collects on its own form BEFORE the
+        Sumsub identity dialog is launched. For individuals this is identity + address
+        fields (Nilos) plus BVN (Nomba, for the Naira account); ID + liveness are
+        handled by Sumsub afterwards. For business (KYB) accounts it additionally
+        returns the full Nilos merchant-onboarding `documents` checklist (Certificate
+        of Incorporation, Director/Shareholder registers, MEMART, proof of address/activity,
+        bank statement, plus importer & EUR/GBP-NRE conditional items) — upload each
+        via POST /kyc/documents with the matching doc_type. `completed` indicates
+        whether intake was already submitted. Only after POST /kyc/intake does POST
+        /kyc/init return a Sumsub token.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/services.IntakeRequirements'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get KYC intake fields
       tags:
       - kyc
   /kyc/status:
@@ -4746,6 +5022,72 @@ paths:
       summary: Connect to market data websocket
       tags:
       - Market
+  /nomba/banks:
+    get:
+      description: Returns the supported Nigerian bank codes and names. Use the `code`
+        as `bank_code` when resolving an account or initiating an NGN bank transfer/withdrawal.
+        Cache client-side — the list rarely changes.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.NombaBanksResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List Nigerian banks (Nomba)
+      tags:
+      - Fiat - NGN (Nomba)
+  /nomba/resolve-account:
+    get:
+      description: Name-enquiry against a Nigerian bank account — returns the account
+        holder name so the sender can confirm the recipient BEFORE transferring. This
+        is the account check used during an NGN transfer. Provide `account_number`
+        (10 digits) and `bank_code` (from GET /nomba/banks).
+      parameters:
+      - description: 10-digit account number
+        in: query
+        name: account_number
+        required: true
+        type: string
+      - description: Bank code from GET /nomba/banks
+        in: query
+        name: bank_code
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.NombaResolveAccountResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Resolve (check) a Nigerian bank account
+      tags:
+      - Fiat - NGN (Nomba)
   /notifications:
     get:
       description: Returns paginated notifications for the authenticated user. Pass
@@ -4850,7 +5192,7 @@ paths:
 
         **platform:** one of `ios`, `android`, `web` (omitted → stored as `unknown`).
 
-        **What the device receives:** a standard FCM message = a `notification` block (`title`, `body`) for the system tray PLUS a `data` map for in-app routing. `data` ALWAYS contains `type` (the event), and event-specific extra keys. Route/deep-link on `data.type`. Known values: `login_detected`, `welcome`, `kyc_submitted`, `kyc_approved`, `kyc_rejected`, `transfer_sent`, `transfer_received`, `deposit_received`, `deposit_confirmed`, `withdrawal_processed`, `crypto_sent`, `crypto_received`, `exchange_completed`, `market_alert` (extra: `symbol`), `test`. CaaS / Instant-USD credits arrive as `type=deposit_confirmed` with `symbol=iUSD`, `tx_hash`, `reference`, `source=caas`.
+        **What the device receives:** a standard FCM message = a `notification` block (`title`, `body`) for the system tray PLUS a `data` map for in-app routing. `data` ALWAYS contains `type` (the event), and event-specific extra keys. Route/deep-link on `data.type`. Known values: `login_detected`, `welcome`, `kyc_submitted`, `kyc_approved`, `kyc_rejected`, `transfer_sent`, `transfer_received`, `deposit_received`, `deposit_confirmed`, `withdrawal_processed`, `crypto_sent`, `crypto_received`, `exchange_completed`, `market_alert` (extra: `symbol`), `test`. CaaS stablecoin credits arrive as `type=deposit_confirmed` with `symbol=USDC`, `tx_hash`, `reference`, `source=caas`.
 
         **Token hygiene:** the server auto-prunes tokens that FCM reports as unregistered/invalid, so always re-register on token refresh to stay reachable. Call DELETE /notifications/devices on logout.
       parameters:
@@ -6239,7 +6581,7 @@ paths:
         coin (e.g. POL) and `tokens[]` lists the on-chain stablecoins (USDT/USDC/…)
         held on that SAME address — so opening the Polygon wallet returns POL plus
         its USDT/USDC together. Each item carries `provider:"waas"`. Balances are
-        fetched live from the Payments API. Distinct from CaaS iUSD (see /crypto/*).'
+        fetched live from the Payments API. Distinct from CaaS USDC (see /crypto/*).'
       parameters:
       - description: Network (BTC, ETH, SOL, LTC, TRX, POL, BCH, XRP)
         in: path
@@ -6504,9 +6846,9 @@ paths:
       - Fiat - Nilos
   /wallets/overview:
     get:
-      description: 'Combined view across ALL rails: the Phone Send card (iUSD balance
+      description: 'Combined view across ALL rails: the Phone Send card (USDC balance
         + recent contacts) plus the unified wallet list — fiat (Nilos/HUB2), CaaS
-        iUSD, and WaaS crypto + on-chain stablecoins. Every item carries a `provider`
+        USDC, and WaaS crypto + on-chain stablecoins. Every item carries a `provider`
         field (caas|waas|hub2|nilos). Filter with ?type=fiat|stablecoin|crypto.'
       parameters:
       - description: Wallet type filter
@@ -6562,9 +6904,9 @@ paths:
       - WaaS - Crypto Wallets
   /wallets/stablecoin/{symbol}:
     get:
-      description: Returns the wallet header for the CaaS Instant USD (iUSD) stablecoin.
+      description: Returns the wallet header for the CaaS Stablecoin (USDC) stablecoin.
         Balance is fetched live from Rach CaaS (settles on-chain as USDC, shown as
-        iUSD). This is the CaaS rail; for WaaS on-chain USDT/USDC see /wallets/crypto/{network}.
+        USDC). This is the CaaS rail; for WaaS on-chain USDT/USDC see /wallets/crypto/{network}.
       parameters:
       - description: Token symbol (USDC)
         in: path
@@ -6589,12 +6931,12 @@ paths:
             $ref: '#/definitions/handlers.ErrorResponse'
       security:
       - BearerAuth: []
-      summary: iUSD wallet detail (CaaS stablecoin)
+      summary: USDC wallet detail (CaaS stablecoin)
       tags:
-      - CaaS - Instant USD (iUSD)
+      - CaaS - Stablecoin (USDC)
   /wallets/stablecoin/{symbol}/transactions:
     get:
-      description: Returns CaaS P2P send/receive history for the Instant USD (iUSD)
+      description: Returns CaaS P2P send/receive history for the Stablecoin (USDC)
         wallet. Maps to the same data as GET /crypto/transactions.
       parameters:
       - description: Token symbol (USDC)
@@ -6624,12 +6966,12 @@ paths:
             $ref: '#/definitions/handlers.ErrorResponse'
       security:
       - BearerAuth: []
-      summary: iUSD transaction history (CaaS)
+      summary: USDC transaction history (CaaS)
       tags:
-      - CaaS - Instant USD (iUSD)
+      - CaaS - Stablecoin (USDC)
   /wallets/supported-assets:
     get:
-      description: Returns all addable assets (WaaS crypto networks + CaaS iUSD) with
+      description: Returns all addable assets (WaaS crypto networks + CaaS USDC) with
         has_wallet=true if the user has already provisioned that wallet, and a `provider`
         field (waas|caas). Used for the + Add flow.
       produces:
@@ -6651,134 +6993,11 @@ paths:
       summary: Supported assets
       tags:
       - Wallets - Overview
-  /wallets/swap/execute:
-    post:
-      consumes:
-      - application/json
-      description: Broadcasts a swap transaction from the caller's WaaS wallet using
-        a previously quoted route.
-      parameters:
-      - description: Swap details
-        in: body
-        name: body
-        required: true
-        schema:
-          $ref: '#/definitions/handlers.ExecuteSwapRequest'
-      produces:
-      - application/json
-      responses:
-        "201":
-          description: Created
-          schema:
-            $ref: '#/definitions/payments.ExecuteSwapResponse'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
-      security:
-      - BearerAuth: []
-      summary: Execute a WaaS token swap
-      tags:
-      - WaaS - Crypto Wallets
-  /wallets/swap/history:
-    get:
-      description: Returns the caller's paginated swap transaction history.
-      parameters:
-      - description: Page number (default 1)
-        in: query
-        name: page
-        type: integer
-      - description: Results per page (default 20)
-        in: query
-        name: limit
-        type: integer
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/payments.GetSwapHistoryResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
-      security:
-      - BearerAuth: []
-      summary: Get WaaS swap history
-      tags:
-      - WaaS - Crypto Wallets
-  /wallets/swap/quote:
-    get:
-      description: Returns a rate quote for swapping tokens across chains using WaaS
-        swap.
-      parameters:
-      - description: Source chain
-        in: query
-        name: from_chain
-        required: true
-        type: string
-      - description: Destination chain
-        in: query
-        name: to_chain
-        required: true
-        type: string
-      - description: Source token
-        in: query
-        name: from_token
-        required: true
-        type: string
-      - description: Destination token
-        in: query
-        name: to_token
-        required: true
-        type: string
-      - description: Amount in base units
-        in: query
-        name: amount_in
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/payments.SwapQuoteResponse'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
-      security:
-      - BearerAuth: []
-      summary: Get a WaaS token swap quote
-      tags:
-      - WaaS - Crypto Wallets
   /wallets/transactions:
     get:
       description: Returns the caller's on-chain transaction history from Rach WaaS,
         filterable by network, currency and status. This is real blockchain history,
-        distinct from the CaaS iUSD ledger.
+        distinct from the CaaS USDC ledger.
       parameters:
       - description: Page (default 1)
         in: query
@@ -6828,7 +7047,7 @@ paths:
         from the caller's Rach WaaS HD wallet to an external address. Amount is in
         the SMALLEST on-chain unit (wei / satoshi / lamport / sun / drop). Currency
         is the coin/token symbol (POL, ETH, BNB, USDT, USDC, …). This is the WaaS
-        rail — distinct from CaaS iUSD Phone Send.
+        rail — distinct from CaaS USDC Phone Send.
       parameters:
       - description: Transfer details
         in: body
@@ -6907,8 +7126,8 @@ paths:
         keyed with the CaaS webhook secret (CAAS_WEBHOOK_SECRET), which is SEPARATE
         from the WaaS secret. Verification also tolerates alternate header names and
         base64 as a hardening fallback. On a credit/deposit event the owning user
-        (resolved by phone) is notified, always labeled iUSD (never USDC). Always
-        returns 200 on business-logic issues so the provider does not retry.
+        (resolved by phone) is notified, always labeled USDC (name "Stablecoin").
+        Always returns 200 on business-logic issues so the provider does not retry.
       parameters:
       - description: hex HMAC-SHA256(rawBody, CaaS secret)
         in: header
@@ -6932,7 +7151,7 @@ paths:
           description: Unauthorized
           schema:
             $ref: '#/definitions/handlers.ErrorResponse'
-      summary: Rach CaaS Webhook (Instant USD / iUSD)
+      summary: Rach CaaS Webhook (Stablecoin / USDC)
       tags:
       - webhooks
   /webhooks/hub2:
@@ -6981,10 +7200,24 @@ paths:
     post:
       consumes:
       - application/json
-      description: Receives verification result events from the configured KYC provider
-        (Sumsub). The provider's decision is recorded and, unless an admin has taken
-        manual control, applied to the user's KYC status (hybrid auto-approval). Signature
-        is verified inside the provider.
+      description: Receives verification result events from Sumsub (e.g. `applicantReviewed`).
+        Verified via HMAC over the raw request body using the Sumsub webhook secret
+        — the digest is read from the `X-Payload-Digest` header and its algorithm
+        from `X-Payload-Digest-Alg` (`HMAC_SHA1_HEX` | `HMAC_SHA256_HEX` | `HMAC_SHA512_HEX`;
+        defaults to SHA-256). On a `GREEN` review the user is auto-approved; other
+        results are rejected — unless an admin has taken manual control, which always
+        wins (hybrid KYC). Always acknowledges with 200 to prevent provider retries.
+      parameters:
+      - description: HMAC digest (hex) of the raw request body
+        in: header
+        name: X-Payload-Digest
+        required: true
+        type: string
+      - description: 'Digest algorithm: HMAC_SHA1_HEX | HMAC_SHA256_HEX | HMAC_SHA512_HEX
+          (default SHA-256)'
+        in: header
+        name: X-Payload-Digest-Alg
+        type: string
       produces:
       - application/json
       responses:
@@ -7013,6 +7246,42 @@ paths:
           schema:
             $ref: '#/definitions/handlers.ErrorResponse'
       summary: MetaMap verification webhook
+      tags:
+      - webhooks
+  /webhooks/nomba:
+    post:
+      consumes:
+      - application/json
+      description: Receiver for Nomba account/transfer events. On `payment_success`
+        (a virtual-account credit) the owning DigitalFX Naira account is credited
+        by the alias account number and the customer is notified. Signature is verified
+        against NOMBA_WEBHOOK_SECRET using the `nomba-signature` header (HmacSHA256
+        of the documented field string). Payout events are logged. Returns 200 on
+        business-logic issues so Nomba does not retry; 401 only on signature mismatch.
+      parameters:
+      - description: Base64 HMAC-SHA256 signature
+        in: header
+        name: nomba-signature
+        type: string
+      - description: 'Nomba webhook payload (event_type: payment_success | payment_failed
+          | payment_reversal | payout_success | payout_failed | payout_refund)'
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/nomba.WebhookEvent'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.MessageResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      summary: Nomba Webhook (NGN virtual accounts + payouts)
       tags:
       - webhooks
   /webhooks/payments:
@@ -7088,7 +7357,13 @@ paths:
     post:
       consumes:
       - application/json
-      description: Initiates a withdrawal from the user's Nilos-backed fiat account
+      description: 'Initiates a withdrawal from the user''s fiat account to a mobile
+        money number (XAF/XOF via HUB2) or an external bank account. Bank payouts
+        route by currency: EUR/GBP settle via Nilos (SEPA/SWIFT/FPS); NGN settles
+        via Nomba. For an NGN transfer set source_currency "NGN" and provide account_number
+        + bank_code (get bank_code from GET /nomba/banks, and verify the holder name
+        first via GET /nomba/resolve-account). The business FX rate is applied for
+        cross-currency withdrawals. Status starts as "processing".'
       parameters:
       - description: Withdrawal request
         in: body

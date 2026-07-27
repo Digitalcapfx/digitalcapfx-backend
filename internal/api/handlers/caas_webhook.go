@@ -46,8 +46,8 @@ type CaasWebhookPayload struct {
 
 // Receive godoc
 //
-//	@Summary      Rach CaaS Webhook (Instant USD / iUSD)
-//	@Description  Receiver for Rach CaaS account/settlement events (funding, on-chain credit, P2P transfer, off-ramp). Follows the standard Rach webhook signing — header `X-Webhook-Signature` = hex HMAC-SHA256 of the raw request body, keyed with the CaaS webhook secret (CAAS_WEBHOOK_SECRET), which is SEPARATE from the WaaS secret. Verification also tolerates alternate header names and base64 as a hardening fallback. On a credit/deposit event the owning user (resolved by phone) is notified, always labeled iUSD (never USDC). Always returns 200 on business-logic issues so the provider does not retry.
+//	@Summary      Rach CaaS Webhook (Stablecoin / USDC)
+//	@Description  Receiver for Rach CaaS account/settlement events (funding, on-chain credit, P2P transfer, off-ramp). Follows the standard Rach webhook signing — header `X-Webhook-Signature` = hex HMAC-SHA256 of the raw request body, keyed with the CaaS webhook secret (CAAS_WEBHOOK_SECRET), which is SEPARATE from the WaaS secret. Verification also tolerates alternate header names and base64 as a hardening fallback. On a credit/deposit event the owning user (resolved by phone) is notified, always labeled USDC (name "Stablecoin"). Always returns 200 on business-logic issues so the provider does not retry.
 //	@Tags         webhooks
 //	@Accept       json
 //	@Produce      json
@@ -101,14 +101,14 @@ func (h *CaasWebhookHandler) Receive(w http.ResponseWriter, r *http.Request) {
 		strings.Contains(ev, "settle") || strings.Contains(ev, "success")
 
 	if credited && payload.Data.Phone != "" {
-		// Customer-facing label is always iUSD (Instant USD), never USDC.
+		// Customer-facing label is USDC (name "Stablecoin"); settles on-chain as USDC.
 		h.svc.Notifications.CreateForPhone(r.Context(), payload.Data.Phone, services.CreateNotificationInput{
 			Type:  services.NotifDepositConfirmed,
-			Title: fmt.Sprintf("Instant USD Received: %s iUSD", payload.Data.Amount),
-			Body:  fmt.Sprintf("Your Instant USD account has been credited with %s iUSD.", payload.Data.Amount),
+			Title: fmt.Sprintf("USDC Received: %s USDC", payload.Data.Amount),
+			Body:  fmt.Sprintf("Your Stablecoin (USDC) account has been credited with %s USDC.", payload.Data.Amount),
 			Metadata: map[string]string{
 				"tx_hash":   payload.Data.TxHash,
-				"symbol":    "iUSD",
+				"symbol":    "USDC",
 				"reference": payload.Data.Reference,
 				"source":    "caas",
 			},

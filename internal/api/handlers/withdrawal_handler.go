@@ -71,10 +71,7 @@ func (h *WithdrawalHandler) Quote(w http.ResponseWriter, r *http.Request) {
 // Initiate godoc
 //
 //	@Summary      Initiate fiat withdrawal
-//	@Description  Initiates a withdrawal from the user's Nilos-backed fiat account
-//	              to a mobile money number (XAF/XOF via HUB2) or external bank
-//	              (SEPA/SWIFT/FPS via Nilos). The business FX rate is applied for
-//	              cross-currency withdrawals. Status starts as "processing".
+//	@Description  Initiates a withdrawal from the user's fiat account to a mobile money number (XAF/XOF via HUB2) or an external bank account. Bank payouts route by currency: EUR/GBP settle via Nilos (SEPA/SWIFT/FPS); NGN settles via Nomba. For an NGN transfer set source_currency "NGN" and provide account_number + bank_code (get bank_code from GET /nomba/banks, and verify the holder name first via GET /nomba/resolve-account). The business FX rate is applied for cross-currency withdrawals. Status starts as "processing".
 //	@Tags         Fiat - Nilos
 //	@Accept       json
 //	@Produce      json
@@ -113,6 +110,7 @@ func (h *WithdrawalHandler) Initiate(w http.ResponseWriter, r *http.Request) {
 		Operator:            body.Operator,
 		BankName:            body.BankName,
 		AccountNumber:       body.AccountNumber,
+		BankCode:            body.BankCode,
 		IBAN:                body.IBAN,
 		SwiftCode:           body.SwiftCode,
 		SortCode:            body.SortCode,
@@ -328,6 +326,7 @@ type InitiateWithdrawalRequestBody struct {
 	// Bank
 	BankName      string `json:"bank_name"`
 	AccountNumber string `json:"account_number"`
+	BankCode      string `json:"bank_code"` // Nigerian NGN transfers (Nomba) — from GET /nomba/banks
 	IBAN          string `json:"iban"`
 	SwiftCode     string `json:"swift_code"`
 	SortCode      string `json:"sort_code"`

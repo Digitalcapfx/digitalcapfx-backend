@@ -53,3 +53,18 @@ SET nilos_account_id = $2,
     updated_at = NOW()
 WHERE id = $1;
 
+-- name: UpdateNombaAccountDetails :exec
+UPDATE accounts
+SET nomba_account_ref         = $2,
+    nomba_account_holder_id   = $3,
+    nomba_bank_name           = $4,
+    nomba_bank_account_number = $5,
+    nomba_bank_account_name   = $6,
+    updated_at                = NOW()
+WHERE id = $1;
+
+-- name: GetAccountByNombaAccountNumber :one
+SELECT * FROM accounts
+WHERE nomba_bank_account_number = $1
+LIMIT 1;
+

@@ -13,13 +13,12 @@ import (
 	db "github.com/rachfinance/digitalfx/internal/db/sqlc"
 )
 
-// The CaaS balance settles on-chain as USDC, but it is presented to customers as
-// "iUSD" (Instant USD) — the customer-facing brand for the Rach CaaS balance.
-// USDC stays only in the internal CaaS/on-chain integration, never in what the
-// customer sees.
+// The CaaS balance settles on-chain as USDC. It is presented to customers as
+// USDC with the human-readable name "Stablecoin" (previously branded "iUSD" /
+// "Instant USD"). This is the Rach CaaS balance — the EIP-4337 SCW rail.
 const (
-	IUSDSymbol = "iUSD"
-	IUSDName   = "Instant USD"
+	StablecoinSymbol = "USDC"
+	StablecoinName   = "Stablecoin"
 )
 
 type CaaSService struct {
@@ -153,12 +152,12 @@ func (s *CaaSService) InitiateFunding(ctx context.Context, in FundingInput) (str
 // GetBalances returns the live USDC balance for the user's SCW.
 // CaaS only returns USDC — USDT is not currently supported in the settlement engine.
 // InstantUSDBalance is the customer-facing CaaS balance. The value settles
-// on-chain as USDC but is presented as iUSD (Instant USD). balance_usdc is kept
-// for backward compatibility.
+// on-chain as USDC and is presented as USDC (name "Stablecoin"). balance_usdc is
+// kept for backward compatibility.
 type InstantUSDBalance struct {
-	Symbol           string  `json:"symbol"`       // "iUSD"
-	Name             string  `json:"name"`         // "Instant USD"
-	Balance          float64 `json:"balance"`      // numeric iUSD balance
+	Symbol           string  `json:"symbol"`       // "USDC"
+	Name             string  `json:"name"`         // "Stablecoin"
+	Balance          float64 `json:"balance"`      // numeric USDC balance
 	BalanceUSDC      string  `json:"balance_usdc"` // raw on-chain USDC (compat)
 	BalanceFormatted string  `json:"balance_formatted"`
 	WalletAddress    string  `json:"wallet_address,omitempty"`
@@ -173,18 +172,18 @@ func (s *CaaSService) GetBalances(ctx context.Context, userID uuid.UUID) (*Insta
 		return nil, ErrAccountNotFound
 	}
 
-	out := &InstantUSDBalance{Symbol: IUSDSymbol, Name: IUSDName, BalanceUSDC: "0"}
-	// Best-effort: an unfunded / freshly-provisioned SCW should read as 0 iUSD,
+	out := &InstantUSDBalance{Symbol: StablecoinSymbol, Name: StablecoinName, BalanceUSDC: "0"}
+	// Best-effort: an unfunded / freshly-provisioned SCW should read as 0 USDC,
 	// not 500.
 	if bal, berr := s.caasClient.GetBalance(ctx, user.PhoneNumber); berr == nil {
 		out.BalanceUSDC = bal.BalanceUSDC
 		out.Balance = parseFloatSafe(bal.BalanceUSDC)
 		out.WalletAddress = bal.WalletAddress
 	} else {
-		s.logger.Warn("crypto balances: caas balance unavailable, returning 0 iUSD",
+		s.logger.Warn("crypto balances: caas balance unavailable, returning 0 USDC",
 			zap.String("user_id", userID.String()), zap.Error(berr))
 	}
-	out.BalanceFormatted = fmt.Sprintf("%.2f %s", out.Balance, IUSDSymbol)
+	out.BalanceFormatted = fmt.Sprintf("%.2f %s", out.Balance, StablecoinSymbol)
 	return out, nil
 }
 

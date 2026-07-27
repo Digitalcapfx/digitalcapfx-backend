@@ -2,8 +2,10 @@ package handlers
 
 import (
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
+	"time"
 
 	"github.com/rachfinance/digitalfx/internal/api/middleware"
 	"github.com/rachfinance/digitalfx/internal/clients/metamap"
@@ -76,7 +78,7 @@ func (h *KYCHandler) ListDocuments(w http.ResponseWriter, r *http.Request) {
 // UploadDocument godoc
 //
 //	@Summary      Submit a KYC document
-//	@Description  Records a KYC document for manual review. The doc_url should be a GCS signed URL or object path obtained from the client-side upload flow.
+//	@Description  Records a KYC/KYB document for review. `doc_url` is a GCS signed URL or object path from the client-side upload flow. `doc_type` is one of the enumerated kinds — for business accounts these are the Nilos merchant-onboarding documents (Certificate of Incorporation, Director/Shareholder registers, MEMART, proof of company address/activity, business bank statement, plus importer & UBO/director items). Call GET /kyc/requirements first: its `documents[]` tells you exactly which doc_types apply to this account and whether each is required.
 //	@Tags         kyc
 //	@Accept       json
 //	@Produce      json
@@ -120,14 +122,20 @@ func (h *KYCHandler) UploadDocument(w http.ResponseWriter, r *http.Request) {
 	response.Created(w, doc)
 }
 
+// KYCInitResponse is returned by POST /kyc/init.
+type KYCInitResponse struct {
+	Token string `json:"token" example:"_act-sbx-jwt-eyJhbGci..."` // short-lived provider SDK token (~30 min)
+	Flow  string `json:"flow" example:"id-and-liveness"`           // provider level / flow name
+}
+
 // Initiate godoc
 //
-//	@Summary      Start or Resume KYC verification
-//	@Description  Creates or resumes a KYC session (e.g. for Sumsub). The returned token is used with the provider SDK.
+//	@Summary      Start or resume KYC verification
+//	@Description  Creates or resumes a KYC verification session for the authenticated user with the configured provider (Sumsub, level `id-and-liveness`). Returns a short-lived `token` (~30 min) to hand to the Sumsub Web/Mobile SDK to launch the ID + liveness flow, plus the `flow` (level) name. The final result is delivered asynchronously to `POST /webhooks/kyc` and, unless an admin overrides, applied automatically.
 //	@Tags         kyc
 //	@Produce      json
 //	@Security     BearerAuth
-//	@Success      200  {object}  MetaMapInitResponse
+//	@Success      200  {object}  KYCInitResponse
 //	@Failure      401  {object}  ErrorResponse
 //	@Failure      500  {object}  ErrorResponse
 //	@Router       /kyc/init [post]
@@ -140,6 +148,12 @@ func (h *KYCHandler) Initiate(w http.ResponseWriter, r *http.Request) {
 
 	result, err := h.svc.KYC.InitiateKYC(r.Context(), userID)
 	if err != nil {
+		// The customer must complete our own KYC intake form before the Sumsub
+		// dialog can be launched — surface a clear, actionable error.
+		if errors.Is(err, services.ErrKYCIntakeRequired) {
+			response.BadRequest(w, "KYC_INTAKE_REQUIRED", err.Error())
+			return
+		}
 		response.InternalError(w)
 		return
 	}
@@ -147,6 +161,140 @@ func (h *KYCHandler) Initiate(w http.ResponseWriter, r *http.Request) {
 	response.OK(w, map[string]string{
 		"token": result.AccessToken,
 		"flow":  result.FlowID,
+	})
+}
+
+// IntakeRequirements godoc
+//
+//	@Summary      Get KYC intake fields
+//	@Description  Returns everything DigitalFX collects on its own form BEFORE the Sumsub identity dialog is launched. For individuals this is identity + address fields (Nilos) plus BVN (Nomba, for the Naira account); ID + liveness are handled by Sumsub afterwards. For business (KYB) accounts it additionally returns the full Nilos merchant-onboarding `documents` checklist (Certificate of Incorporation, Director/Shareholder registers, MEMART, proof of address/activity, bank statement, plus importer & EUR/GBP-NRE conditional items) — upload each via POST /kyc/documents with the matching doc_type. `completed` indicates whether intake was already submitted. Only after POST /kyc/intake does POST /kyc/init return a Sumsub token.
+//	@Tags         kyc
+//	@Produce      json
+//	@Security     BearerAuth
+//	@Success      200  {object}  services.IntakeRequirements
+//	@Failure      401  {object}  ErrorResponse
+//	@Router       /kyc/requirements [get]
+func (h *KYCHandler) IntakeRequirements(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		response.Unauthorized(w, "unauthorized")
+		return
+	}
+	req, err := h.svc.KYC.IntakeRequirementsForUser(r.Context(), userID)
+	if err != nil {
+		response.InternalError(w)
+		return
+	}
+	// Returned as the typed IntakeRequirements shape: account_type, completed,
+	// fields[] (key/label/type/required/options), documents[] (Nilos KYB
+	// checklist for business), and notes[].
+	response.OK(w, req)
+}
+
+// CounterpartyInput is one top counterparty (EUR/GBP NRE businesses).
+type CounterpartyInput struct {
+	Country      string `json:"country"`
+	Relationship string `json:"relationship"`
+	Purpose      string `json:"purpose"`
+}
+
+// SubmitIntakeRequest is the POST /kyc/intake payload.
+type SubmitIntakeRequest struct {
+	LegalFirstName   string `json:"legal_first_name"`
+	LegalLastName    string `json:"legal_last_name"`
+	DateOfBirth      string `json:"date_of_birth"` // YYYY-MM-DD
+	Nationality      string `json:"nationality"`
+	BVN              string `json:"bvn"`
+	AddressLine1     string `json:"address_line1"`
+	AddressLine2     string `json:"address_line2"`
+	City             string `json:"city"`
+	State            string `json:"state"`
+	PostalCode       string `json:"postal_code"`
+	Country          string `json:"country"`
+	Occupation       string `json:"occupation"`
+	SourceOfFunds    string `json:"source_of_funds"`
+	PurposeOfAccount string `json:"purpose_of_account"`
+	// Business (KYB) extras.
+	IsImporter     *bool               `json:"is_importer"`
+	Counterparties []CounterpartyInput `json:"top_3_counterparties"`
+	ContactEmail   string              `json:"contact_email"`
+	ContactPhone   string              `json:"contact_phone"`
+}
+
+// KYCIntakeResponse is the POST /kyc/intake success payload.
+type KYCIntakeResponse struct {
+	Status      string     `json:"status" example:"completed"`
+	Message     string     `json:"message" example:"KYC intake completed. You can now start identity verification via POST /kyc/init."`
+	SubmittedAt *time.Time `json:"submitted_at"`
+}
+
+// SubmitIntake godoc
+//
+//	@Summary      Submit KYC intake
+//	@Description  Submits the DigitalFX KYC intake fields (see GET /kyc/requirements). Validates the fields required for the user's account type, stores them, mirrors the BVN onto the account so the Naira (NGN) account can be provisioned, and marks the intake completed. After this succeeds, POST /kyc/init will return a Sumsub SDK token.
+//	@Tags         kyc
+//	@Accept       json
+//	@Produce      json
+//	@Security     BearerAuth
+//	@Param        body  body      SubmitIntakeRequest  true  "Intake fields"
+//	@Success      200   {object}  KYCIntakeResponse
+//	@Failure      400   {object}  ErrorResponse
+//	@Failure      401   {object}  ErrorResponse
+//	@Router       /kyc/intake [post]
+func (h *KYCHandler) SubmitIntake(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		response.Unauthorized(w, "unauthorized")
+		return
+	}
+	var req SubmitIntakeRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		response.BadRequest(w, "VALIDATION_ERROR", "invalid request body")
+		return
+	}
+
+	counterparties := make([]services.Counterparty, 0, len(req.Counterparties))
+	for _, c := range req.Counterparties {
+		counterparties = append(counterparties, services.Counterparty{
+			Country:      c.Country,
+			Relationship: c.Relationship,
+			Purpose:      c.Purpose,
+		})
+	}
+
+	intake, err := h.svc.KYC.SubmitIntake(r.Context(), userID, services.SubmitIntakeInput{
+		LegalFirstName:   req.LegalFirstName,
+		LegalLastName:    req.LegalLastName,
+		DateOfBirth:      req.DateOfBirth,
+		Nationality:      req.Nationality,
+		BVN:              req.BVN,
+		AddressLine1:     req.AddressLine1,
+		AddressLine2:     req.AddressLine2,
+		City:             req.City,
+		State:            req.State,
+		PostalCode:       req.PostalCode,
+		Country:          req.Country,
+		Occupation:       req.Occupation,
+		SourceOfFunds:    req.SourceOfFunds,
+		PurposeOfAccount: req.PurposeOfAccount,
+		IsImporter:       req.IsImporter,
+		Counterparties:   counterparties,
+		ContactEmail:     req.ContactEmail,
+		ContactPhone:     req.ContactPhone,
+	})
+	if err != nil {
+		if errors.Is(err, services.ErrUserNotFound) {
+			response.NotFound(w, "user not found")
+			return
+		}
+		response.BadRequest(w, "VALIDATION_ERROR", err.Error())
+		return
+	}
+
+	response.OK(w, KYCIntakeResponse{
+		Status:      intake.Status,
+		Message:     "KYC intake completed. You can now start identity verification via POST /kyc/init.",
+		SubmittedAt: intake.SubmittedAt,
 	})
 }
 
@@ -213,10 +361,12 @@ func (h *KYCHandler) MetaMapWebhook(w http.ResponseWriter, r *http.Request) {
 // ProviderWebhook godoc
 //
 //	@Summary      KYC provider webhook (Sumsub)
-//	@Description  Receives verification result events from the configured KYC provider (Sumsub). The provider's decision is recorded and, unless an admin has taken manual control, applied to the user's KYC status (hybrid auto-approval). Signature is verified inside the provider.
+//	@Description  Receives verification result events from Sumsub (e.g. `applicantReviewed`). Verified via HMAC over the raw request body using the Sumsub webhook secret — the digest is read from the `X-Payload-Digest` header and its algorithm from `X-Payload-Digest-Alg` (`HMAC_SHA1_HEX` | `HMAC_SHA256_HEX` | `HMAC_SHA512_HEX`; defaults to SHA-256). On a `GREEN` review the user is auto-approved; other results are rejected — unless an admin has taken manual control, which always wins (hybrid KYC). Always acknowledges with 200 to prevent provider retries.
 //	@Tags         webhooks
 //	@Accept       json
 //	@Produce      json
+//	@Param        X-Payload-Digest      header  string  true   "HMAC digest (hex) of the raw request body"
+//	@Param        X-Payload-Digest-Alg  header  string  false  "Digest algorithm: HMAC_SHA1_HEX | HMAC_SHA256_HEX | HMAC_SHA512_HEX (default SHA-256)"
 //	@Success      200  {object}  MessageResponse
 //	@Router       /webhooks/kyc [post]
 func (h *KYCHandler) ProviderWebhook(w http.ResponseWriter, r *http.Request) {

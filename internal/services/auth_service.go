@@ -235,7 +235,9 @@ func (s *AuthService) Register(ctx context.Context, in RegisterInput) (*token.Pa
 	}
 
 	// Provision default fiat accounts.
-	for _, currency := range []string{"XAF", "XOF", "USD", "GBP", "EUR"} {
+	// Every customer gets an account in all supported fiat currencies, including
+	// NGN (Nigerian Naira), regardless of their country of residence.
+	for _, currency := range []string{"XAF", "XOF", "USD", "GBP", "EUR", "NGN"} {
 		if _, err := q.CreateAccount(ctx, db.CreateAccountParams{
 			UserID:        user.ID,
 			Currency:      currency,
@@ -430,7 +432,9 @@ func (s *AuthService) GoogleSignIn(ctx context.Context, in GoogleSignInInput) (*
 	}
 
 	// Provision default fiat accounts.
-	for _, currency := range []string{"XAF", "XOF", "USD", "GBP", "EUR"} {
+	// Every customer gets an account in all supported fiat currencies, including
+	// NGN (Nigerian Naira), regardless of their country of residence.
+	for _, currency := range []string{"XAF", "XOF", "USD", "GBP", "EUR", "NGN"} {
 		if _, err := q.CreateAccount(ctx, db.CreateAccountParams{
 			UserID:        googleUser.ID,
 			Currency:      currency,
@@ -1073,7 +1077,9 @@ func (s *AuthService) RegisterMerchantStaff(ctx context.Context, token string, p
 		return nil, fmt.Errorf("create user: %w", err)
 	}
 
-	for _, currency := range []string{"XAF", "XOF", "USD", "GBP", "EUR"} {
+	// Every customer gets an account in all supported fiat currencies, including
+	// NGN (Nigerian Naira), regardless of their country of residence.
+	for _, currency := range []string{"XAF", "XOF", "USD", "GBP", "EUR", "NGN"} {
 		if _, err := q.CreateAccount(ctx, db.CreateAccountParams{
 			UserID:        user.ID,
 			Currency:      currency,

@@ -26,7 +26,7 @@ func NewWalletOverviewHandler(svc *services.Services) *WalletOverviewHandler {
 // GetOverview godoc
 //
 //	@Summary      Wallets overview
-//	@Description  Combined view across ALL rails: the Phone Send card (iUSD balance + recent contacts) plus the unified wallet list — fiat (Nilos/HUB2), CaaS iUSD, and WaaS crypto + on-chain stablecoins. Every item carries a `provider` field (caas|waas|hub2|nilos). Filter with ?type=fiat|stablecoin|crypto.
+//	@Description  Combined view across ALL rails: the Phone Send card (USDC balance + recent contacts) plus the unified wallet list — fiat (Nilos/HUB2), CaaS USDC, and WaaS crypto + on-chain stablecoins. Every item carries a `provider` field (caas|waas|hub2|nilos). Filter with ?type=fiat|stablecoin|crypto.
 //	@Tags         Wallets - Overview
 //	@Produce      json
 //	@Security     BearerAuth
@@ -52,7 +52,7 @@ func (h *WalletOverviewHandler) GetOverview(w http.ResponseWriter, r *http.Reque
 // GetSupportedAssets godoc
 //
 //	@Summary      Supported assets
-//	@Description  Returns all addable assets (WaaS crypto networks + CaaS iUSD) with has_wallet=true if the user has already provisioned that wallet, and a `provider` field (waas|caas). Used for the + Add flow.
+//	@Description  Returns all addable assets (WaaS crypto networks + CaaS USDC) with has_wallet=true if the user has already provisioned that wallet, and a `provider` field (waas|caas). Used for the + Add flow.
 //	@Tags         Wallets - Overview
 //	@Produce      json
 //	@Security     BearerAuth
@@ -153,7 +153,7 @@ func (h *WalletOverviewHandler) GetFiatTransactions(w http.ResponseWriter, r *ht
 // GetCryptoWalletDetail godoc
 //
 //	@Summary      Crypto wallet detail (WaaS)
-//	@Description  Returns the Rach WaaS wallet for a network: `wallet` is the native coin (e.g. POL) and `tokens[]` lists the on-chain stablecoins (USDT/USDC/…) held on that SAME address — so opening the Polygon wallet returns POL plus its USDT/USDC together. Each item carries `provider:"waas"`. Balances are fetched live from the Payments API. Distinct from CaaS iUSD (see /crypto/*).
+//	@Description  Returns the Rach WaaS wallet for a network: `wallet` is the native coin (e.g. POL) and `tokens[]` lists the on-chain stablecoins (USDT/USDC/…) held on that SAME address — so opening the Polygon wallet returns POL plus its USDT/USDC together. Each item carries `provider:"waas"`. Balances are fetched live from the Payments API. Distinct from CaaS USDC (see /crypto/*).
 //	@Tags         WaaS - Crypto Wallets
 //	@Produce      json
 //	@Security     BearerAuth
@@ -216,9 +216,9 @@ func (h *WalletOverviewHandler) GetCryptoTransactions(w http.ResponseWriter, r *
 
 // GetStablecoinDetail godoc
 //
-//	@Summary      iUSD wallet detail (CaaS stablecoin)
-//	@Description  Returns the wallet header for the CaaS Instant USD (iUSD) stablecoin. Balance is fetched live from Rach CaaS (settles on-chain as USDC, shown as iUSD). This is the CaaS rail; for WaaS on-chain USDT/USDC see /wallets/crypto/{network}.
-//	@Tags         CaaS - Instant USD (iUSD)
+//	@Summary      USDC wallet detail (CaaS stablecoin)
+//	@Description  Returns the wallet header for the CaaS Stablecoin (USDC) stablecoin. Balance is fetched live from Rach CaaS (settles on-chain as USDC, shown as USDC). This is the CaaS rail; for WaaS on-chain USDT/USDC see /wallets/crypto/{network}.
+//	@Tags         CaaS - Stablecoin (USDC)
 //	@Produce      json
 //	@Security     BearerAuth
 //	@Param        symbol  path      string  true  "Token symbol (USDC)"
@@ -243,9 +243,9 @@ func (h *WalletOverviewHandler) GetStablecoinDetail(w http.ResponseWriter, r *ht
 
 // GetStablecoinTransactions godoc
 //
-//	@Summary      iUSD transaction history (CaaS)
-//	@Description  Returns CaaS P2P send/receive history for the Instant USD (iUSD) wallet. Maps to the same data as GET /crypto/transactions.
-//	@Tags         CaaS - Instant USD (iUSD)
+//	@Summary      USDC transaction history (CaaS)
+//	@Description  Returns CaaS P2P send/receive history for the Stablecoin (USDC) wallet. Maps to the same data as GET /crypto/transactions.
+//	@Tags         CaaS - Stablecoin (USDC)
 //	@Produce      json
 //	@Security     BearerAuth
 //	@Param        symbol  path    string  true   "Token symbol (USDC)"

@@ -25,9 +25,9 @@ func NewCaaSHandler(svc *services.Services) *CaaSHandler {
 
 // GetWallet godoc
 //
-//	@Summary      Get or create the user's iUSD (CaaS) wallet
-//	@Description  Returns the caller's Instant USD (iUSD) wallet — an EIP-4337 Smart Contract Wallet (SCW) provisioned on Rach CaaS, keyed by the user's phone number (provisioned on first call). This is the CaaS rail (instant dollars that settle on-chain as USDC), NOT the Rach WaaS HD crypto wallets. Customer-facing unit is always iUSD.
-//	@Tags         CaaS - Instant USD (iUSD)
+//	@Summary      Get or create the user's USDC (CaaS) wallet
+//	@Description  Returns the caller's Stablecoin (USDC) wallet — an EIP-4337 Smart Contract Wallet (SCW) provisioned on Rach CaaS, keyed by the user's phone number (provisioned on first call). This is the CaaS rail (instant dollars that settle on-chain as USDC), NOT the Rach WaaS HD crypto wallets. Customer-facing unit is always USDC.
+//	@Tags         CaaS - Stablecoin (USDC)
 //	@Produce      json
 //	@Security     BearerAuth
 //	@Success      200  {object}  CaasWalletResponse
@@ -53,9 +53,9 @@ func (h *CaaSHandler) GetWallet(w http.ResponseWriter, r *http.Request) {
 
 // GetBalances godoc
 //
-//	@Summary      Get iUSD balance
-//	@Description  Returns the caller's Instant USD (iUSD) balance from Rach CaaS. iUSD settles on-chain as USDC inside the EIP-4337 Smart Contract Wallet, but is always shown to the customer as iUSD. This is separate from any USDT/USDC held in the Rach WaaS crypto wallets.
-//	@Tags         CaaS - Instant USD (iUSD)
+//	@Summary      Get USDC balance
+//	@Description  Returns the caller's Stablecoin (USDC) balance from Rach CaaS. It settles on-chain as USDC inside the EIP-4337 Smart Contract Wallet. This is separate from any USDT/USDC held in the Rach WaaS crypto wallets.
+//	@Tags         CaaS - Stablecoin (USDC)
 //	@Produce      json
 //	@Security     BearerAuth
 //	@Success      200  {object}  CryptoBalanceResponse
@@ -80,9 +80,9 @@ func (h *CaaSHandler) GetBalances(w http.ResponseWriter, r *http.Request) {
 
 // FundAccount godoc
 //
-//	@Summary      Fund iUSD account via Mobile Money
-//	@Description  Funds the customer's Instant USD (iUSD) account. Initiates a HUB2 Mobile Money collection: the customer receives a push-to-pay prompt on their phone. After they approve, HUB2 fires a webhook which triggers Rach CaaS to convert the XOF/XAF to on-chain USDC and credit the customer's EIP-4337 Smart Contract Wallet — reflected to the customer as iUSD. Poll GET /crypto/balances for the updated iUSD balance once CaaS confirms the fiat and completes the conversion.
-//	@Tags         CaaS - Instant USD (iUSD)
+//	@Summary      Fund USDC account via Mobile Money
+//	@Description  Funds the customer's Stablecoin (USDC) account. Initiates a HUB2 Mobile Money collection: the customer receives a push-to-pay prompt on their phone. After they approve, HUB2 fires a webhook which triggers Rach CaaS to convert the XOF/XAF to on-chain USDC and credit the customer's EIP-4337 Smart Contract Wallet — reflected to the customer as USDC. Poll GET /crypto/balances for the updated USDC balance once CaaS confirms the fiat and completes the conversion.
+//	@Tags         CaaS - Stablecoin (USDC)
 //	@Accept       json
 //	@Produce      json
 //	@Security     BearerAuth
@@ -138,9 +138,9 @@ func (h *CaaSHandler) FundAccount(w http.ResponseWriter, r *http.Request) {
 
 // Send godoc
 //
-//	@Summary      Send iUSD to another user (Phone Send)
-//	@Description  Transfers Instant USD (iUSD) from the caller to another DigitalFX user identified by phone number, via Rach CaaS (settles on-chain as USDC between the two EIP-4337 wallets). Amount is USD-equivalent decimal (e.g. "50.00"). Note: the `token` field selects the on-chain settlement asset (USDC/USDT) but the customer-facing unit is iUSD. This is the CaaS P2P rail, distinct from WaaS on-chain crypto transfers.
-//	@Tags         CaaS - Instant USD (iUSD)
+//	@Summary      Send USDC to another user (Phone Send)
+//	@Description  Transfers Stablecoin (USDC) from the caller to another DigitalFX user identified by phone number, via Rach CaaS (settles on-chain as USDC between the two EIP-4337 wallets). Amount is USD-equivalent decimal (e.g. "50.00"). Note: the `token` field selects the on-chain settlement asset (USDC/USDT) but the customer-facing unit is USDC. This is the CaaS P2P rail, distinct from WaaS on-chain crypto transfers.
+//	@Tags         CaaS - Stablecoin (USDC)
 //	@Accept       json
 //	@Produce      json
 //	@Security     BearerAuth
@@ -205,9 +205,9 @@ func (h *CaaSHandler) Send(w http.ResponseWriter, r *http.Request) {
 
 // ListTransactions godoc
 //
-//	@Summary      List iUSD (CaaS) transactions
-//	@Description  Returns a paginated list of the user's Instant USD (iUSD / CaaS) transactions — funding, Phone Send transfers, and off-ramp withdrawals. These are CaaS-rail movements, not WaaS on-chain crypto history (see /wallets/crypto/{network}/transactions for that).
-//	@Tags         CaaS - Instant USD (iUSD)
+//	@Summary      List USDC (CaaS) transactions
+//	@Description  Returns a paginated list of the user's Stablecoin (USDC / CaaS) transactions — funding, Phone Send transfers, and off-ramp withdrawals. These are CaaS-rail movements, not WaaS on-chain crypto history (see /wallets/crypto/{network}/transactions for that).
+//	@Tags         CaaS - Stablecoin (USDC)
 //	@Produce      json
 //	@Security     BearerAuth
 //	@Param        page      query     int  false  "Page number (default 1)"
@@ -243,9 +243,9 @@ func (h *CaaSHandler) ListTransactions(w http.ResponseWriter, r *http.Request) {
 
 // GetTransaction godoc
 //
-//	@Summary      Get an iUSD (CaaS) transaction
-//	@Description  Returns a single Instant USD (iUSD / CaaS) transaction by its UUID.
-//	@Tags         CaaS - Instant USD (iUSD)
+//	@Summary      Get an USDC (CaaS) transaction
+//	@Description  Returns a single Stablecoin (USDC / CaaS) transaction by its UUID.
+//	@Tags         CaaS - Stablecoin (USDC)
 //	@Produce      json
 //	@Security     BearerAuth
 //	@Param        id  path      string  true  "Transaction UUID"
@@ -266,9 +266,9 @@ func (h *CaaSHandler) GetTransaction(w http.ResponseWriter, r *http.Request) {
 
 // Withdraw godoc
 //
-//	@Summary      Withdraw iUSD to Mobile Money (off-ramp)
-//	@Description  Off-ramps Instant USD (iUSD) from the user's EIP-4337 Smart Contract Wallet back to fiat on their Mobile Money number, via Rach CaaS (settles the on-chain USDC and pays out local currency). The `token` field is the on-chain settlement asset; the customer balance is iUSD.
-//	@Tags         CaaS - Instant USD (iUSD)
+//	@Summary      Withdraw USDC to Mobile Money (off-ramp)
+//	@Description  Off-ramps Stablecoin (USDC) from the user's EIP-4337 Smart Contract Wallet back to fiat on their Mobile Money number, via Rach CaaS (settles the on-chain USDC and pays out local currency). The `token` field is the on-chain settlement asset; the customer balance is USDC.
+//	@Tags         CaaS - Stablecoin (USDC)
 //	@Accept       json
 //	@Produce      json
 //	@Security     BearerAuth

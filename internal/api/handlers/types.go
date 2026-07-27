@@ -213,7 +213,7 @@ type CryptoBalanceResponse struct {
 
 // FundAccountRequest is the body for POST /crypto/fund.
 // The customer specifies how much XOF/XAF to collect via Mobile Money
-// and which stablecoin they want in their Instant USD Account.
+// and which stablecoin they want in their Stablecoin Account.
 type FundAccountRequest struct {
 	// Currency of the Mobile Money deposit: XOF or XAF
 	Currency string `json:"currency" example:"XOF" enums:"XOF,XAF"`
@@ -459,8 +459,14 @@ type KYCStatusResponse struct {
 }
 
 type KYCDocumentRequest struct {
-	// DocType one of: national_id | passport | selfie | proof_of_address
-	DocType string `json:"doc_type" example:"national_id" enums:"national_id,passport,selfie,proof_of_address"`
+	// DocType is the kind of document. Individual KYC: national_id | passport |
+	// selfie | proof_of_address. Business (KYB, Nilos merchant onboarding):
+	// certificate_of_incorporation | director_register | shareholder_register |
+	// articles_of_association | proof_of_address | proof_of_address_ubo |
+	// proof_of_company_activity | business_bank_statement | proof_of_imports |
+	// id_document | idv_liveness | proof_of_wealth. Which ones apply (and whether
+	// required) is returned by GET /kyc/requirements documents[].
+	DocType string `json:"doc_type" example:"certificate_of_incorporation" enums:"national_id,passport,selfie,proof_of_address,proof_of_address_ubo,certificate_of_incorporation,director_register,shareholder_register,articles_of_association,proof_of_company_activity,business_bank_statement,proof_of_imports,id_document,idv_liveness,proof_of_wealth"`
 	// DocURL is the GCS object path or signed URL returned by the upload endpoint
 	DocURL string `json:"doc_url" example:"https://storage.googleapis.com/digitalfx-kyc-dev/doc.jpg"`
 }

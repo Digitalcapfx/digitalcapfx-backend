@@ -32,6 +32,7 @@ import (
 
 	"github.com/rachfinance/digitalfx/internal/clients/hub2"
 	"github.com/rachfinance/digitalfx/internal/clients/nilos"
+	"github.com/rachfinance/digitalfx/internal/clients/nomba"
 	db "github.com/rachfinance/digitalfx/internal/db/sqlc"
 )
 
@@ -57,6 +58,7 @@ type WithdrawalService struct {
 	pool        *pgxpool.Pool
 	hub2Client  *hub2.Client
 	nilosClient *nilos.Client
+	nombaClient *nomba.Client
 	notif       *NotificationService
 	limits      LimitsProvider
 	logger      *zap.Logger
@@ -66,6 +68,7 @@ func NewWithdrawalService(
 	pool *pgxpool.Pool,
 	hub2Client *hub2.Client,
 	nilosClient *nilos.Client,
+	nombaClient *nomba.Client,
 	notif *NotificationService,
 	limits LimitsProvider,
 	logger *zap.Logger,
@@ -74,6 +77,7 @@ func NewWithdrawalService(
 		pool:        pool,
 		hub2Client:  hub2Client,
 		nilosClient: nilosClient,
+		nombaClient: nombaClient,
 		notif:       notif,
 		limits:      limits,
 		logger:      logger,
@@ -185,6 +189,7 @@ type InitiateWithdrawalRequest struct {
 	// Bank
 	BankName      string `json:"bank_name"`
 	AccountNumber string `json:"account_number"`
+	BankCode      string `json:"bank_code"` // Nigerian NGN transfers (Nomba) — from GET /nomba/banks
 	IBAN          string `json:"iban"`
 	SwiftCode     string `json:"swift_code"`
 	SortCode      string `json:"sort_code"`
@@ -215,6 +220,8 @@ func (s *WithdrawalService) Initiate(ctx context.Context, userID uuid.UUID, req 
 		incomingUSD *= 1.08
 	case "GBP":
 		incomingUSD *= 1.27
+	case "NGN":
+		incomingUSD *= 0.00065 // ~₦1,540/USD — approximate, for limit checks only
 	}
 	limits := s.limits.Resolve(ctx, userID, s.accountType(ctx, userID))
 	if limits.PerTransactionUSD > 0 && incomingUSD > limits.PerTransactionUSD {
@@ -370,6 +377,12 @@ func (s *WithdrawalService) processBankTransfer(
 	req InitiateWithdrawalRequest,
 	quote *WithdrawalQuoteResponse,
 ) error {
+	// Nigerian Naira payouts settle via Nomba (bank transfer to any NGN bank),
+	// not Nilos.
+	if req.SourceCurrency == "NGN" || req.DestinationCurrency == "NGN" {
+		return s.processNombaNGNTransfer(ctx, q, w, req, quote)
+	}
+
 	if acct.NilosAccountID == nil || *acct.NilosAccountID == "" {
 		return fmt.Errorf("no Nilos account provisioned for %s", req.SourceCurrency)
 	}
@@ -452,6 +465,51 @@ func (s *WithdrawalService) processBankTransfer(
 		zap.String("nilos_payout_id", payout.ID),
 		zap.String("source", req.SourceCurrency),
 		zap.String("target", req.DestinationCurrency),
+	)
+	return nil
+}
+
+// processNombaNGNTransfer pays out Naira to a Nigerian bank account via Nomba.
+// NGN payouts are same-currency, so no FX quote is needed. Final confirmation
+// arrives asynchronously on the Nomba payout webhook.
+func (s *WithdrawalService) processNombaNGNTransfer(
+	ctx context.Context,
+	q *db.Queries,
+	w *db.FiatWithdrawal,
+	req InitiateWithdrawalRequest,
+	quote *WithdrawalQuoteResponse,
+) error {
+	if s.nombaClient == nil || !s.nombaClient.Configured() {
+		return fmt.Errorf("nomba not configured for NGN payouts")
+	}
+	if req.AccountNumber == "" || req.BankCode == "" {
+		return fmt.Errorf("account_number and bank_code are required for NGN bank transfers")
+	}
+
+	res, err := s.nombaClient.BankTransfer(ctx, nomba.BankTransferRequest{
+		Amount:        quote.DestinationAmount,
+		AccountNumber: req.AccountNumber,
+		AccountName:   req.RecipientName,
+		BankCode:      req.BankCode,
+		MerchantTxRef: w.Reference,
+		SenderName:    "DigitalFX",
+		Narration:     "DigitalFX withdrawal " + w.Reference,
+	})
+	if err != nil {
+		return fmt.Errorf("nomba bank transfer: %w", err)
+	}
+
+	// SUCCESS or PENDING_BILLING → mark processing; the payout webhook finalises.
+	if _, err := q.UpdateFiatWithdrawalStatus(ctx, db.UpdateFiatWithdrawalStatusParams{
+		ID: w.ID, Status: "processing",
+	}); err != nil {
+		s.logger.Error("update NGN withdrawal status", zap.Error(err))
+	}
+
+	s.logger.Info("nomba NGN payout submitted",
+		zap.String("wd_ref", w.Reference),
+		zap.String("nomba_tx_id", res.ID),
+		zap.String("nomba_status", res.Status),
 	)
 	return nil
 }

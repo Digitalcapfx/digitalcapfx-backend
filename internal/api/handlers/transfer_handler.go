@@ -68,14 +68,14 @@ func (h *TransferHandler) InternalTransfer(w http.ResponseWriter, r *http.Reques
 //	@Failure      500   {object}  ErrorResponse
 //	@Router       /transfers/hub2 [post]
 func (h *TransferHandler) Hub2Payment(w http.ResponseWriter, r *http.Request) {
-	// Deprecated: use POST /api/v1/crypto/fund to fund the Instant USD Account
+	// Deprecated: use POST /api/v1/crypto/fund to fund the Stablecoin Account
 	// via Mobile Money. This generic endpoint is no longer active.
 	_, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
 		response.Unauthorized(w, "unauthorized")
 		return
 	}
-	response.BadRequest(w, "DEPRECATED", "use POST /api/v1/crypto/fund to fund your Instant USD Account")
+	response.BadRequest(w, "DEPRECATED", "use POST /api/v1/crypto/fund to fund your Stablecoin Account")
 }
 
 // ExchangeCurrency godoc

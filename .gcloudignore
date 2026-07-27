@@ -1,0 +1,15 @@
+# Keep the Cloud Build upload lean and free of local secrets/junk.
+.git/
+.gitignore
+scratch/
+.env
+.env.*
+!.env.example
+*.log
+bin/
+tmp/
+# Throwaway root scripts (each is its own package main) — not part of the app.
+test_nilos.go
+test_nilos_endpoints.go
+test_sms.go
+find_missing_swag.go
