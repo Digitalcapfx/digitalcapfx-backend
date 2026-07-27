@@ -70,15 +70,24 @@ func (p *SumsubProvider) HandleWebhook(ctx context.Context, body []byte, headers
 
 func mapSumsubEvent(eventType, reviewAnswer string) string {
 	switch eventType {
-	case "applicantReviewed":
+	// Final decision events. `applicantWorkflowCompleted` is the decision event
+	// for workflow-based levels — without it, workflow applicants would never be
+	// approved/rejected.
+	case "applicantReviewed", "applicantWorkflowCompleted":
 		if reviewAnswer == "GREEN" {
 			return "approved"
 		}
 		return "rejected"
-	case "applicantPending", "applicantCreated":
+	case "applicantWorkflowFailed":
+		return "rejected"
+	// In-progress / awaiting states → under review (documents submitted).
+	case "applicantPending", "applicantCreated", "applicantOnHold",
+		"applicantAwaitingUser", "applicantAwaitingService":
 		return "under_review"
 	case "applicantActionPending":
 		return "processing"
+	// Everything else (activated/deactivated/deleted/reset/level-changed/kyt/…)
+	// is not a KYC decision — ignore.
 	default:
 		return "pending"
 	}
