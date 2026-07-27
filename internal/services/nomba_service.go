@@ -5,8 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strconv"
+	"strings"
 
-	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"go.uber.org/zap"
 
@@ -48,6 +49,48 @@ func (s *NombaService) LookupAccount(ctx context.Context, accountNumber, bankCod
 		return nil, errors.New("nomba not configured")
 	}
 	return s.client.LookupBankAccount(ctx, accountNumber, bankCode)
+}
+
+// GetWalletBalance returns the aggregate Nomba merchant (parent) NGN balance,
+// for treasury reconciliation against the sum of NGN ledger balances. This is
+// NOT a per-customer balance — Nomba virtual accounts are collection aliases.
+func (s *NombaService) GetWalletBalance(ctx context.Context) (float64, error) {
+	if s.client == nil || !s.client.Configured() {
+		return 0, errors.New("nomba not configured")
+	}
+	bal, err := s.client.GetWalletBalance(ctx)
+	if err != nil {
+		return 0, err
+	}
+	f, _ := strconv.ParseFloat(strings.TrimSpace(bal.Amount), 64)
+	return f, nil
+}
+
+// NombaReconciliation compares the Nomba merchant wallet balance against the sum
+// of all customers' NGN ledger balances. A non-zero difference flags drift
+// between what Nomba holds and what our ledger says we owe customers.
+type NombaReconciliation struct {
+	Currency           string  `json:"currency"`
+	NombaWalletBalance float64 `json:"nomba_wallet_balance"`
+	LedgerTotalNGN     float64 `json:"ledger_total_ngn"`
+	Difference         float64 `json:"difference"`
+}
+
+// Reconcile returns the NGN treasury reconciliation (Nomba wallet vs ledger).
+func (s *NombaService) Reconcile(ctx context.Context) (*NombaReconciliation, error) {
+	wallet, err := s.GetWalletBalance(ctx)
+	if err != nil {
+		return nil, err
+	}
+	q := db.New(s.pool)
+	sum, _ := q.SumAccountBalanceByCurrency(ctx, "NGN")
+	ledger := pgNumericToFloat(sum)
+	return &NombaReconciliation{
+		Currency:           "NGN",
+		NombaWalletBalance: wallet,
+		LedgerTotalNGN:     ledger,
+		Difference:         wallet - ledger,
+	}, nil
 }
 
 // HandleWebhook verifies and processes an inbound Nomba webhook. When a webhook
@@ -112,12 +155,15 @@ func (s *NombaService) creditVirtualAccount(ctx context.Context, ev *nomba.Webho
 		return nil
 	}
 
-	var amt pgtype.Numeric
-	if err := amt.Scan(fmt.Sprintf("%.6f", amount)); err != nil {
-		return fmt.Errorf("encode nomba credit amount: %w", err)
-	}
-	if _, err := q.CreditAccount(ctx, db.CreditAccountParams{ID: account.ID, Balance: amt}); err != nil {
+	// Idempotent credit: keyed on the Nomba transaction id so a redelivered
+	// webhook never inflates the balance.
+	credited, err := creditDepositOnce(ctx, s.pool, "nomba", ev.TxID(), account.ID, "NGN", amount)
+	if err != nil {
 		return fmt.Errorf("credit NGN account %s: %w", account.ID, err)
+	}
+	if !credited {
+		s.logger.Info("nomba credit webhook: duplicate event ignored", zap.String("tx_id", ev.TxID()))
+		return nil
 	}
 
 	s.logger.Info("nomba NGN credit applied",

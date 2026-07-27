@@ -28,6 +28,7 @@ type Services struct {
 	CaaS           *CaaSService // Stablecoin (USDC) — EIP-4337 SCW rail
 	KYC            *KYCService
 	Nomba          *NombaService // Nigerian NGN rails (virtual accounts + payouts)
+	Nilos          *NilosService // Nilos fiat rails: deposit crediting + live balance
 	HUB2           *HUB2Service
 	Dashboard      *DashboardService
 	Notifications  *NotificationService
@@ -40,6 +41,7 @@ type Services struct {
 	Activity       *ActivityService
 	Insights       *InsightsService
 	Staff          *StaffService
+	Department     *DepartmentService
 	Business       *BusinessService
 	Referral       *ReferralService
 	Swap           *SwapService
@@ -81,6 +83,7 @@ func New(
 	}
 
 	notif := NewNotificationService(pool, fcm, logger)
+	nilosSvc := NewNilosService(pool, nilosClient, notif, cfg.Nilos.WebhookSecret, logger)
 	hub2Svc := NewHUB2Service(pool, hub2Client, caasClient, logger)
 	limitsSvc := NewLimitsService(pool, DefaultLimitsResolver(), logger)
 	withdrawalSvc := NewWithdrawalService(pool, hub2Client, nilosClient, nombaClient, notif, limitsSvc, logger)
@@ -100,6 +103,7 @@ func New(
 		CaaS:           NewCaaSService(pool, caasClient, hub2Client, logger),
 		KYC:            NewKYCService(pool, cfg, logger, kycProvider, emailClient, notif, nilosClient, nombaClient),
 		Nomba:          NewNombaService(pool, nombaClient, notif, cfg.Nomba.WebhookSecret, logger),
+		Nilos:          nilosSvc,
 		HUB2:           hub2Svc,
 		Dashboard:      NewDashboardService(pool, nilosClient, paymentsClient, caasClient, logger),
 		Notifications:  notif,
@@ -107,11 +111,12 @@ func New(
 		Security:       NewSecurityService(pool, rdb, logger),
 		Preferences:    NewPreferencesService(pool, logger),
 		Support:        NewSupportService(pool, logger),
-		WalletOverview: NewWalletOverviewService(pool, caasClient, paymentsClient, logger),
+		WalletOverview: NewWalletOverviewService(pool, caasClient, paymentsClient, nilosSvc, logger),
 		Exchange:       NewExchangeService(pool, nilosClient, logger),
 		Activity:       NewActivityService(pool, logger),
 		Insights:       NewInsightsService(pool, caasClient, paymentsClient, logger),
 		Staff:          NewStaffService(pool, emailClient, cfg.App.BaseURL, logger),
+		Department:     NewDepartmentService(pool, logger),
 		Business:       NewBusinessService(pool, logger),
 		Referral:       NewReferralService(pool, logger),
 		Swap:           NewSwapService(paymentsClient, logger),

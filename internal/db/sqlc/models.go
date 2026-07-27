@@ -48,6 +48,14 @@ type AdminAuditLog struct {
 	CreatedAt  time.Time `json:"created_at"`
 }
 
+type AdminDepartment struct {
+	ID          uuid.UUID `json:"id"`
+	Name        string    `json:"name"`
+	Description *string   `json:"description"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
+}
+
 type AdminStaff struct {
 	ID                 uuid.UUID       `json:"id"`
 	UserID             *uuid.UUID      `json:"user_id"`
@@ -63,6 +71,9 @@ type AdminStaff struct {
 	LastLoginAt        *time.Time      `json:"last_login_at"`
 	CreatedAt          time.Time       `json:"created_at"`
 	UpdatedAt          time.Time       `json:"updated_at"`
+	DepartmentID       *uuid.UUID      `json:"department_id"`
+	InviteOtpHash      *string         `json:"invite_otp_hash"`
+	InviteOtpExpiresAt *time.Time      `json:"invite_otp_expires_at"`
 }
 
 type Beneficiary struct {
@@ -180,10 +191,6 @@ type CryptoTransaction struct {
 	LocalFiatAmount *string    `json:"local_fiat_amount"`
 	LocalCurrency   *string    `json:"local_currency"`
 }
-
-// NOTE: CurrencyRate is intentionally in the hand-written currency_rates.sql.go
-// (float64 via ::float8), not here. sqlc re-adds a conflicting pgtype.Numeric
-// version on every generate — delete it after each `sqlc generate`.
 
 type DeviceToken struct {
 	ID        uuid.UUID `json:"id"`
@@ -390,6 +397,16 @@ type PointsLedger struct {
 	Amount      int32     `json:"amount"`
 	Description string    `json:"description"`
 	CreatedAt   time.Time `json:"created_at"`
+}
+
+type ProcessedDepositEvent struct {
+	ID        uuid.UUID      `json:"id"`
+	Provider  string         `json:"provider"`
+	EventID   string         `json:"event_id"`
+	AccountID *uuid.UUID     `json:"account_id"`
+	Amount    pgtype.Numeric `json:"amount"`
+	Currency  string         `json:"currency"`
+	CreatedAt time.Time      `json:"created_at"`
 }
 
 type SumsubVerification struct {

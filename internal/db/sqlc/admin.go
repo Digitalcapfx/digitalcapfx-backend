@@ -24,6 +24,7 @@ type StaffMember struct {
 	InviteToken        *string    `json:"-"`
 	InviteAcceptedAt   *time.Time `json:"invite_accepted_at"`
 	LastLoginAt        *time.Time `json:"last_login_at"`
+	DepartmentID       *uuid.UUID `json:"department_id"`
 	CreatedAt          time.Time  `json:"created_at"`
 	UpdatedAt          time.Time  `json:"updated_at"`
 }
@@ -47,6 +48,7 @@ func FromAdminStaff(m AdminStaff) StaffMember {
 		InviteToken:        m.InviteToken,
 		InviteAcceptedAt:   m.InviteAcceptedAt,
 		LastLoginAt:        m.LastLoginAt,
+		DepartmentID:       m.DepartmentID,
 		CreatedAt:          m.CreatedAt,
 		UpdatedAt:          m.UpdatedAt,
 	}

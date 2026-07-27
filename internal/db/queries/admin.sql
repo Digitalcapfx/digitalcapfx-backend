@@ -1,8 +1,9 @@
 -- name: CreateStaffMember :one
 INSERT INTO admin_staff (
-    email, name, role, custom_permissions, revoked_permissions, invited_by, invite_token
+    email, name, role, custom_permissions, revoked_permissions, invited_by,
+    invite_token, department_id, invite_otp_hash, invite_otp_expires_at
 ) VALUES (
-    $1, $2, $3, $4, $5, $6, $7
+    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10
 ) RETURNING *;
 
 -- name: GetStaffMemberByID :one
@@ -40,6 +41,26 @@ RETURNING *;
 UPDATE admin_staff
 SET user_id = $1, invite_token = NULL, invite_accepted_at = now(), updated_at = now(), is_active = true
 WHERE invite_token = $2;
+
+-- name: AcceptStaffInviteByID :exec
+UPDATE admin_staff
+SET user_id = $1, invite_token = NULL, invite_otp_hash = NULL, invite_otp_expires_at = NULL,
+    invite_accepted_at = now(), updated_at = now(), is_active = true
+WHERE id = $2 AND invite_accepted_at IS NULL;
+
+-- name: SetStaffInviteOTP :exec
+UPDATE admin_staff
+SET invite_otp_hash = $2, invite_otp_expires_at = $3, invite_token = $4, updated_at = now()
+WHERE id = $1 AND invite_accepted_at IS NULL;
+
+-- name: RevokeStaffInvite :execrows
+DELETE FROM admin_staff WHERE id = $1 AND invite_accepted_at IS NULL;
+
+-- name: DeleteStaffMember :execrows
+DELETE FROM admin_staff WHERE id = $1;
+
+-- name: SetStaffDepartment :exec
+UPDATE admin_staff SET department_id = $2, updated_at = now() WHERE id = $1;
 
 -- name: DisableStaffMember :exec
 UPDATE admin_staff SET is_active = false, updated_at = now() WHERE id = $1;

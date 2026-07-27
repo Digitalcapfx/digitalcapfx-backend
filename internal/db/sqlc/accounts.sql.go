@@ -179,6 +179,40 @@ func (q *Queries) GetAccountByID(ctx context.Context, id uuid.UUID) (Account, er
 	return i, err
 }
 
+const getAccountByNilosAccountID = `-- name: GetAccountByNilosAccountID :one
+SELECT id, user_id, currency, balance, available_balance, account_number, status, created_at, updated_at, nilos_account_id, nilos_customer_id, iban, bic, sort_code, account_number_uk, nomba_account_ref, nomba_account_holder_id, nomba_bank_name, nomba_bank_account_number, nomba_bank_account_name FROM accounts
+WHERE nilos_account_id = $1
+LIMIT 1
+`
+
+func (q *Queries) GetAccountByNilosAccountID(ctx context.Context, nilosAccountID *string) (Account, error) {
+	row := q.db.QueryRow(ctx, getAccountByNilosAccountID, nilosAccountID)
+	var i Account
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.Currency,
+		&i.Balance,
+		&i.AvailableBalance,
+		&i.AccountNumber,
+		&i.Status,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.NilosAccountID,
+		&i.NilosCustomerID,
+		&i.Iban,
+		&i.Bic,
+		&i.SortCode,
+		&i.AccountNumberUk,
+		&i.NombaAccountRef,
+		&i.NombaAccountHolderID,
+		&i.NombaBankName,
+		&i.NombaBankAccountNumber,
+		&i.NombaBankAccountName,
+	)
+	return i, err
+}
+
 const getAccountByNombaAccountNumber = `-- name: GetAccountByNombaAccountNumber :one
 SELECT id, user_id, currency, balance, available_balance, account_number, status, created_at, updated_at, nilos_account_id, nilos_customer_id, iban, bic, sort_code, account_number_uk, nomba_account_ref, nomba_account_holder_id, nomba_bank_name, nomba_bank_account_number, nomba_bank_account_name FROM accounts
 WHERE nomba_bank_account_number = $1
@@ -332,6 +366,47 @@ func (q *Queries) GetAccountsByUserID(ctx context.Context, userID uuid.UUID) ([]
 		return nil, err
 	}
 	return items, nil
+}
+
+const recordDepositEvent = `-- name: RecordDepositEvent :execrows
+INSERT INTO processed_deposit_events (provider, event_id, account_id, amount, currency)
+VALUES ($1, $2, $3, $4, $5)
+ON CONFLICT (provider, event_id) DO NOTHING
+`
+
+type RecordDepositEventParams struct {
+	Provider  string         `json:"provider"`
+	EventID   string         `json:"event_id"`
+	AccountID *uuid.UUID     `json:"account_id"`
+	Amount    pgtype.Numeric `json:"amount"`
+	Currency  string         `json:"currency"`
+}
+
+func (q *Queries) RecordDepositEvent(ctx context.Context, arg RecordDepositEventParams) (int64, error) {
+	result, err := q.db.Exec(ctx, recordDepositEvent,
+		arg.Provider,
+		arg.EventID,
+		arg.AccountID,
+		arg.Amount,
+		arg.Currency,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const sumAccountBalanceByCurrency = `-- name: SumAccountBalanceByCurrency :one
+SELECT COALESCE(SUM(balance), 0)::numeric AS total
+FROM accounts
+WHERE currency = $1
+`
+
+func (q *Queries) SumAccountBalanceByCurrency(ctx context.Context, currency string) (pgtype.Numeric, error) {
+	row := q.db.QueryRow(ctx, sumAccountBalanceByCurrency, currency)
+	var total pgtype.Numeric
+	err := row.Scan(&total)
+	return total, err
 }
 
 const updateNilosAccountDetails = `-- name: UpdateNilosAccountDetails :exec

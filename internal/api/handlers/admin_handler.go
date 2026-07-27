@@ -62,6 +62,53 @@ func (h *AdminHandler) ListPendingKYC(w http.ResponseWriter, r *http.Request) {
 	response.OK(w, out)
 }
 
+// GetKYCReview godoc
+//
+//	@Summary      Get a user's KYC/KYB review detail
+//	@Description  Everything an admin needs to decide on a user's identity verification: the decision state (kyc_status, provider status, manual override), the fields the customer submitted in the intake form (identity + address + AML; for business, importer flag + top counterparties + contact), their uploaded documents (the Nilos KYB set for business), and the company profile for business accounts. Use before POST /admin/kyc/{id}/approve or /reject.
+//	@Tags         admin
+//	@Produce      json
+//	@Security     BearerAuth
+//	@Param        id   path      string  true  "User ID"
+//	@Success      200  {object}  services.AdminKYCReview
+//	@Failure      401  {object}  ErrorResponse
+//	@Failure      403  {object}  ErrorResponse
+//	@Failure      404  {object}  ErrorResponse
+//	@Router       /admin/kyc/{id} [get]
+func (h *AdminHandler) GetKYCReview(w http.ResponseWriter, r *http.Request) {
+	userID, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		response.BadRequest(w, "VALIDATION_ERROR", "invalid user id")
+		return
+	}
+	review, err := h.svc.KYC.AdminGetKYCReview(r.Context(), userID)
+	if err != nil {
+		response.NotFound(w, "user not found")
+		return
+	}
+	response.OK(w, review)
+}
+
+// GetNombaReconciliation godoc
+//
+//	@Summary      NGN treasury reconciliation (Nomba)
+//	@Description  Compares the Nomba merchant (parent) wallet NGN balance against the sum of all customers' NGN ledger balances. A non-zero `difference` flags drift. Nomba virtual accounts are collection aliases (no per-customer balance at Nomba), so per-customer NGN balances live in our ledger — this is the aggregate check.
+//	@Tags         admin
+//	@Produce      json
+//	@Security     BearerAuth
+//	@Success      200  {object}  services.NombaReconciliation
+//	@Failure      403  {object}  ErrorResponse
+//	@Failure      503  {object}  ErrorResponse
+//	@Router       /admin/reconciliation/nomba [get]
+func (h *AdminHandler) GetNombaReconciliation(w http.ResponseWriter, r *http.Request) {
+	rec, err := h.svc.Nomba.Reconcile(r.Context())
+	if err != nil {
+		response.ServiceUnavailable(w, err.Error())
+		return
+	}
+	response.OK(w, rec)
+}
+
 // ApproveKYC godoc
 //
 //	@Summary      Approve user KYC

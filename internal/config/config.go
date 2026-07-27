@@ -153,9 +153,10 @@ type GoogleConfig struct {
 // NilosConfig holds credentials for the Nilos fiat banking API.
 // Auth uses HMAC-SHA256: X-Api-Key = APIKey (ID), X-Api-Signature = HMAC-SHA256(path+body, APISecret).
 type NilosConfig struct {
-	BaseURL   string
-	APIKey    string // key ID sent as X-Api-Key
-	APISecret string // signing secret for HMAC-SHA256
+	BaseURL       string
+	APIKey        string // key ID sent as X-Api-Key
+	APISecret     string // signing secret for HMAC-SHA256
+	WebhookSecret string // secret for verifying inbound Nilos deposit webhooks
 }
 
 // NombaConfig holds credentials for the Nomba API (Nigerian NGN rails: virtual
@@ -250,6 +251,7 @@ func Load() (*Config, error) {
 	cfg.Nilos.BaseURL = getEnv("NILOS_BASE_URL", "https://app-demo.nilos.io")
 	cfg.Nilos.APIKey = getEnv("NILOS_API_KEY", "")
 	cfg.Nilos.APISecret = getEnv("NILOS_API_SECRET", "")
+	cfg.Nilos.WebhookSecret = getEnv("NILOS_WEBHOOK_SECRET", "")
 
 	cfg.Nomba.BaseURL = getEnv("NOMBA_BASE_URL", "https://api.nomba.com")
 	cfg.Nomba.ClientID = getEnv("NOMBA_CLIENT_ID", "")

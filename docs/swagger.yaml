@@ -32,6 +32,44 @@ definitions:
         description: '"credit" | "debit" | "exchange"'
         type: string
     type: object
+  db.AdminDepartment:
+    properties:
+      created_at:
+        type: string
+      description:
+        type: string
+      id:
+        type: string
+      name:
+        type: string
+      updated_at:
+        type: string
+    type: object
+  db.BusinessProfile:
+    properties:
+      annual_revenue:
+        type: string
+      business_website:
+        type: string
+      company_legal_name:
+        type: string
+      company_registration_no:
+        type: string
+      country_of_incorporation:
+        type: string
+      created_at:
+        type: string
+      directors_complete:
+        type: boolean
+      documents_complete:
+        type: boolean
+      industry:
+        type: string
+      updated_at:
+        type: string
+      user_id:
+        type: string
+    type: object
   db.CaasWithdrawal:
     properties:
       amount:
@@ -70,6 +108,25 @@ definitions:
       standard_rate:
         type: number
       updated_at:
+        type: string
+    type: object
+  db.KycDocument:
+    properties:
+      created_at:
+        type: string
+      doc_type:
+        type: string
+      doc_url:
+        type: string
+      id:
+        type: string
+      rejection_reason:
+        type: string
+      status:
+        type: string
+      updated_at:
+        type: string
+      user_id:
         type: string
     type: object
   db.MerchantStaff:
@@ -125,8 +182,11 @@ definitions:
     type: object
   handlers.AcceptInviteRequest:
     properties:
-      token:
-        example: a3f8b2c1...
+      email:
+        example: alice@example.com
+        type: string
+      otp:
+        example: "482913"
         type: string
     type: object
   handlers.AccountData:
@@ -388,6 +448,15 @@ definitions:
       success:
         example: true
         type: boolean
+    type: object
+  handlers.DepartmentRequest:
+    properties:
+      description:
+        example: Handles KYC/AML review
+        type: string
+      name:
+        example: Compliance
+        type: string
     type: object
   handlers.DepositRequest:
     properties:
@@ -742,6 +811,10 @@ definitions:
         items:
           type: string
         type: array
+      department_id:
+        example: ""
+        format: uuid
+        type: string
       email:
         example: alice@example.com
         type: string
@@ -1288,6 +1361,14 @@ definitions:
       standard_rate:
         example: 609
         type: number
+    type: object
+  handlers.SetStaffDepartmentRequest:
+    properties:
+      department_id:
+        description: null to clear
+        example: ""
+        format: uuid
+        type: string
     type: object
   handlers.SetUserLimitsInput:
     properties:
@@ -2075,6 +2156,74 @@ definitions:
       per_transaction_usd:
         type: number
     type: object
+  services.AdminKYCIntakeView:
+    properties:
+      address_line1:
+        type: string
+      address_line2:
+        type: string
+      bvn:
+        type: string
+      city:
+        type: string
+      contact_email:
+        type: string
+      contact_phone:
+        type: string
+      counterparties:
+        items:
+          $ref: '#/definitions/services.Counterparty'
+        type: array
+      country:
+        type: string
+      date_of_birth:
+        type: string
+      is_importer:
+        type: boolean
+      legal_first_name:
+        type: string
+      legal_last_name:
+        type: string
+      nationality:
+        type: string
+      occupation:
+        type: string
+      postal_code:
+        type: string
+      purpose_of_account:
+        type: string
+      source_of_funds:
+        type: string
+      state:
+        type: string
+      status:
+        type: string
+      submitted_at:
+        type: string
+    type: object
+  services.AdminKYCReview:
+    properties:
+      account_type:
+        type: string
+      business_profile:
+        $ref: '#/definitions/db.BusinessProfile'
+      documents:
+        items:
+          $ref: '#/definitions/db.KycDocument'
+        type: array
+      intake:
+        $ref: '#/definitions/services.AdminKYCIntakeView'
+      intake_completed:
+        type: boolean
+      kyc_provider_status:
+        type: string
+      kyc_status:
+        type: string
+      manual_override:
+        type: boolean
+      user_id:
+        type: string
+    type: object
   services.AssetAllocation:
     properties:
       crypto_pct:
@@ -2217,6 +2366,15 @@ definitions:
       name:
         type: string
       phone_number:
+        type: string
+    type: object
+  services.Counterparty:
+    properties:
+      country:
+        type: string
+      purpose:
+        type: string
+      relationship:
         type: string
     type: object
   services.CurrencyBalance:
@@ -2439,6 +2597,17 @@ definitions:
       spending:
         type: number
     type: object
+  services.NombaReconciliation:
+    properties:
+      currency:
+        type: string
+      difference:
+        type: number
+      ledger_total_ngn:
+        type: number
+      nomba_wallet_balance:
+        type: number
+    type: object
   services.PointsHistoryResponse:
     properties:
       history:
@@ -2520,6 +2689,77 @@ definitions:
       tier_default:
         $ref: '#/definitions/services.AccountLimits'
       user_id:
+        type: string
+    type: object
+  services.WalletActions:
+    properties:
+      can_exchange:
+        type: boolean
+      can_receive:
+        type: boolean
+      can_send:
+        type: boolean
+      can_withdraw:
+        type: boolean
+    type: object
+  services.WalletDetailResponse:
+    properties:
+      actions:
+        $ref: '#/definitions/services.WalletActions'
+      tokens:
+        items:
+          $ref: '#/definitions/services.WalletItem'
+        type: array
+      wallet:
+        $ref: '#/definitions/services.WalletItem'
+    type: object
+  services.WalletItem:
+    properties:
+      account_number:
+        description: fiat account number
+        type: string
+      address:
+        description: crypto / stablecoin receive address
+        type: string
+      balance:
+        description: decimal string
+        type: string
+      balance_raw:
+        type: number
+      balance_usd:
+        type: number
+      currency_symbol:
+        description: '"$" "€" "£"'
+        type: string
+      flag:
+        type: string
+      formatted_balance:
+        description: '"$12,450.75" | "0.4523 BTC"'
+        type: string
+      has_wallet:
+        description: false = not yet provisioned
+        type: boolean
+      id:
+        type: string
+      name:
+        type: string
+      network:
+        description: '"BTC" "ETH" etc.'
+        type: string
+      provider:
+        description: '"caas" | "waas" | "hub2" | "nilos"'
+        type: string
+      provider_balance:
+        description: |-
+          ProviderBalance is the authoritative live balance held at the provider
+          (Nilos for EUR/GBP/…) for verification/reconciliation against the ledger
+          `balance`. Nil when not applicable (e.g. NGN — Nomba has no per-account
+          balance) or when the provider read failed.
+        type: number
+      symbol:
+        type: string
+      type:
+        description: '"fiat" | "stablecoin" | "crypto"'
         type: string
     type: object
 host: localhost:8080
@@ -2885,6 +3125,183 @@ paths:
       summary: Admin dashboard statistics
       tags:
       - admin-users
+  /admin/departments:
+    get:
+      description: Returns all admin team departments with the number of staff assigned
+        to each.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List departments
+      tags:
+      - admin-departments
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Department
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.DepartmentRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/db.AdminDepartment'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Create a department
+      tags:
+      - admin-departments
+  /admin/departments/{id}:
+    delete:
+      description: Deletes a department. Fails if staff are still assigned to it —
+        reassign them first.
+      parameters:
+      - description: Department ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.MessageResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete a department
+      tags:
+      - admin-departments
+    get:
+      parameters:
+      - description: Department ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/db.AdminDepartment'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get a department
+      tags:
+      - admin-departments
+    patch:
+      consumes:
+      - application/json
+      parameters:
+      - description: Department ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Fields to update
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.DepartmentRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/db.AdminDepartment'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Update a department
+      tags:
+      - admin-departments
+  /admin/kyc/{id}:
+    get:
+      description: 'Everything an admin needs to decide on a user''s identity verification:
+        the decision state (kyc_status, provider status, manual override), the fields
+        the customer submitted in the intake form (identity + address + AML; for business,
+        importer flag + top counterparties + contact), their uploaded documents (the
+        Nilos KYB set for business), and the company profile for business accounts.
+        Use before POST /admin/kyc/{id}/approve or /reject.'
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/services.AdminKYCReview'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get a user's KYC/KYB review detail
+      tags:
+      - admin
   /admin/kyc/{id}/approve:
     post:
       description: Marks the user's identity as verified and activates full account
@@ -3090,6 +3507,33 @@ paths:
       summary: Permission catalogue
       tags:
       - admin-staff
+  /admin/reconciliation/nomba:
+    get:
+      description: Compares the Nomba merchant (parent) wallet NGN balance against
+        the sum of all customers' NGN ledger balances. A non-zero `difference` flags
+        drift. Nomba virtual accounts are collection aliases (no per-customer balance
+        at Nomba), so per-customer NGN balances live in our ledger — this is the aggregate
+        check.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/services.NombaReconciliation'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: NGN treasury reconciliation (Nomba)
+      tags:
+      - admin
   /admin/roles:
     get:
       description: Returns all role definitions with their default permissions, labels,
@@ -3178,6 +3622,40 @@ paths:
       tags:
       - admin-staff
   /admin/staff/{id}:
+    delete:
+      description: Permanently removes a staff member (any status). The linked user
+        account is untouched — only their admin access is removed. The owner cannot
+        be removed.
+      parameters:
+      - description: Staff ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.MessageResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Remove a staff member
+      tags:
+      - admin-staff
     get:
       description: Returns the full profile for a single staff member including their
         effective permissions (role defaults minus revocations plus custom grants).
@@ -3247,6 +3725,44 @@ paths:
       summary: Update a staff member's role or permissions
       tags:
       - admin-staff
+  /admin/staff/{id}/department:
+    put:
+      consumes:
+      - application/json
+      description: Sets (or clears, with null) the department of a staff member.
+      parameters:
+      - description: Staff ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Department assignment
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.SetStaffDepartmentRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Assign a staff member to a department
+      tags:
+      - admin-staff
   /admin/staff/{id}/disable:
     post:
       description: Deactivates a staff member's access. Subsequent API requests from
@@ -3301,6 +3817,71 @@ paths:
       security:
       - BearerAuth: []
       summary: Re-enable a disabled staff member
+      tags:
+      - admin-staff
+  /admin/staff/{id}/resend-invite:
+    post:
+      description: Regenerates the one-time code + link for a still-pending invite
+        and re-sends the email. Fails if the invite was already accepted.
+      parameters:
+      - description: Staff ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.MessageResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Resend a staff invitation
+      tags:
+      - admin-staff
+  /admin/staff/{id}/revoke:
+    post:
+      description: Cancels a still-pending invite (deletes the record, freeing the
+        email for a fresh invite). Fails if the invite was already accepted — use
+        DELETE /admin/staff/{id} to remove an active member.
+      parameters:
+      - description: Staff ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.MessageResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Revoke a pending staff invitation
       tags:
       - admin-staff
   /admin/staff/invite:
@@ -6764,7 +7345,7 @@ paths:
         a specific fiat currency. Fiat is backed by Nilos (foreign currencies) or
         HUB2 (XAF/XOF mobile money).
       parameters:
-      - description: Currency code (USD, EUR, GBP, XAF, XOF)
+      - description: Currency code (USD, EUR, GBP, XAF, XOF, NGN)
         in: path
         name: currency
         required: true
@@ -6773,10 +7354,10 @@ paths:
       - application/json
       responses:
         "200":
-          description: OK
+          description: Includes provider_balance (live Nilos balance) for verification
+            when applicable
           schema:
-            additionalProperties: true
-            type: object
+            $ref: '#/definitions/services.WalletDetailResponse'
         "401":
           description: Unauthorized
           schema:
@@ -7246,6 +7827,39 @@ paths:
           schema:
             $ref: '#/definitions/handlers.ErrorResponse'
       summary: MetaMap verification webhook
+      tags:
+      - webhooks
+  /webhooks/nilos:
+    post:
+      consumes:
+      - application/json
+      description: Receiver for Nilos transaction events. An inbound, successful transaction
+        credits the owning DigitalFX fiat account (resolved by the Nilos account id)
+        — idempotently, keyed on the Nilos transaction id, so redelivery never double-credits.
+        Signature is verified against NILOS_WEBHOOK_SECRET when set (the Nilos webhook
+        scheme is confirmed on first delivery — mismatches log the headers). Returns
+        200 on business-logic issues so Nilos does not retry; 401 only on signature
+        mismatch.
+      parameters:
+      - description: Nilos webhook payload
+        in: body
+        name: body
+        required: true
+        schema:
+          additionalProperties: true
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.MessageResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      summary: Nilos Webhook (fiat deposits)
       tags:
       - webhooks
   /webhooks/nomba:

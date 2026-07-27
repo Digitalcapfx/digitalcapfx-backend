@@ -16,6 +16,7 @@ import (
 
 	db "github.com/rachfinance/digitalfx/internal/db/sqlc"
 	"github.com/rachfinance/digitalfx/internal/pkg/email"
+	"github.com/rachfinance/digitalfx/internal/pkg/hash"
 )
 
 var (
@@ -24,6 +25,9 @@ var (
 	ErrCannotModifyOwner  = errors.New("the owner account cannot be modified via this endpoint")
 	ErrInvalidRole        = errors.New("invalid role — must be one of: admin, compliance, support, finance, readonly")
 	ErrInvalidInviteToken = errors.New("invite token is invalid or has already been used")
+	ErrInviteOTPInvalid   = errors.New("invite code is invalid or has expired")
+	ErrInviteAlreadyUsed  = errors.New("this invite has already been accepted")
+	ErrNoPendingInvite    = errors.New("no pending invite found (already accepted or does not exist)")
 )
 
 // ─── Response types ───────────────────────────────────────────────────────────
@@ -40,6 +44,7 @@ type StaffMemberView struct {
 	RevokedPermissions  []string   `json:"revoked_permissions"`
 	IsActive            bool       `json:"is_active"`
 	InviteAccepted      bool       `json:"invite_accepted"`
+	DepartmentID        *string    `json:"department_id"`
 	LastLoginAt         *time.Time `json:"last_login_at"`
 	CreatedAt           time.Time  `json:"created_at"`
 }
@@ -64,6 +69,7 @@ type InviteStaffInput struct {
 	Email          string
 	Name           string
 	Role           string
+	DepartmentID   *uuid.UUID
 	CustomPerms    []string
 	RevokedPerms   []string
 }
@@ -114,7 +120,20 @@ func (s *StaffService) InviteStaff(ctx context.Context, in InviteStaffInput) (*S
 		}
 	}
 
+	// Validate the department exists, if one was chosen.
+	if in.DepartmentID != nil {
+		if _, err := q.GetDepartmentByID(ctx, *in.DepartmentID); err != nil {
+			return nil, ErrDepartmentNotFound
+		}
+	}
+
 	token := generateStaffInviteToken()
+	otp := generateStaffInviteOTP()
+	otpHash, err := hash.PIN(otp)
+	if err != nil {
+		return nil, fmt.Errorf("hash invite otp: %w", err)
+	}
+	expires := time.Now().Add(inviteOTPTTL)
 
 	inviterID := in.InviterStaffID
 	member, err := q.CreateStaffMember(ctx, db.CreateStaffMemberParams{
@@ -125,15 +144,15 @@ func (s *StaffService) InviteStaff(ctx context.Context, in InviteStaffInput) (*S
 		RevokedPermissions: permsJSON(in.RevokedPerms),
 		InvitedBy:          &inviterID,
 		InviteToken:        &token,
+		DepartmentID:       in.DepartmentID,
+		InviteOtpHash:      &otpHash,
+		InviteOtpExpiresAt: &expires,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("create staff: %w", err)
 	}
 
-	// Send invite email asynchronously (best-effort).
-	if s.emailClient != nil {
-		go s.sendInviteEmail(in.Email, in.Name, in.Role, token)
-	}
+	s.deliverInvite(in.Email, in.Name, in.Role, token, otp)
 
 	s.logger.Info("staff invite created",
 		zap.String("email", in.Email),
@@ -144,14 +163,127 @@ func (s *StaffService) InviteStaff(ctx context.Context, in InviteStaffInput) (*S
 	return staffToView(db.FromAdminStaff(member)), nil
 }
 
-// AcceptInvite links a user account to the pending staff_member record.
-// Called after the invitee has registered/logged in and clicked the invite link.
-func (s *StaffService) AcceptInvite(ctx context.Context, token string, userID uuid.UUID) error {
+// AcceptInvite links the authenticated user to a pending staff record by
+// verifying the one-time code (OTP) emailed to that address. Called after the
+// invitee has registered/logged in as a user.
+func (s *StaffService) AcceptInvite(ctx context.Context, email, otp string, userID uuid.UUID) error {
+	email = strings.ToLower(strings.TrimSpace(email))
+	otp = strings.TrimSpace(otp)
+	if email == "" || otp == "" {
+		return ErrInviteOTPInvalid
+	}
+
 	q := db.New(s.pool)
-	if err := q.AcceptStaffInvite(ctx, db.AcceptStaffInviteParams{UserID: &userID, InviteToken: &token}); err != nil {
-		return ErrInvalidInviteToken
+	m, err := q.GetStaffMemberByEmail(ctx, email)
+	if err != nil {
+		return ErrInviteOTPInvalid
+	}
+	if m.InviteAcceptedAt != nil {
+		return ErrInviteAlreadyUsed
+	}
+	if m.InviteOtpHash == nil || m.InviteOtpExpiresAt == nil {
+		return ErrInviteOTPInvalid
+	}
+	if time.Now().After(*m.InviteOtpExpiresAt) {
+		return ErrInviteOTPInvalid
+	}
+	if !hash.CheckPIN(*m.InviteOtpHash, otp) {
+		return ErrInviteOTPInvalid
+	}
+
+	if err := q.AcceptStaffInviteByID(ctx, db.AcceptStaffInviteByIDParams{UserID: &userID, ID: m.ID}); err != nil {
+		return ErrInviteOTPInvalid
+	}
+	s.logger.Info("staff invite accepted", zap.String("email", email), zap.String("user_id", userID.String()))
+	return nil
+}
+
+// ResendInvite regenerates the invite code + token for a still-pending invite
+// and re-sends the email.
+func (s *StaffService) ResendInvite(ctx context.Context, id uuid.UUID) error {
+	q := db.New(s.pool)
+	m, err := q.GetStaffMemberByID(ctx, id)
+	if err != nil {
+		return ErrStaffNotFound
+	}
+	if m.InviteAcceptedAt != nil {
+		return ErrInviteAlreadyUsed
+	}
+
+	token := generateStaffInviteToken()
+	otp := generateStaffInviteOTP()
+	otpHash, err := hash.PIN(otp)
+	if err != nil {
+		return fmt.Errorf("hash invite otp: %w", err)
+	}
+	expires := time.Now().Add(inviteOTPTTL)
+	if err := q.SetStaffInviteOTP(ctx, db.SetStaffInviteOTPParams{
+		ID:                 id,
+		InviteOtpHash:      &otpHash,
+		InviteOtpExpiresAt: &expires,
+		InviteToken:        &token,
+	}); err != nil {
+		return fmt.Errorf("resend invite: %w", err)
+	}
+	s.deliverInvite(m.Email, m.Name, m.Role, token, otp)
+	s.logger.Info("staff invite resent", zap.String("email", m.Email))
+	return nil
+}
+
+// RevokeInvite cancels a still-pending invite (deletes the record, freeing the
+// email for a fresh invite). Errors if the invite was already accepted.
+func (s *StaffService) RevokeInvite(ctx context.Context, id uuid.UUID) error {
+	q := db.New(s.pool)
+	rows, err := q.RevokeStaffInvite(ctx, id)
+	if err != nil {
+		return fmt.Errorf("revoke invite: %w", err)
+	}
+	if rows == 0 {
+		return ErrNoPendingInvite
 	}
 	return nil
+}
+
+// Remove permanently deletes a staff member (any status). The owner cannot be
+// removed. The linked user account is untouched — only their admin access is.
+func (s *StaffService) Remove(ctx context.Context, id uuid.UUID) error {
+	q := db.New(s.pool)
+	m, err := q.GetStaffMemberByID(ctx, id)
+	if err != nil {
+		return ErrStaffNotFound
+	}
+	if m.Role == "owner" {
+		return ErrCannotModifyOwner
+	}
+	rows, err := q.DeleteStaffMember(ctx, id)
+	if err != nil {
+		return fmt.Errorf("remove staff: %w", err)
+	}
+	if rows == 0 {
+		return ErrStaffNotFound
+	}
+	return nil
+}
+
+// SetDepartment assigns (or clears, with nil) a staff member's department.
+func (s *StaffService) SetDepartment(ctx context.Context, id uuid.UUID, deptID *uuid.UUID) (*StaffMemberView, error) {
+	q := db.New(s.pool)
+	if _, err := q.GetStaffMemberByID(ctx, id); err != nil {
+		return nil, ErrStaffNotFound
+	}
+	if deptID != nil {
+		if _, err := q.GetDepartmentByID(ctx, *deptID); err != nil {
+			return nil, ErrDepartmentNotFound
+		}
+	}
+	if err := q.SetStaffDepartment(ctx, db.SetStaffDepartmentParams{ID: id, DepartmentID: deptID}); err != nil {
+		return nil, fmt.Errorf("set department: %w", err)
+	}
+	updated, err := q.GetStaffMemberByID(ctx, id)
+	if err != nil {
+		return nil, ErrStaffNotFound
+	}
+	return staffToView(db.FromAdminStaff(updated)), nil
 }
 
 // GetByID returns a single staff member.
@@ -373,10 +505,23 @@ func staffToView(m db.StaffMember) *StaffMemberView {
 		RevokedPermissions:   m.RevokedPermissions,
 		IsActive:             m.IsActive,
 		InviteAccepted:       m.InviteAcceptedAt != nil,
+		DepartmentID:         uuidPtrToStr(m.DepartmentID),
 		LastLoginAt:          m.LastLoginAt,
 		CreatedAt:            m.CreatedAt,
 	}
 }
+
+// uuidPtrToStr renders a *uuid.UUID as *string (nil-safe) for JSON responses.
+func uuidPtrToStr(id *uuid.UUID) *string {
+	if id == nil {
+		return nil
+	}
+	s := id.String()
+	return &s
+}
+
+// inviteOTPTTL is how long a staff invite code stays valid (matches email copy).
+const inviteOTPTTL = 7 * 24 * time.Hour
 
 func generateStaffInviteToken() string {
 	b := make([]byte, 32)
@@ -386,26 +531,42 @@ func generateStaffInviteToken() string {
 	return hex.EncodeToString(b)
 }
 
+// generateStaffInviteOTP returns a random 6-digit numeric one-time code.
+func generateStaffInviteOTP() string {
+	const digits = "0123456789"
+	b := make([]byte, 6)
+	if _, err := rand.Read(b); err != nil {
+		return "000000"
+	}
+	for i := range b {
+		b[i] = digits[int(b[i])%len(digits)]
+	}
+	return string(b)
+}
+
 func mustParseUUID(s string) uuid.UUID {
 	id, _ := uuid.Parse(s)
 	return id
 }
 
-func (s *StaffService) sendInviteEmail(toEmail, name, role, inviteToken string) {
+// deliverInvite emails the invite (OTP + accept link). When no email client is
+// configured (dev), it logs the OTP so the flow can still be completed.
+func (s *StaffService) deliverInvite(toEmail, name, role, inviteToken, otp string) {
 	if s.emailClient == nil {
+		s.logger.Warn("staff invite email not configured — OTP for manual delivery",
+			zap.String("to", toEmail), zap.String("otp", otp))
 		return
 	}
 	roleLabel := RoleLabels[role]
 	if roleLabel == "" {
 		roleLabel = role
 	}
-	inviteURL := s.baseURL + "/staff/accept-invite?token=" + inviteToken
-	subj, html := email.StaffInvite(toEmail, name, role, roleLabel, inviteURL)
-	if err := s.emailClient.Send(toEmail, subj, html); err != nil {
-		s.logger.Error("send staff invite email",
-			zap.String("to", toEmail),
-			zap.String("role", role),
-			zap.Error(err),
-		)
-	}
+	inviteURL := s.baseURL + "/staff/accept-invite?email=" + toEmail
+	subj, html := email.StaffInvite(toEmail, name, role, roleLabel, inviteURL, otp)
+	go func() {
+		if err := s.emailClient.Send(toEmail, subj, html); err != nil {
+			s.logger.Error("send staff invite email",
+				zap.String("to", toEmail), zap.String("role", role), zap.Error(err))
+		}
+	}()
 }

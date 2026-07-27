@@ -8,6 +8,7 @@ package db
 import (
 	"context"
 	"encoding/json"
+	"time"
 
 	"github.com/google/uuid"
 )
@@ -25,6 +26,23 @@ type AcceptStaffInviteParams struct {
 
 func (q *Queries) AcceptStaffInvite(ctx context.Context, arg AcceptStaffInviteParams) error {
 	_, err := q.db.Exec(ctx, acceptStaffInvite, arg.UserID, arg.InviteToken)
+	return err
+}
+
+const acceptStaffInviteByID = `-- name: AcceptStaffInviteByID :exec
+UPDATE admin_staff
+SET user_id = $1, invite_token = NULL, invite_otp_hash = NULL, invite_otp_expires_at = NULL,
+    invite_accepted_at = now(), updated_at = now(), is_active = true
+WHERE id = $2 AND invite_accepted_at IS NULL
+`
+
+type AcceptStaffInviteByIDParams struct {
+	UserID *uuid.UUID `json:"user_id"`
+	ID     uuid.UUID  `json:"id"`
+}
+
+func (q *Queries) AcceptStaffInviteByID(ctx context.Context, arg AcceptStaffInviteByIDParams) error {
+	_, err := q.db.Exec(ctx, acceptStaffInviteByID, arg.UserID, arg.ID)
 	return err
 }
 
@@ -108,10 +126,11 @@ func (q *Queries) CreateAdminAuditLog(ctx context.Context, arg CreateAdminAuditL
 
 const createStaffMember = `-- name: CreateStaffMember :one
 INSERT INTO admin_staff (
-    email, name, role, custom_permissions, revoked_permissions, invited_by, invite_token
+    email, name, role, custom_permissions, revoked_permissions, invited_by,
+    invite_token, department_id, invite_otp_hash, invite_otp_expires_at
 ) VALUES (
-    $1, $2, $3, $4, $5, $6, $7
-) RETURNING id, user_id, email, name, role, custom_permissions, revoked_permissions, is_active, invited_by, invite_token, invite_accepted_at, last_login_at, created_at, updated_at
+    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10
+) RETURNING id, user_id, email, name, role, custom_permissions, revoked_permissions, is_active, invited_by, invite_token, invite_accepted_at, last_login_at, created_at, updated_at, department_id, invite_otp_hash, invite_otp_expires_at
 `
 
 type CreateStaffMemberParams struct {
@@ -122,6 +141,9 @@ type CreateStaffMemberParams struct {
 	RevokedPermissions json.RawMessage `json:"revoked_permissions"`
 	InvitedBy          *uuid.UUID      `json:"invited_by"`
 	InviteToken        *string         `json:"invite_token"`
+	DepartmentID       *uuid.UUID      `json:"department_id"`
+	InviteOtpHash      *string         `json:"invite_otp_hash"`
+	InviteOtpExpiresAt *time.Time      `json:"invite_otp_expires_at"`
 }
 
 func (q *Queries) CreateStaffMember(ctx context.Context, arg CreateStaffMemberParams) (AdminStaff, error) {
@@ -133,6 +155,9 @@ func (q *Queries) CreateStaffMember(ctx context.Context, arg CreateStaffMemberPa
 		arg.RevokedPermissions,
 		arg.InvitedBy,
 		arg.InviteToken,
+		arg.DepartmentID,
+		arg.InviteOtpHash,
+		arg.InviteOtpExpiresAt,
 	)
 	var i AdminStaff
 	err := row.Scan(
@@ -150,8 +175,23 @@ func (q *Queries) CreateStaffMember(ctx context.Context, arg CreateStaffMemberPa
 		&i.LastLoginAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.DepartmentID,
+		&i.InviteOtpHash,
+		&i.InviteOtpExpiresAt,
 	)
 	return i, err
+}
+
+const deleteStaffMember = `-- name: DeleteStaffMember :execrows
+DELETE FROM admin_staff WHERE id = $1
+`
+
+func (q *Queries) DeleteStaffMember(ctx context.Context, id uuid.UUID) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteStaffMember, id)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const disableStaffMember = `-- name: DisableStaffMember :exec
@@ -173,7 +213,7 @@ func (q *Queries) EnableStaffMember(ctx context.Context, id uuid.UUID) error {
 }
 
 const getStaffMemberByEmail = `-- name: GetStaffMemberByEmail :one
-SELECT id, user_id, email, name, role, custom_permissions, revoked_permissions, is_active, invited_by, invite_token, invite_accepted_at, last_login_at, created_at, updated_at FROM admin_staff WHERE email = $1
+SELECT id, user_id, email, name, role, custom_permissions, revoked_permissions, is_active, invited_by, invite_token, invite_accepted_at, last_login_at, created_at, updated_at, department_id, invite_otp_hash, invite_otp_expires_at FROM admin_staff WHERE email = $1
 `
 
 func (q *Queries) GetStaffMemberByEmail(ctx context.Context, email string) (AdminStaff, error) {
@@ -194,12 +234,15 @@ func (q *Queries) GetStaffMemberByEmail(ctx context.Context, email string) (Admi
 		&i.LastLoginAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.DepartmentID,
+		&i.InviteOtpHash,
+		&i.InviteOtpExpiresAt,
 	)
 	return i, err
 }
 
 const getStaffMemberByID = `-- name: GetStaffMemberByID :one
-SELECT id, user_id, email, name, role, custom_permissions, revoked_permissions, is_active, invited_by, invite_token, invite_accepted_at, last_login_at, created_at, updated_at FROM admin_staff WHERE id = $1
+SELECT id, user_id, email, name, role, custom_permissions, revoked_permissions, is_active, invited_by, invite_token, invite_accepted_at, last_login_at, created_at, updated_at, department_id, invite_otp_hash, invite_otp_expires_at FROM admin_staff WHERE id = $1
 `
 
 func (q *Queries) GetStaffMemberByID(ctx context.Context, id uuid.UUID) (AdminStaff, error) {
@@ -220,12 +263,15 @@ func (q *Queries) GetStaffMemberByID(ctx context.Context, id uuid.UUID) (AdminSt
 		&i.LastLoginAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.DepartmentID,
+		&i.InviteOtpHash,
+		&i.InviteOtpExpiresAt,
 	)
 	return i, err
 }
 
 const getStaffMemberByInviteToken = `-- name: GetStaffMemberByInviteToken :one
-SELECT id, user_id, email, name, role, custom_permissions, revoked_permissions, is_active, invited_by, invite_token, invite_accepted_at, last_login_at, created_at, updated_at FROM admin_staff WHERE invite_token = $1
+SELECT id, user_id, email, name, role, custom_permissions, revoked_permissions, is_active, invited_by, invite_token, invite_accepted_at, last_login_at, created_at, updated_at, department_id, invite_otp_hash, invite_otp_expires_at FROM admin_staff WHERE invite_token = $1
 `
 
 func (q *Queries) GetStaffMemberByInviteToken(ctx context.Context, inviteToken *string) (AdminStaff, error) {
@@ -246,12 +292,15 @@ func (q *Queries) GetStaffMemberByInviteToken(ctx context.Context, inviteToken *
 		&i.LastLoginAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.DepartmentID,
+		&i.InviteOtpHash,
+		&i.InviteOtpExpiresAt,
 	)
 	return i, err
 }
 
 const getStaffMemberByUserID = `-- name: GetStaffMemberByUserID :one
-SELECT id, user_id, email, name, role, custom_permissions, revoked_permissions, is_active, invited_by, invite_token, invite_accepted_at, last_login_at, created_at, updated_at FROM admin_staff WHERE user_id = $1
+SELECT id, user_id, email, name, role, custom_permissions, revoked_permissions, is_active, invited_by, invite_token, invite_accepted_at, last_login_at, created_at, updated_at, department_id, invite_otp_hash, invite_otp_expires_at FROM admin_staff WHERE user_id = $1
 `
 
 func (q *Queries) GetStaffMemberByUserID(ctx context.Context, userID *uuid.UUID) (AdminStaff, error) {
@@ -272,6 +321,9 @@ func (q *Queries) GetStaffMemberByUserID(ctx context.Context, userID *uuid.UUID)
 		&i.LastLoginAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.DepartmentID,
+		&i.InviteOtpHash,
+		&i.InviteOtpExpiresAt,
 	)
 	return i, err
 }
@@ -331,7 +383,7 @@ func (q *Queries) ListAdminAuditLogs(ctx context.Context, arg ListAdminAuditLogs
 }
 
 const listStaffMembers = `-- name: ListStaffMembers :many
-SELECT id, user_id, email, name, role, custom_permissions, revoked_permissions, is_active, invited_by, invite_token, invite_accepted_at, last_login_at, created_at, updated_at FROM admin_staff
+SELECT id, user_id, email, name, role, custom_permissions, revoked_permissions, is_active, invited_by, invite_token, invite_accepted_at, last_login_at, created_at, updated_at, department_id, invite_otp_hash, invite_otp_expires_at FROM admin_staff
 WHERE ($1::boolean = true OR is_active = true)
 ORDER BY created_at DESC
 LIMIT $3 OFFSET $2
@@ -367,6 +419,9 @@ func (q *Queries) ListStaffMembers(ctx context.Context, arg ListStaffMembersPara
 			&i.LastLoginAt,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.DepartmentID,
+			&i.InviteOtpHash,
+			&i.InviteOtpExpiresAt,
 		); err != nil {
 			return nil, err
 		}
@@ -376,6 +431,55 @@ func (q *Queries) ListStaffMembers(ctx context.Context, arg ListStaffMembersPara
 		return nil, err
 	}
 	return items, nil
+}
+
+const revokeStaffInvite = `-- name: RevokeStaffInvite :execrows
+DELETE FROM admin_staff WHERE id = $1 AND invite_accepted_at IS NULL
+`
+
+func (q *Queries) RevokeStaffInvite(ctx context.Context, id uuid.UUID) (int64, error) {
+	result, err := q.db.Exec(ctx, revokeStaffInvite, id)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const setStaffDepartment = `-- name: SetStaffDepartment :exec
+UPDATE admin_staff SET department_id = $2, updated_at = now() WHERE id = $1
+`
+
+type SetStaffDepartmentParams struct {
+	ID           uuid.UUID  `json:"id"`
+	DepartmentID *uuid.UUID `json:"department_id"`
+}
+
+func (q *Queries) SetStaffDepartment(ctx context.Context, arg SetStaffDepartmentParams) error {
+	_, err := q.db.Exec(ctx, setStaffDepartment, arg.ID, arg.DepartmentID)
+	return err
+}
+
+const setStaffInviteOTP = `-- name: SetStaffInviteOTP :exec
+UPDATE admin_staff
+SET invite_otp_hash = $2, invite_otp_expires_at = $3, invite_token = $4, updated_at = now()
+WHERE id = $1 AND invite_accepted_at IS NULL
+`
+
+type SetStaffInviteOTPParams struct {
+	ID                 uuid.UUID  `json:"id"`
+	InviteOtpHash      *string    `json:"invite_otp_hash"`
+	InviteOtpExpiresAt *time.Time `json:"invite_otp_expires_at"`
+	InviteToken        *string    `json:"invite_token"`
+}
+
+func (q *Queries) SetStaffInviteOTP(ctx context.Context, arg SetStaffInviteOTPParams) error {
+	_, err := q.db.Exec(ctx, setStaffInviteOTP,
+		arg.ID,
+		arg.InviteOtpHash,
+		arg.InviteOtpExpiresAt,
+		arg.InviteToken,
+	)
+	return err
 }
 
 const updateStaffLastLogin = `-- name: UpdateStaffLastLogin :exec
@@ -394,7 +498,7 @@ SET role = coalesce($1, role),
     revoked_permissions = coalesce($3, revoked_permissions),
     updated_at = now()
 WHERE id = $4
-RETURNING id, user_id, email, name, role, custom_permissions, revoked_permissions, is_active, invited_by, invite_token, invite_accepted_at, last_login_at, created_at, updated_at
+RETURNING id, user_id, email, name, role, custom_permissions, revoked_permissions, is_active, invited_by, invite_token, invite_accepted_at, last_login_at, created_at, updated_at, department_id, invite_otp_hash, invite_otp_expires_at
 `
 
 type UpdateStaffMemberParams struct {
@@ -427,6 +531,9 @@ func (q *Queries) UpdateStaffMember(ctx context.Context, arg UpdateStaffMemberPa
 		&i.LastLoginAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.DepartmentID,
+		&i.InviteOtpHash,
+		&i.InviteOtpExpiresAt,
 	)
 	return i, err
 }

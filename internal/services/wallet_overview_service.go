@@ -43,6 +43,11 @@ type WalletItem struct {
 	AccountNumber    string  `json:"account_number,omitempty"` // fiat account number
 	BalanceUSD       float64 `json:"balance_usd"`
 	HasWallet        bool    `json:"has_wallet"` // false = not yet provisioned
+	// ProviderBalance is the authoritative live balance held at the provider
+	// (Nilos for EUR/GBP/…) for verification/reconciliation against the ledger
+	// `balance`. Nil when not applicable (e.g. NGN — Nomba has no per-account
+	// balance) or when the provider read failed.
+	ProviderBalance *float64 `json:"provider_balance,omitempty"`
 }
 
 // PhoneSendCard is the "Phone Send — Instant · iUSD-powered" card at the top.
@@ -141,6 +146,7 @@ type WalletOverviewService struct {
 	pool           *pgxpool.Pool
 	caasClient     *caas.Client
 	paymentsClient *payments.Client
+	nilos          *NilosService
 	logger         *zap.Logger
 }
 
@@ -148,9 +154,10 @@ func NewWalletOverviewService(
 	pool *pgxpool.Pool,
 	caasClient *caas.Client,
 	paymentsClient *payments.Client,
+	nilosSvc *NilosService,
 	logger *zap.Logger,
 ) *WalletOverviewService {
-	return &WalletOverviewService{pool: pool, caasClient: caasClient, paymentsClient: paymentsClient, logger: logger}
+	return &WalletOverviewService{pool: pool, caasClient: caasClient, paymentsClient: paymentsClient, nilos: nilosSvc, logger: logger}
 }
 
 // ─── Wallets Overview ─────────────────────────────────────────────────────────
@@ -416,6 +423,16 @@ func (s *WalletOverviewService) GetFiatWalletDetail(ctx context.Context, userID 
 		}
 	}
 
+	// Live provider balance for verification (Nilos-backed EUR/GBP/…). This is
+	// the authoritative money-at-provider, shown alongside the ledger balance so
+	// drift is visible.
+	var providerBal *float64
+	if s.nilos != nil {
+		if live, ok := s.nilos.GetLiveBalance(ctx, acc); ok {
+			providerBal = &live
+		}
+	}
+
 	return &WalletDetailResponse{
 		Wallet: WalletItem{
 			ID:               acc.ID.String(),
@@ -431,6 +448,7 @@ func (s *WalletOverviewService) GetFiatWalletDetail(ctx context.Context, userID 
 			AccountNumber:    acctNumber,
 			BalanceUSD:       roundUSD(bal / defaultFXRates()[acc.Currency]),
 			HasWallet:        true,
+			ProviderBalance:  providerBal,
 		},
 		Actions: WalletActions{CanSend: true, CanReceive: true, CanExchange: true, CanWithdraw: true},
 	}, nil

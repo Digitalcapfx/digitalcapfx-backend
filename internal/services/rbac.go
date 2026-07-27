@@ -50,6 +50,11 @@ const (
 	PermStaffInvite  = "staff:invite"
 	PermStaffUpdate  = "staff:update"
 	PermStaffDisable = "staff:disable"
+	PermStaffRemove  = "staff:remove" // revoke pending invite / hard-remove a member
+
+	// Departments
+	PermDepartmentsView   = "departments:view"
+	PermDepartmentsManage = "departments:manage"
 
 	// Roles / permission catalogue
 	PermRolesView = "roles:view"
@@ -159,8 +164,16 @@ var permissionCatalogue = []PermissionGroup{
 		Permissions: []PermissionMeta{
 			{PermStaffView, "View staff", "List and view staff members.", "staff", "view"},
 			{PermStaffInvite, "Invite staff", "Invite a new staff member.", "staff", "invite"},
-			{PermStaffUpdate, "Update staff", "Change a staff member's role and permissions.", "staff", "update"},
+			{PermStaffUpdate, "Update staff", "Change a staff member's role, department and permissions.", "staff", "update"},
 			{PermStaffDisable, "Disable staff", "Disable or re-enable a staff member.", "staff", "disable"},
+			{PermStaffRemove, "Remove staff", "Revoke a pending invite or permanently remove a member.", "staff", "remove"},
+		},
+	},
+	{
+		Resource: "departments", Label: "Departments", Description: "Admin team departments.", Wildcard: "departments:*",
+		Permissions: []PermissionMeta{
+			{PermDepartmentsView, "View departments", "List and view departments.", "departments", "view"},
+			{PermDepartmentsManage, "Manage departments", "Create, update and delete departments.", "departments", "manage"},
 		},
 	},
 	{
@@ -248,7 +261,8 @@ var rolePermissions = map[string][]string{
 		"withdrawals:*",
 		"limits:*",
 		"fees:*",
-		PermStaffView,
+		"staff:*",
+		"departments:*",
 		PermRolesView,
 		"support:*",
 		PermNotificationsBroadcast,

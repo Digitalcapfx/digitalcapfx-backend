@@ -68,3 +68,18 @@ SELECT * FROM accounts
 WHERE nomba_bank_account_number = $1
 LIMIT 1;
 
+-- name: GetAccountByNilosAccountID :one
+SELECT * FROM accounts
+WHERE nilos_account_id = $1
+LIMIT 1;
+
+-- name: SumAccountBalanceByCurrency :one
+SELECT COALESCE(SUM(balance), 0)::numeric AS total
+FROM accounts
+WHERE currency = $1;
+
+-- name: RecordDepositEvent :execrows
+INSERT INTO processed_deposit_events (provider, event_id, account_id, amount, currency)
+VALUES ($1, $2, $3, $4, $5)
+ON CONFLICT (provider, event_id) DO NOTHING;
+

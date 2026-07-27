@@ -497,6 +497,7 @@ type InviteStaffRequest struct {
 	Email              string   `json:"email"                example:"alice@example.com"`
 	Name               string   `json:"name"                 example:"Alice Dupont"`
 	Role               string   `json:"role"                 example:"compliance"        enums:"admin,compliance,support,finance,readonly"`
+	DepartmentID       string   `json:"department_id"        example:"" format:"uuid"`
 	CustomPermissions  []string `json:"custom_permissions"   example:"[]"`
 	RevokedPermissions []string `json:"revoked_permissions"  example:"[]"`
 }
@@ -508,7 +509,19 @@ type UpdateStaffRequest struct {
 }
 
 type AcceptInviteRequest struct {
-	Token string `json:"token" example:"a3f8b2c1..."`
+	Email string `json:"email" example:"alice@example.com"`
+	OTP   string `json:"otp"   example:"482913"`
+}
+
+// SetStaffDepartmentRequest assigns/clears a staff member's department.
+type SetStaffDepartmentRequest struct {
+	DepartmentID *string `json:"department_id" example:"" format:"uuid"` // null to clear
+}
+
+// DepartmentRequest creates/updates a department.
+type DepartmentRequest struct {
+	Name        string `json:"name"        example:"Compliance"`
+	Description string `json:"description" example:"Handles KYC/AML review"`
 }
 
 // ─── Admin Users ──────────────────────────────────────────────────────────────

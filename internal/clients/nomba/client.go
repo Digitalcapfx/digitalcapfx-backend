@@ -300,6 +300,27 @@ func (c *Client) BankTransfer(ctx context.Context, req BankTransferRequest) (*Tr
 	return &out, nil
 }
 
+// ─── Parent (merchant) balance ────────────────────────────────────────────────
+
+// WalletBalance is the parent account (merchant wallet) balance. This is the
+// aggregate NGN across all virtual accounts — for treasury reconciliation, not a
+// per-customer balance (virtual accounts are collection aliases, not wallets).
+type WalletBalance struct {
+	Amount      string `json:"amount"`
+	Currency    string `json:"currency"`
+	TimeCreated string `json:"timeCreated"`
+}
+
+// GetWalletBalance returns the parent (merchant) account balance.
+// GET /v1/accounts/balance
+func (c *Client) GetWalletBalance(ctx context.Context) (*WalletBalance, error) {
+	var out WalletBalance
+	if err := c.doJSON(ctx, http.MethodGet, "/v1/accounts/balance", nil, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
 // ─── Bank lookup ──────────────────────────────────────────────────────────────
 
 // Bank is a Nigerian bank code + name.

@@ -54,6 +54,7 @@ func newRouter(cfg *config.Config, svc *services.Services, pool *pgxpool.Pool, l
 	adminStaffH := handlers.NewAdminStaffHandler(svc)
 	adminUsersH := handlers.NewAdminUsersHandler(svc)
 	adminLimitsH := handlers.NewAdminLimitsHandler(svc)
+	adminDeptH := handlers.NewAdminDepartmentsHandler(svc)
 	webhookH := handlers.NewWebhookHandler(svc, cfg.HUB2.SecretKey, logger)
 	businessH := handlers.NewBusinessHandler(svc)
 	teamH := handlers.NewTeamHandler(svc)
@@ -68,6 +69,7 @@ func newRouter(cfg *config.Config, svc *services.Services, pool *pgxpool.Pool, l
 	paymentsWebhookH := handlers.NewPaymentsWebhookHandler(svc, cfg.PaymentsAPI.WebhookSecret, logger)
 	caasWebhookH := handlers.NewCaasWebhookHandler(svc, cfg.CaaS.WebhookSecret, logger)
 	nombaWebhookH := handlers.NewNombaWebhookHandler(svc, logger)
+	nilosWebhookH := handlers.NewNilosWebhookHandler(svc, logger)
 	nombaH := handlers.NewNombaHandler(svc)
 
 	kycRequired := middleware.KYCRequired(pool)
@@ -85,6 +87,7 @@ func newRouter(cfg *config.Config, svc *services.Services, pool *pgxpool.Pool, l
 	r.Post("/webhooks/payments", paymentsWebhookH.Receive)
 	r.Post("/webhooks/caas", caasWebhookH.Receive)
 	r.Post("/webhooks/nomba", nombaWebhookH.Receive)
+	r.Post("/webhooks/nilos", nilosWebhookH.Receive)
 
 	// Swagger UI
 	r.Get("/swagger/*", httpSwagger.Handler(
@@ -358,10 +361,30 @@ func newRouter(cfg *config.Config, svc *services.Services, pool *pgxpool.Pool, l
 					Get("/admin/staff/{id}", adminStaffH.GetStaff)
 				r.With(middleware.RequirePermission(services.PermStaffUpdate)).
 					Patch("/admin/staff/{id}", adminStaffH.UpdateStaff)
+				r.With(middleware.RequirePermission(services.PermStaffUpdate)).
+					Put("/admin/staff/{id}/department", adminStaffH.SetStaffDepartment)
 				r.With(middleware.RequirePermission(services.PermStaffDisable)).
 					Post("/admin/staff/{id}/disable", adminStaffH.DisableStaff)
 				r.With(middleware.RequirePermission(services.PermStaffDisable)).
 					Post("/admin/staff/{id}/enable", adminStaffH.EnableStaff)
+				r.With(middleware.RequirePermission(services.PermStaffInvite)).
+					Post("/admin/staff/{id}/resend-invite", adminStaffH.ResendInvite)
+				r.With(middleware.RequirePermission(services.PermStaffRemove)).
+					Post("/admin/staff/{id}/revoke", adminStaffH.RevokeInvite)
+				r.With(middleware.RequirePermission(services.PermStaffRemove)).
+					Delete("/admin/staff/{id}", adminStaffH.RemoveStaff)
+
+				// Departments (team org units)
+				r.With(middleware.RequirePermission(services.PermDepartmentsView)).
+					Get("/admin/departments", adminDeptH.ListDepartments)
+				r.With(middleware.RequirePermission(services.PermDepartmentsView)).
+					Get("/admin/departments/{id}", adminDeptH.GetDepartment)
+				r.With(middleware.RequirePermission(services.PermDepartmentsManage)).
+					Post("/admin/departments", adminDeptH.CreateDepartment)
+				r.With(middleware.RequirePermission(services.PermDepartmentsManage)).
+					Patch("/admin/departments/{id}", adminDeptH.UpdateDepartment)
+				r.With(middleware.RequirePermission(services.PermDepartmentsManage)).
+					Delete("/admin/departments/{id}", adminDeptH.DeleteDepartment)
 
 				// Roles + permission catalogue (read-only)
 				r.With(middleware.RequirePermission(services.PermRolesView)).
@@ -398,6 +421,8 @@ func newRouter(cfg *config.Config, svc *services.Services, pool *pgxpool.Pool, l
 				// KYC review
 				r.With(middleware.RequirePermission(services.PermKYCView)).
 					Get("/admin/kyc/pending", adminH.ListPendingKYC)
+				r.With(middleware.RequirePermission(services.PermKYCView)).
+					Get("/admin/kyc/{id}", adminH.GetKYCReview)
 				r.With(middleware.RequirePermission(services.PermKYCApprove)).
 					Post("/admin/kyc/{id}/approve", adminH.ApproveKYC)
 				r.With(middleware.RequirePermission(services.PermKYCReject)).
@@ -405,6 +430,10 @@ func newRouter(cfg *config.Config, svc *services.Services, pool *pgxpool.Pool, l
 				// Hybrid KYC: hand automated control back to the provider.
 				r.With(middleware.RequirePermission(services.PermKYCApprove)).
 					Post("/admin/kyc/{id}/release", adminH.ReleaseKYCToProvider)
+
+				// Treasury reconciliation (NGN: Nomba wallet vs ledger)
+				r.With(middleware.RequirePermission(services.PermAnalyticsView)).
+					Get("/admin/reconciliation/nomba", adminH.GetNombaReconciliation)
 
 				// Withdrawal rates
 				r.With(middleware.RequirePermission(services.PermWithdrawalsRates)).

@@ -53,11 +53,22 @@ func (h *AdminStaffHandler) InviteStaff(w http.ResponseWriter, r *http.Request) 
 
 	inviterID, _ := middleware.StaffIDFromContext(r.Context())
 
+	var deptID *uuid.UUID
+	if body.DepartmentID != "" {
+		id, perr := uuid.Parse(body.DepartmentID)
+		if perr != nil {
+			response.BadRequest(w, "VALIDATION_ERROR", "invalid department_id")
+			return
+		}
+		deptID = &id
+	}
+
 	member, err := h.svc.Staff.InviteStaff(r.Context(), services.InviteStaffInput{
 		InviterStaffID: inviterID,
 		Email:          body.Email,
 		Name:           body.Name,
 		Role:           body.Role,
+		DepartmentID:   deptID,
 		CustomPerms:    body.CustomPermissions,
 		RevokedPerms:   body.RevokedPermissions,
 	})
@@ -68,6 +79,9 @@ func (h *AdminStaffHandler) InviteStaff(w http.ResponseWriter, r *http.Request) 
 		return
 	case services.ErrInvalidRole:
 		response.BadRequest(w, "INVALID_ROLE", err.Error())
+		return
+	case services.ErrDepartmentNotFound:
+		response.BadRequest(w, "DEPARTMENT_NOT_FOUND", err.Error())
 		return
 	default:
 		response.BadRequest(w, "VALIDATION_ERROR", err.Error())
@@ -294,16 +308,161 @@ func (h *AdminStaffHandler) AcceptInvite(w http.ResponseWriter, r *http.Request)
 	}
 
 	var body AcceptInviteRequest
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.Token == "" {
-		response.BadRequest(w, "VALIDATION_ERROR", "token is required")
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.Email == "" || body.OTP == "" {
+		response.BadRequest(w, "VALIDATION_ERROR", "email and otp are required")
 		return
 	}
 
-	if err := h.svc.Staff.AcceptInvite(r.Context(), body.Token, userID); err != nil {
-		response.BadRequest(w, "INVALID_TOKEN", err.Error())
+	if err := h.svc.Staff.AcceptInvite(r.Context(), body.Email, body.OTP, userID); err != nil {
+		response.BadRequest(w, "INVALID_OTP", err.Error())
 		return
 	}
 	response.OKWithMessage(w, "invite accepted — staff access is now active", nil)
+}
+
+// ResendInvite godoc
+//
+//	@Summary      Resend a staff invitation
+//	@Description  Regenerates the one-time code + link for a still-pending invite and re-sends the email. Fails if the invite was already accepted.
+//	@Tags         admin-staff
+//	@Produce      json
+//	@Security     BearerAuth
+//	@Param        id  path  string  true  "Staff ID"
+//	@Success      200  {object}  MessageResponse
+//	@Failure      400  {object}  ErrorResponse
+//	@Failure      403  {object}  ErrorResponse
+//	@Failure      404  {object}  ErrorResponse
+//	@Router       /admin/staff/{id}/resend-invite [post]
+func (h *AdminStaffHandler) ResendInvite(w http.ResponseWriter, r *http.Request) {
+	set, _ := middleware.StaffPermissionsFromContext(r.Context())
+	id, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		response.BadRequest(w, "VALIDATION_ERROR", "invalid staff id")
+		return
+	}
+	switch err := h.svc.Staff.ResendInvite(r.Context(), id); err {
+	case nil:
+	case services.ErrStaffNotFound:
+		response.NotFound(w, err.Error())
+		return
+	default:
+		response.BadRequest(w, "RESEND_FAILED", err.Error())
+		return
+	}
+	h.svc.Staff.LogAction(r.Context(), set, "staff.resend_invite", "staff", id.String(), nil, r.RemoteAddr)
+	response.OKWithMessage(w, "invitation resent", nil)
+}
+
+// RevokeInvite godoc
+//
+//	@Summary      Revoke a pending staff invitation
+//	@Description  Cancels a still-pending invite (deletes the record, freeing the email for a fresh invite). Fails if the invite was already accepted — use DELETE /admin/staff/{id} to remove an active member.
+//	@Tags         admin-staff
+//	@Produce      json
+//	@Security     BearerAuth
+//	@Param        id  path  string  true  "Staff ID"
+//	@Success      200  {object}  MessageResponse
+//	@Failure      400  {object}  ErrorResponse
+//	@Failure      403  {object}  ErrorResponse
+//	@Router       /admin/staff/{id}/revoke [post]
+func (h *AdminStaffHandler) RevokeInvite(w http.ResponseWriter, r *http.Request) {
+	set, _ := middleware.StaffPermissionsFromContext(r.Context())
+	id, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		response.BadRequest(w, "VALIDATION_ERROR", "invalid staff id")
+		return
+	}
+	if err := h.svc.Staff.RevokeInvite(r.Context(), id); err != nil {
+		response.BadRequest(w, "REVOKE_FAILED", err.Error())
+		return
+	}
+	h.svc.Staff.LogAction(r.Context(), set, "staff.revoke_invite", "staff", id.String(), nil, r.RemoteAddr)
+	response.OKWithMessage(w, "pending invitation revoked", nil)
+}
+
+// RemoveStaff godoc
+//
+//	@Summary      Remove a staff member
+//	@Description  Permanently removes a staff member (any status). The linked user account is untouched — only their admin access is removed. The owner cannot be removed.
+//	@Tags         admin-staff
+//	@Produce      json
+//	@Security     BearerAuth
+//	@Param        id  path  string  true  "Staff ID"
+//	@Success      200  {object}  MessageResponse
+//	@Failure      400  {object}  ErrorResponse
+//	@Failure      403  {object}  ErrorResponse
+//	@Failure      404  {object}  ErrorResponse
+//	@Router       /admin/staff/{id} [delete]
+func (h *AdminStaffHandler) RemoveStaff(w http.ResponseWriter, r *http.Request) {
+	set, _ := middleware.StaffPermissionsFromContext(r.Context())
+	id, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		response.BadRequest(w, "VALIDATION_ERROR", "invalid staff id")
+		return
+	}
+	switch err := h.svc.Staff.Remove(r.Context(), id); err {
+	case nil:
+	case services.ErrStaffNotFound:
+		response.NotFound(w, err.Error())
+		return
+	case services.ErrCannotModifyOwner:
+		response.Forbidden(w, err.Error())
+		return
+	default:
+		response.BadRequest(w, "REMOVE_FAILED", err.Error())
+		return
+	}
+	h.svc.Staff.LogAction(r.Context(), set, "staff.remove", "staff", id.String(), nil, r.RemoteAddr)
+	response.OKWithMessage(w, "staff member removed", nil)
+}
+
+// SetStaffDepartment godoc
+//
+//	@Summary      Assign a staff member to a department
+//	@Description  Sets (or clears, with null) the department of a staff member.
+//	@Tags         admin-staff
+//	@Accept       json
+//	@Produce      json
+//	@Security     BearerAuth
+//	@Param        id    path  string                     true  "Staff ID"
+//	@Param        body  body  SetStaffDepartmentRequest  true  "Department assignment"
+//	@Success      200  {object}  map[string]any
+//	@Failure      400  {object}  ErrorResponse
+//	@Failure      404  {object}  ErrorResponse
+//	@Router       /admin/staff/{id}/department [put]
+func (h *AdminStaffHandler) SetStaffDepartment(w http.ResponseWriter, r *http.Request) {
+	set, _ := middleware.StaffPermissionsFromContext(r.Context())
+	id, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		response.BadRequest(w, "VALIDATION_ERROR", "invalid staff id")
+		return
+	}
+	var body SetStaffDepartmentRequest
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		response.BadRequest(w, "VALIDATION_ERROR", "invalid request body")
+		return
+	}
+	var deptID *uuid.UUID
+	if body.DepartmentID != nil && *body.DepartmentID != "" {
+		parsed, perr := uuid.Parse(*body.DepartmentID)
+		if perr != nil {
+			response.BadRequest(w, "VALIDATION_ERROR", "invalid department_id")
+			return
+		}
+		deptID = &parsed
+	}
+	member, err := h.svc.Staff.SetDepartment(r.Context(), id, deptID)
+	switch err {
+	case nil:
+	case services.ErrStaffNotFound, services.ErrDepartmentNotFound:
+		response.NotFound(w, err.Error())
+		return
+	default:
+		response.BadRequest(w, "VALIDATION_ERROR", err.Error())
+		return
+	}
+	h.svc.Staff.LogAction(r.Context(), set, "staff.set_department", "staff", id.String(), map[string]any{"department_id": body.DepartmentID}, r.RemoteAddr)
+	response.OK(w, member)
 }
 
 // ListRoles godoc

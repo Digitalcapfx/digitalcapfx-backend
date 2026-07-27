@@ -242,20 +242,24 @@ func KYCApproved(toEmail, firstName string) (subject, html string) {
 
 // ─── Staff Invite ─────────────────────────────────────────────────────────────
 
-func StaffInvite(toEmail, name, role, roleLabel, inviteURL string) (subject, html string) {
+func StaffInvite(toEmail, name, role, roleLabel, inviteURL, otp string) (subject, html string) {
 	subject = "You've been invited to join DigitalFX Staff"
 	content := fmt.Sprintf(`
 <h2>You're invited, %s!</h2>
 <p>You've been added to the <strong>DigitalFX</strong> admin platform as a <strong>%s</strong>.</p>
-<p>Click the button below to accept your invitation and activate your staff account. The link is valid for <strong>7 days</strong>.</p>
-<p style="text-align:center;margin:32px 0">
-  <a href="%s" class="btn">Accept Invitation</a>
+<p>To accept, sign in and enter this one-time code:</p>
+<p style="text-align:center;margin:24px 0">
+  <span style="display:inline-block;background:#0f3460;color:#fff;font-size:28px;letter-spacing:8px;font-weight:700;padding:14px 28px;border-radius:8px">%s</span>
+</p>
+<p style="text-align:center;color:#777;font-size:13px">This code is valid for <strong>7 days</strong>.</p>
+<p style="text-align:center;margin:24px 0">
+  <a href="%s" class="btn">Open the accept-invite page</a>
 </p>
 <p>Or copy and paste this link into your browser:</p>
 <p style="background:#f4f6f9;border-radius:6px;padding:12px 16px;font-size:13px;word-break:break-all;color:#555">%s</p>
 <hr class="divider"/>
 <p style="font-size:13px;color:#777">If you were not expecting this invitation, you can safely ignore this email. If you have questions, contact <a href="mailto:support@digitalfx.finance" style="color:#0f3460">support@digitalfx.finance</a>.</p>
-`, name, roleLabel, inviteURL, inviteURL)
+`, name, roleLabel, otp, inviteURL, inviteURL)
 	html = render(subject, toEmail, content)
 	return
 }

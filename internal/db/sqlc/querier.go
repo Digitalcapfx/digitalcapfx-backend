@@ -9,15 +9,18 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 type Querier interface {
 	AcceptMerchantStaffInvite(ctx context.Context, arg AcceptMerchantStaffInviteParams) error
 	AcceptStaffInvite(ctx context.Context, arg AcceptStaffInviteParams) error
+	AcceptStaffInviteByID(ctx context.Context, arg AcceptStaffInviteByIDParams) error
 	CountActiveVirtualCards(ctx context.Context, userID uuid.UUID) (int64, error)
 	CountActivity(ctx context.Context, arg CountActivityParams) (int64, error)
 	CountAdminAuditLogs(ctx context.Context, arg CountAdminAuditLogsParams) (int64, error)
 	CountNotifications(ctx context.Context, arg CountNotificationsParams) (int64, error)
+	CountStaffInDepartment(ctx context.Context, departmentID *uuid.UUID) (int64, error)
 	CountStaffMembers(ctx context.Context, includeInactive bool) (int64, error)
 	CountTransactionsByAccount(ctx context.Context, accountID uuid.UUID) (int64, error)
 	CountUnreadNotifications(ctx context.Context, userID uuid.UUID) (int64, error)
@@ -34,6 +37,7 @@ type Querier interface {
 	CreateCaasWithdrawal(ctx context.Context, arg CreateCaasWithdrawalParams) (CaasWithdrawal, error)
 	CreateCardTransaction(ctx context.Context, arg CreateCardTransactionParams) (CardTransaction, error)
 	CreateCryptoTransaction(ctx context.Context, arg CreateCryptoTransactionParams) (CryptoTransaction, error)
+	CreateDepartment(ctx context.Context, arg CreateDepartmentParams) (AdminDepartment, error)
 	CreateEmailOTP(ctx context.Context, arg CreateEmailOTPParams) (EmailOtp, error)
 	// ─── FX quote queries ─────────────────────────────────────────────────────────
 	CreateFXQuote(ctx context.Context, arg CreateFXQuoteParams) (FxQuote, error)
@@ -62,6 +66,7 @@ type Querier interface {
 	DeactivateUser(ctx context.Context, id uuid.UUID) error
 	DebitAccount(ctx context.Context, arg DebitAccountParams) (Account, error)
 	DeleteBusinessDirector(ctx context.Context, arg DeleteBusinessDirectorParams) error
+	DeleteDepartment(ctx context.Context, id uuid.UUID) (int64, error)
 	DeleteDeviceToken(ctx context.Context, arg DeleteDeviceTokenParams) error
 	// Removes tokens FCM reported as unregistered/invalid (any owner).
 	DeleteDeviceTokens(ctx context.Context, tokens []string) error
@@ -69,11 +74,13 @@ type Querier interface {
 	DeleteExpiredFXQuotes(ctx context.Context) error
 	DeleteExpiredOTPs(ctx context.Context) error
 	DeleteMerchantStaff(ctx context.Context, arg DeleteMerchantStaffParams) error
+	DeleteStaffMember(ctx context.Context, id uuid.UUID) (int64, error)
 	DeleteUserLimitOverride(ctx context.Context, userID uuid.UUID) error
 	DisableStaffMember(ctx context.Context, id uuid.UUID) error
 	EnableStaffMember(ctx context.Context, id uuid.UUID) error
 	FreezeAccount(ctx context.Context, id uuid.UUID) error
 	GetAccountByID(ctx context.Context, id uuid.UUID) (Account, error)
+	GetAccountByNilosAccountID(ctx context.Context, nilosAccountID *string) (Account, error)
 	GetAccountByNombaAccountNumber(ctx context.Context, nombaBankAccountNumber *string) (Account, error)
 	GetAccountByUserAndCurrency(ctx context.Context, arg GetAccountByUserAndCurrencyParams) (Account, error)
 	GetAccountForUpdate(ctx context.Context, id uuid.UUID) (Account, error)
@@ -101,6 +108,7 @@ type Querier interface {
 	GetCryptoTransactionByIdempotencyKey(ctx context.Context, idempotencyKey *string) (CryptoTransaction, error)
 	GetCryptoTransactionByReference(ctx context.Context, reference string) (CryptoTransaction, error)
 	GetDefaultWaasWallet(ctx context.Context, userID uuid.UUID) (WaasWallet, error)
+	GetDepartmentByID(ctx context.Context, id uuid.UUID) (AdminDepartment, error)
 	GetFXQuoteByQuoteID(ctx context.Context, quoteID string) (FxQuote, error)
 	GetHub2PaymentByReference(ctx context.Context, hub2Reference string) (Hub2Payment, error)
 	GetHub2PaymentByReferenceForFunding(ctx context.Context, hub2Reference string) (Hub2Payment, error)
@@ -167,6 +175,7 @@ type Querier interface {
 	ListCaasWithdrawalsByUser(ctx context.Context, arg ListCaasWithdrawalsByUserParams) ([]CaasWithdrawal, error)
 	ListCardTransactions(ctx context.Context, cardID uuid.UUID) ([]CardTransaction, error)
 	ListCryptoTransactionsByUser(ctx context.Context, arg ListCryptoTransactionsByUserParams) ([]CryptoTransaction, error)
+	ListDepartments(ctx context.Context) ([]ListDepartmentsRow, error)
 	ListDeviceTokensByUser(ctx context.Context, userID uuid.UUID) ([]string, error)
 	ListMerchantStaff(ctx context.Context, businessUserID uuid.UUID) ([]MerchantStaff, error)
 	ListNotifications(ctx context.Context, arg ListNotificationsParams) ([]Notification, error)
@@ -186,8 +195,10 @@ type Querier interface {
 	MarkNotificationRead(ctx context.Context, arg MarkNotificationReadParams) (Notification, error)
 	MarkOTPUsed(ctx context.Context, id uuid.UUID) error
 	PromoteUserToOwnerByPhone(ctx context.Context, phoneNumber string) (PromoteUserToOwnerByPhoneRow, error)
+	RecordDepositEvent(ctx context.Context, arg RecordDepositEventParams) (int64, error)
 	RevokeAllOtherSessions(ctx context.Context, arg RevokeAllOtherSessionsParams) error
 	RevokeAllUserSessions(ctx context.Context, userID uuid.UUID) error
+	RevokeStaffInvite(ctx context.Context, id uuid.UUID) (int64, error)
 	RevokeUserSessionByID(ctx context.Context, arg RevokeUserSessionByIDParams) error
 	SaveBusinessProfile(ctx context.Context, arg SaveBusinessProfileParams) (BusinessProfile, error)
 	// Flags (or clears) admin manual control over a user's KYC decision.
@@ -196,12 +207,16 @@ type Querier interface {
 	// final kyc_status).
 	SetKycProviderStatus(ctx context.Context, arg SetKycProviderStatusParams) error
 	SetReferralCode(ctx context.Context, arg SetReferralCodeParams) error
+	SetStaffDepartment(ctx context.Context, arg SetStaffDepartmentParams) error
+	SetStaffInviteOTP(ctx context.Context, arg SetStaffInviteOTPParams) error
 	SetUserAccountType(ctx context.Context, arg SetUserAccountTypeParams) (SetUserAccountTypeRow, error)
 	SetUserBVN(ctx context.Context, arg SetUserBVNParams) (User, error)
+	SumAccountBalanceByCurrency(ctx context.Context, currency string) (pgtype.Numeric, error)
 	UpdateCaasWalletPhone(ctx context.Context, arg UpdateCaasWalletPhoneParams) error
 	UpdateCaasWithdrawalStatus(ctx context.Context, arg UpdateCaasWithdrawalStatusParams) (CaasWithdrawal, error)
 	UpdateCryptoTransactionCaasResult(ctx context.Context, arg UpdateCryptoTransactionCaasResultParams) (CryptoTransaction, error)
 	UpdateCryptoTransactionStatus(ctx context.Context, arg UpdateCryptoTransactionStatusParams) (CryptoTransaction, error)
+	UpdateDepartment(ctx context.Context, arg UpdateDepartmentParams) (AdminDepartment, error)
 	UpdateHub2PaymentStatus(ctx context.Context, arg UpdateHub2PaymentStatusParams) (Hub2Payment, error)
 	UpdateKYCDocumentStatus(ctx context.Context, arg UpdateKYCDocumentStatusParams) (KycDocument, error)
 	UpdateMerchantStaffRole(ctx context.Context, arg UpdateMerchantStaffRoleParams) error

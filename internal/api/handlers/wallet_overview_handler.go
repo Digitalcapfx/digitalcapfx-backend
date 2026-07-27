@@ -82,8 +82,8 @@ func (h *WalletOverviewHandler) GetSupportedAssets(w http.ResponseWriter, r *htt
 //	@Tags         Fiat - Nilos
 //	@Produce      json
 //	@Security     BearerAuth
-//	@Param        currency  path      string  true  "Currency code (USD, EUR, GBP, XAF, XOF)"
-//	@Success      200       {object}  map[string]any
+//	@Param        currency  path      string  true  "Currency code (USD, EUR, GBP, XAF, XOF, NGN)"
+//	@Success      200       {object}  services.WalletDetailResponse  "Includes provider_balance (live Nilos balance) for verification when applicable"
 //	@Failure      401       {object}  ErrorResponse
 //	@Failure      404       {object}  ErrorResponse
 //	@Router       /wallets/fiat/{currency} [get]

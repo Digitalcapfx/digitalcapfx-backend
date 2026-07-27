@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -468,6 +469,112 @@ func (s *KYCService) GetIntake(ctx context.Context, userID uuid.UUID) (*db.KycIn
 		return nil, nil
 	}
 	return &intake, nil
+}
+
+// ─── Admin KYC/KYB review ─────────────────────────────────────────────────────
+
+// AdminKYCIntakeView is the collected intake, with counterparties parsed from
+// JSONB (so the admin panel gets a real array, not a base64 blob).
+type AdminKYCIntakeView struct {
+	Status           string         `json:"status"`
+	LegalFirstName   *string        `json:"legal_first_name,omitempty"`
+	LegalLastName    *string        `json:"legal_last_name,omitempty"`
+	DateOfBirth      *string        `json:"date_of_birth,omitempty"`
+	Nationality      *string        `json:"nationality,omitempty"`
+	BVN              *string        `json:"bvn,omitempty"`
+	AddressLine1     *string        `json:"address_line1,omitempty"`
+	AddressLine2     *string        `json:"address_line2,omitempty"`
+	City             *string        `json:"city,omitempty"`
+	State            *string        `json:"state,omitempty"`
+	PostalCode       *string        `json:"postal_code,omitempty"`
+	Country          *string        `json:"country,omitempty"`
+	Occupation       *string        `json:"occupation,omitempty"`
+	SourceOfFunds    *string        `json:"source_of_funds,omitempty"`
+	PurposeOfAccount *string        `json:"purpose_of_account,omitempty"`
+	IsImporter       *bool          `json:"is_importer,omitempty"`
+	Counterparties   []Counterparty `json:"counterparties,omitempty"`
+	ContactEmail     *string        `json:"contact_email,omitempty"`
+	ContactPhone     *string        `json:"contact_phone,omitempty"`
+	SubmittedAt      *time.Time     `json:"submitted_at,omitempty"`
+}
+
+// AdminKYCReview is the full picture an admin needs to approve/reject a user's
+// KYC/KYB: the decision state, the fields the customer submitted, their uploaded
+// documents, and (for business accounts) the company profile.
+type AdminKYCReview struct {
+	UserID            string              `json:"user_id"`
+	AccountType       string              `json:"account_type"`
+	KycStatus         string              `json:"kyc_status"`
+	KycProviderStatus *string             `json:"kyc_provider_status,omitempty"`
+	ManualOverride    bool                `json:"manual_override"`
+	IntakeCompleted   bool                `json:"intake_completed"`
+	Intake            *AdminKYCIntakeView `json:"intake"`
+	Documents         []db.KycDocument    `json:"documents"`
+	BusinessProfile   *db.BusinessProfile `json:"business_profile,omitempty"`
+}
+
+// AdminGetKYCReview aggregates everything an admin needs to review a user's KYC.
+func (s *KYCService) AdminGetKYCReview(ctx context.Context, userID uuid.UUID) (*AdminKYCReview, error) {
+	q := db.New(s.pool)
+
+	user, err := q.GetUserByID(ctx, userID)
+	if err != nil {
+		return nil, ErrUserNotFound
+	}
+
+	review := &AdminKYCReview{
+		UserID:            user.ID.String(),
+		AccountType:       user.AccountType,
+		KycStatus:         user.KycStatus,
+		KycProviderStatus: user.KycProviderStatus,
+		ManualOverride:    user.KycManualOverride,
+		Documents:         []db.KycDocument{},
+	}
+
+	// Intake (nil if never submitted).
+	if intake, ierr := q.GetKYCIntake(ctx, userID); ierr == nil {
+		review.IntakeCompleted = intake.Status == "completed"
+		var cps []Counterparty
+		if len(intake.Counterparties) > 0 {
+			_ = json.Unmarshal(intake.Counterparties, &cps)
+		}
+		review.Intake = &AdminKYCIntakeView{
+			Status:           intake.Status,
+			LegalFirstName:   intake.LegalFirstName,
+			LegalLastName:    intake.LegalLastName,
+			DateOfBirth:      intake.DateOfBirth,
+			Nationality:      intake.Nationality,
+			BVN:              intake.Bvn,
+			AddressLine1:     intake.AddressLine1,
+			AddressLine2:     intake.AddressLine2,
+			City:             intake.City,
+			State:            intake.State,
+			PostalCode:       intake.PostalCode,
+			Country:          intake.Country,
+			Occupation:       intake.Occupation,
+			SourceOfFunds:    intake.SourceOfFunds,
+			PurposeOfAccount: intake.PurposeOfAccount,
+			IsImporter:       intake.IsImporter,
+			Counterparties:   cps,
+			ContactEmail:     intake.ContactEmail,
+			ContactPhone:     intake.ContactPhone,
+			SubmittedAt:      intake.SubmittedAt,
+		}
+	}
+
+	// Uploaded documents.
+	if docs, derr := q.GetKYCDocumentsByUserID(ctx, userID); derr == nil && docs != nil {
+		review.Documents = docs
+	}
+
+	// Business profile (KYB), if any.
+	if user.AccountType == "business" {
+		if bp, berr := q.GetBusinessProfileByUserID(ctx, userID); berr == nil {
+			review.BusinessProfile = &bp
+		}
+	}
+
+	return review, nil
 }
 
 // ptrOrNil returns nil for an empty string, else a pointer to it — so empty

@@ -535,6 +535,224 @@
                 }
             }
         },
+        "/admin/departments": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns all admin team departments with the number of staff assigned to each.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin-departments"
+                ],
+                "summary": "List departments",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin-departments"
+                ],
+                "summary": "Create a department",
+                "parameters": [
+                    {
+                        "description": "Department",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.DepartmentRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/db.AdminDepartment"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/departments/{id}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin-departments"
+                ],
+                "summary": "Get a department",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Department ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/db.AdminDepartment"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Deletes a department. Fails if staff are still assigned to it — reassign them first.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin-departments"
+                ],
+                "summary": "Delete a department",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Department ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.MessageResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "patch": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin-departments"
+                ],
+                "summary": "Update a department",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Department ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Fields to update",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.DepartmentRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/db.AdminDepartment"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/admin/kyc/pending": {
             "get": {
                 "security": [
@@ -565,6 +783,58 @@
                     },
                     "403": {
                         "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/kyc/{id}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Everything an admin needs to decide on a user's identity verification: the decision state (kyc_status, provider status, manual override), the fields the customer submitted in the intake form (identity + address + AML; for business, importer flag + top counterparties + contact), their uploaded documents (the Nilos KYB set for business), and the company profile for business accounts. Use before POST /admin/kyc/{id}/approve or /reject.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin"
+                ],
+                "summary": "Get a user's KYC/KYB review detail",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "User ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/services.AdminKYCReview"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
                         "schema": {
                             "$ref": "#/definitions/handlers.ErrorResponse"
                         }
@@ -843,6 +1113,43 @@
                 }
             }
         },
+        "/admin/reconciliation/nomba": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Compares the Nomba merchant (parent) wallet NGN balance against the sum of all customers' NGN ledger balances. A non-zero `difference` flags drift. Nomba virtual accounts are collection aliases (no per-customer balance at Nomba), so per-customer NGN balances live in our ledger — this is the aggregate check.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin"
+                ],
+                "summary": "NGN treasury reconciliation (Nomba)",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/services.NombaReconciliation"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "503": {
+                        "description": "Service Unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/admin/roles": {
             "get": {
                 "security": [
@@ -1109,6 +1416,56 @@
                     }
                 }
             },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Permanently removes a staff member (any status). The linked user account is untouched — only their admin access is removed. The owner cannot be removed.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin-staff"
+                ],
+                "summary": "Remove a staff member",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Staff ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.MessageResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    }
+                }
+            },
             "patch": {
                 "security": [
                     {
@@ -1160,6 +1517,65 @@
                     },
                     "403": {
                         "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/staff/{id}/department": {
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Sets (or clears, with null) the department of a staff member.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin-staff"
+                ],
+                "summary": "Assign a staff member to a department",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Staff ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Department assignment",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.SetStaffDepartmentRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
                         "schema": {
                             "$ref": "#/definitions/handlers.ErrorResponse"
                         }
@@ -1252,6 +1668,104 @@
                     },
                     "404": {
                         "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/staff/{id}/resend-invite": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Regenerates the one-time code + link for a still-pending invite and re-sends the email. Fails if the invite was already accepted.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin-staff"
+                ],
+                "summary": "Resend a staff invitation",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Staff ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.MessageResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/staff/{id}/revoke": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Cancels a still-pending invite (deletes the record, freeing the email for a fresh invite). Fails if the invite was already accepted — use DELETE /admin/staff/{id} to remove an active member.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin-staff"
+                ],
+                "summary": "Revoke a pending staff invitation",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Staff ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.MessageResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
                         "schema": {
                             "$ref": "#/definitions/handlers.ErrorResponse"
                         }
@@ -6295,7 +6809,7 @@
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Currency code (USD, EUR, GBP, XAF, XOF)",
+                        "description": "Currency code (USD, EUR, GBP, XAF, XOF, NGN)",
                         "name": "currency",
                         "in": "path",
                         "required": true
@@ -6303,10 +6817,9 @@
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "Includes provider_balance (live Nilos balance) for verification when applicable",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": true
+                            "$ref": "#/definitions/services.WalletDetailResponse"
                         }
                     },
                     "401": {
@@ -7027,6 +7540,47 @@
                 }
             }
         },
+        "/webhooks/nilos": {
+            "post": {
+                "description": "Receiver for Nilos transaction events. An inbound, successful transaction credits the owning DigitalFX fiat account (resolved by the Nilos account id) — idempotently, keyed on the Nilos transaction id, so redelivery never double-credits. Signature is verified against NILOS_WEBHOOK_SECRET when set (the Nilos webhook scheme is confirmed on first delivery — mismatches log the headers). Returns 200 on business-logic issues so Nilos does not retry; 401 only on signature mismatch.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "webhooks"
+                ],
+                "summary": "Nilos Webhook (fiat deposits)",
+                "parameters": [
+                    {
+                        "description": "Nilos webhook payload",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.MessageResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/webhooks/nomba": {
             "post": {
                 "description": "Receiver for Nomba account/transfer events. On `payment_success` (a virtual-account credit) the owning DigitalFX Naira account is credited by the alias account number and the customer is notified. Signature is verified against NOMBA_WEBHOOK_SECRET using the `nomba-signature` header (HmacSHA256 of the documented field string). Payout events are logged. Returns 200 on business-logic issues so Nomba does not retry; 401 only on signature mismatch.",
@@ -7473,6 +8027,64 @@
                 }
             }
         },
+        "db.AdminDepartment": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                }
+            }
+        },
+        "db.BusinessProfile": {
+            "type": "object",
+            "properties": {
+                "annual_revenue": {
+                    "type": "string"
+                },
+                "business_website": {
+                    "type": "string"
+                },
+                "company_legal_name": {
+                    "type": "string"
+                },
+                "company_registration_no": {
+                    "type": "string"
+                },
+                "country_of_incorporation": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "directors_complete": {
+                    "type": "boolean"
+                },
+                "documents_complete": {
+                    "type": "boolean"
+                },
+                "industry": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "user_id": {
+                    "type": "string"
+                }
+            }
+        },
         "db.CaasWithdrawal": {
             "type": "object",
             "properties": {
@@ -7530,6 +8142,35 @@
                     "type": "number"
                 },
                 "updated_at": {
+                    "type": "string"
+                }
+            }
+        },
+        "db.KycDocument": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "doc_type": {
+                    "type": "string"
+                },
+                "doc_url": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "rejection_reason": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "user_id": {
                     "type": "string"
                 }
             }
@@ -7615,9 +8256,13 @@
         "handlers.AcceptInviteRequest": {
             "type": "object",
             "properties": {
-                "token": {
+                "email": {
                     "type": "string",
-                    "example": "a3f8b2c1..."
+                    "example": "alice@example.com"
+                },
+                "otp": {
+                    "type": "string",
+                    "example": "482913"
                 }
             }
         },
@@ -7990,6 +8635,19 @@
                 "success": {
                     "type": "boolean",
                     "example": true
+                }
+            }
+        },
+        "handlers.DepartmentRequest": {
+            "type": "object",
+            "properties": {
+                "description": {
+                    "type": "string",
+                    "example": "Handles KYC/AML review"
+                },
+                "name": {
+                    "type": "string",
+                    "example": "Compliance"
                 }
             }
         },
@@ -8479,6 +9137,11 @@
                     "example": [
                         "[]"
                     ]
+                },
+                "department_id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "example": ""
                 },
                 "email": {
                     "type": "string",
@@ -9236,6 +9899,17 @@
                 "standard_rate": {
                     "type": "number",
                     "example": 609
+                }
+            }
+        },
+        "handlers.SetStaffDepartmentRequest": {
+            "type": "object",
+            "properties": {
+                "department_id": {
+                    "description": "null to clear",
+                    "type": "string",
+                    "format": "uuid",
+                    "example": ""
                 }
             }
         },
@@ -10390,6 +11064,109 @@
                 }
             }
         },
+        "services.AdminKYCIntakeView": {
+            "type": "object",
+            "properties": {
+                "address_line1": {
+                    "type": "string"
+                },
+                "address_line2": {
+                    "type": "string"
+                },
+                "bvn": {
+                    "type": "string"
+                },
+                "city": {
+                    "type": "string"
+                },
+                "contact_email": {
+                    "type": "string"
+                },
+                "contact_phone": {
+                    "type": "string"
+                },
+                "counterparties": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/services.Counterparty"
+                    }
+                },
+                "country": {
+                    "type": "string"
+                },
+                "date_of_birth": {
+                    "type": "string"
+                },
+                "is_importer": {
+                    "type": "boolean"
+                },
+                "legal_first_name": {
+                    "type": "string"
+                },
+                "legal_last_name": {
+                    "type": "string"
+                },
+                "nationality": {
+                    "type": "string"
+                },
+                "occupation": {
+                    "type": "string"
+                },
+                "postal_code": {
+                    "type": "string"
+                },
+                "purpose_of_account": {
+                    "type": "string"
+                },
+                "source_of_funds": {
+                    "type": "string"
+                },
+                "state": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "submitted_at": {
+                    "type": "string"
+                }
+            }
+        },
+        "services.AdminKYCReview": {
+            "type": "object",
+            "properties": {
+                "account_type": {
+                    "type": "string"
+                },
+                "business_profile": {
+                    "$ref": "#/definitions/db.BusinessProfile"
+                },
+                "documents": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/db.KycDocument"
+                    }
+                },
+                "intake": {
+                    "$ref": "#/definitions/services.AdminKYCIntakeView"
+                },
+                "intake_completed": {
+                    "type": "boolean"
+                },
+                "kyc_provider_status": {
+                    "type": "string"
+                },
+                "kyc_status": {
+                    "type": "string"
+                },
+                "manual_override": {
+                    "type": "boolean"
+                },
+                "user_id": {
+                    "type": "string"
+                }
+            }
+        },
         "services.AssetAllocation": {
             "type": "object",
             "properties": {
@@ -10601,6 +11378,20 @@
                     "type": "string"
                 },
                 "phone_number": {
+                    "type": "string"
+                }
+            }
+        },
+        "services.Counterparty": {
+            "type": "object",
+            "properties": {
+                "country": {
+                    "type": "string"
+                },
+                "purpose": {
+                    "type": "string"
+                },
+                "relationship": {
                     "type": "string"
                 }
             }
@@ -10931,6 +11722,23 @@
                 }
             }
         },
+        "services.NombaReconciliation": {
+            "type": "object",
+            "properties": {
+                "currency": {
+                    "type": "string"
+                },
+                "difference": {
+                    "type": "number"
+                },
+                "ledger_total_ngn": {
+                    "type": "number"
+                },
+                "nomba_wallet_balance": {
+                    "type": "number"
+                }
+            }
+        },
         "services.PointsHistoryResponse": {
             "type": "object",
             "properties": {
@@ -11052,6 +11860,103 @@
                     "$ref": "#/definitions/services.AccountLimits"
                 },
                 "user_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "services.WalletActions": {
+            "type": "object",
+            "properties": {
+                "can_exchange": {
+                    "type": "boolean"
+                },
+                "can_receive": {
+                    "type": "boolean"
+                },
+                "can_send": {
+                    "type": "boolean"
+                },
+                "can_withdraw": {
+                    "type": "boolean"
+                }
+            }
+        },
+        "services.WalletDetailResponse": {
+            "type": "object",
+            "properties": {
+                "actions": {
+                    "$ref": "#/definitions/services.WalletActions"
+                },
+                "tokens": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/services.WalletItem"
+                    }
+                },
+                "wallet": {
+                    "$ref": "#/definitions/services.WalletItem"
+                }
+            }
+        },
+        "services.WalletItem": {
+            "type": "object",
+            "properties": {
+                "account_number": {
+                    "description": "fiat account number",
+                    "type": "string"
+                },
+                "address": {
+                    "description": "crypto / stablecoin receive address",
+                    "type": "string"
+                },
+                "balance": {
+                    "description": "decimal string",
+                    "type": "string"
+                },
+                "balance_raw": {
+                    "type": "number"
+                },
+                "balance_usd": {
+                    "type": "number"
+                },
+                "currency_symbol": {
+                    "description": "\"$\" \"€\" \"£\"",
+                    "type": "string"
+                },
+                "flag": {
+                    "type": "string"
+                },
+                "formatted_balance": {
+                    "description": "\"$12,450.75\" | \"0.4523 BTC\"",
+                    "type": "string"
+                },
+                "has_wallet": {
+                    "description": "false = not yet provisioned",
+                    "type": "boolean"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "network": {
+                    "description": "\"BTC\" \"ETH\" etc.",
+                    "type": "string"
+                },
+                "provider": {
+                    "description": "\"caas\" | \"waas\" | \"hub2\" | \"nilos\"",
+                    "type": "string"
+                },
+                "provider_balance": {
+                    "description": "ProviderBalance is the authoritative live balance held at the provider\n(Nilos for EUR/GBP/…) for verification/reconciliation against the ledger\n`balance`. Nil when not applicable (e.g. NGN — Nomba has no per-account\nbalance) or when the provider read failed.",
+                    "type": "number"
+                },
+                "symbol": {
+                    "type": "string"
+                },
+                "type": {
+                    "description": "\"fiat\" | \"stablecoin\" | \"crypto\"",
                     "type": "string"
                 }
             }
