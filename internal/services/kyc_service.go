@@ -184,23 +184,23 @@ type IntakeRequirements struct {
 	Notes       []string          `json:"notes,omitempty"`
 }
 
-// personIdentityFields are the identity + address + AML fields for an individual
-// or a business's authorised representative.
+// personIdentityFields are the ADDITIONAL identity + address + AML fields the
+// intake collects for an individual or a business's authorised representative.
+// Fields already captured at registration are intentionally NOT re-collected
+// here: first/last name, country, BVN (all from signup), and — for business —
+// the company profile. BVN is never asked here; it is optional at signup and, if
+// absent, the customer simply does not get a Nigerian (NGN) account.
 func personIdentityFields() []IntakeFieldSpec {
 	sourceOfFunds := []string{"Salary", "Business Income", "Savings", "Investment", "Inheritance", "Gift", "Other"}
 	purpose := []string{"Personal Use", "Business Payments", "Remittance", "Savings", "Trading", "Other"}
 	return []IntakeFieldSpec{
-		{Key: "legal_first_name", Label: "Legal First Name", Type: "text", Required: true},
-		{Key: "legal_last_name", Label: "Legal Last Name", Type: "text", Required: true},
 		{Key: "date_of_birth", Label: "Date of Birth", Type: "date", Required: true, Help: "YYYY-MM-DD"},
 		{Key: "nationality", Label: "Nationality", Type: "country", Required: true},
-		{Key: "bvn", Label: "BVN (Bank Verification Number)", Type: "text", Required: false, Help: "Required to activate your Naira (NGN) account"},
 		{Key: "address_line1", Label: "Address Line 1", Type: "text", Required: true},
 		{Key: "address_line2", Label: "Address Line 2", Type: "text", Required: false},
 		{Key: "city", Label: "City", Type: "text", Required: true},
 		{Key: "state", Label: "State / Province", Type: "text", Required: false},
 		{Key: "postal_code", Label: "Postal Code", Type: "text", Required: false},
-		{Key: "country", Label: "Country of Residence", Type: "country", Required: true},
 		{Key: "occupation", Label: "Occupation", Type: "text", Required: true},
 		{Key: "source_of_funds", Label: "Source of Funds", Type: "select", Required: true, Options: sourceOfFunds},
 		{Key: "purpose_of_account", Label: "Purpose of Account", Type: "select", Required: true, Options: purpose},
@@ -221,7 +221,9 @@ func BuildIntakeRequirements(accountType string, opts IntakeOptions) IntakeRequi
 				{Key: DocProofOfAddress, Label: "Proof of Address", Required: false, AppliesTo: "all", Scope: "director_ubo", MaxAgeMonths: 3, Help: "Utility bill or bank statement, ≤3 months old"},
 			},
 			Notes: []string{
+				"Your name, country and BVN come from signup and are not re-collected here.",
 				"Your ID document and liveness check are completed via the identity-verification dialog after this form.",
+				"A Nigerian (NGN) account is only activated if a BVN was provided at signup.",
 			},
 		}
 	}
@@ -230,10 +232,6 @@ func BuildIntakeRequirements(accountType string, opts IntakeOptions) IntakeRequi
 	fields := personIdentityFields()
 	for i := range fields {
 		switch fields[i].Key {
-		case "legal_first_name":
-			fields[i].Label = "Representative First Name"
-		case "legal_last_name":
-			fields[i].Label = "Representative Last Name"
 		case "address_line1":
 			fields[i].Label = "Registered Business Address Line 1"
 		case "occupation":
@@ -272,7 +270,7 @@ func BuildIntakeRequirements(accountType string, opts IntakeOptions) IntakeRequi
 	notes := []string{
 		"All documents must be dated within the specified timeframes (registers & proofs of address ≤3 months; bank statement ≤90 days). Alternatives are accepted where noted.",
 		"Where a shareholder is itself a company, also provide that company's Shareholder Register and Articles of Association.",
-		"Company identity fields (legal name, registration number, industry, country of incorporation) were captured at signup and are reused.",
+		"Company identity fields (legal name, registration number, industry, country of incorporation) and the representative's name, country and BVN were captured at signup and are reused — not re-collected here.",
 	}
 	if opts.IsImporter {
 		notes = append(notes, "As an importer, Proof of Imports documentation is required.")
@@ -329,19 +327,17 @@ type Counterparty struct {
 	Purpose      string `json:"purpose"`
 }
 
-// SubmitIntakeInput is the payload for POST /kyc/intake.
+// SubmitIntakeInput is the payload for POST /kyc/intake. Fields captured at
+// registration (name, country, BVN, company profile) are NOT part of this input
+// — they are reused from the user record.
 type SubmitIntakeInput struct {
-	LegalFirstName   string
-	LegalLastName    string
 	DateOfBirth      string // YYYY-MM-DD
 	Nationality      string
-	BVN              string
 	AddressLine1     string
 	AddressLine2     string
 	City             string
 	State            string
 	PostalCode       string
-	Country          string
 	Occupation       string
 	SourceOfFunds    string
 	PurposeOfAccount string
@@ -354,9 +350,11 @@ type SubmitIntakeInput struct {
 }
 
 // SubmitIntake validates the collected fields against the account-type
-// requirements, persists them (marking the intake completed), and mirrors the
-// BVN onto the user record so NGN (Nomba) provisioning can use it. Once this
-// succeeds, InitiateKYC will issue the Sumsub token.
+// requirements and persists them (marking the intake completed). Registration
+// fields (name, country, BVN) are copied from the user record into the intake
+// snapshot but never re-asked. BVN is NOT collected here; a Nigerian account is
+// only provisioned when a BVN was supplied at signup. Once this succeeds,
+// InitiateKYC will issue the Sumsub token.
 func (s *KYCService) SubmitIntake(ctx context.Context, userID uuid.UUID, in SubmitIntakeInput) (*db.KycIntake, error) {
 	q := db.New(s.pool)
 	user, err := q.GetUserByID(ctx, userID)
@@ -366,17 +364,13 @@ func (s *KYCService) SubmitIntake(ctx context.Context, userID uuid.UUID, in Subm
 
 	// Validate required fields for the account type.
 	values := map[string]string{
-		"legal_first_name":   strings.TrimSpace(in.LegalFirstName),
-		"legal_last_name":    strings.TrimSpace(in.LegalLastName),
 		"date_of_birth":      strings.TrimSpace(in.DateOfBirth),
 		"nationality":        strings.TrimSpace(in.Nationality),
-		"bvn":                strings.TrimSpace(in.BVN),
 		"address_line1":      strings.TrimSpace(in.AddressLine1),
 		"address_line2":      strings.TrimSpace(in.AddressLine2),
 		"city":               strings.TrimSpace(in.City),
 		"state":              strings.TrimSpace(in.State),
 		"postal_code":        strings.TrimSpace(in.PostalCode),
-		"country":            strings.TrimSpace(in.Country),
 		"occupation":         strings.TrimSpace(in.Occupation),
 		"source_of_funds":    strings.TrimSpace(in.SourceOfFunds),
 		"purpose_of_account": strings.TrimSpace(in.PurposeOfAccount),
@@ -402,9 +396,6 @@ func (s *KYCService) SubmitIntake(ctx context.Context, userID uuid.UUID, in Subm
 	if len(missing) > 0 {
 		return nil, fmt.Errorf("missing required KYC fields: %s", strings.Join(missing, ", "))
 	}
-	if bvn := values["bvn"]; bvn != "" && len(bvn) != 11 {
-		return nil, fmt.Errorf("BVN must be exactly 11 digits")
-	}
 	// Business-specific validation: importer flag is mandatory; EUR/GBP (NRE)
 	// businesses must list at least one counterparty.
 	if user.AccountType == "business" {
@@ -425,19 +416,20 @@ func (s *KYCService) SubmitIntake(ctx context.Context, userID uuid.UUID, in Subm
 	}
 
 	intake, err := q.UpsertKYCIntake(ctx, db.UpsertKYCIntakeParams{
-		UserID:           userID,
-		AccountType:      user.AccountType,
-		LegalFirstName:   ptrOrNil(values["legal_first_name"]),
-		LegalLastName:    ptrOrNil(values["legal_last_name"]),
+		UserID:      userID,
+		AccountType: user.AccountType,
+		// Name / country / BVN are reused from the signup record (not re-asked).
+		LegalFirstName:   ptrOrNil(user.FirstName),
+		LegalLastName:    ptrOrNil(user.LastName),
+		Bvn:              user.Bvn,
+		Country:          user.Country,
 		DateOfBirth:      ptrOrNil(values["date_of_birth"]),
 		Nationality:      ptrOrNil(values["nationality"]),
-		Bvn:              ptrOrNil(values["bvn"]),
 		AddressLine1:     ptrOrNil(values["address_line1"]),
 		AddressLine2:     ptrOrNil(values["address_line2"]),
 		City:             ptrOrNil(values["city"]),
 		State:            ptrOrNil(values["state"]),
 		PostalCode:       ptrOrNil(values["postal_code"]),
-		Country:          ptrOrNil(values["country"]),
 		Occupation:       ptrOrNil(values["occupation"]),
 		SourceOfFunds:    ptrOrNil(values["source_of_funds"]),
 		PurposeOfAccount: ptrOrNil(values["purpose_of_account"]),
@@ -448,13 +440,6 @@ func (s *KYCService) SubmitIntake(ctx context.Context, userID uuid.UUID, in Subm
 	})
 	if err != nil {
 		return nil, fmt.Errorf("save kyc intake: %w", err)
-	}
-
-	// Mirror the BVN onto the user so NGN (Nomba) provisioning can attach it.
-	if bvn := values["bvn"]; bvn != "" {
-		if _, err := q.SetUserBVN(ctx, db.SetUserBVNParams{ID: userID, Bvn: &bvn}); err != nil {
-			s.logger.Error("mirror bvn to user on intake", zap.Error(err))
-		}
 	}
 
 	s.logger.Info("kyc intake completed", zap.String("user_id", userID.String()), zap.String("account_type", user.AccountType))
@@ -1043,8 +1028,9 @@ func (s *KYCService) provisionNilosAccount(ctx context.Context, user db.User, ac
 }
 
 // provisionNombaNGN provisions a real NGN virtual bank account via Nomba for the
-// user's NGN account (idempotent — skips if already provisioned). BVN is attached
-// when the user has one on file; it is optional at Nomba.
+// user's NGN account (idempotent — skips if already provisioned). It is ONLY
+// provisioned when the user supplied a BVN at signup; without a BVN the customer
+// simply does not get a Nigerian account.
 func (s *KYCService) provisionNombaNGN(ctx context.Context, user db.User, acc db.Account) {
 	if s.nombaClient == nil || !s.nombaClient.Configured() {
 		s.logger.Warn("nomba not configured, skipping NGN virtual account", zap.String("user_id", user.ID.String()))
@@ -1052,6 +1038,12 @@ func (s *KYCService) provisionNombaNGN(ctx context.Context, user db.User, acc db
 	}
 	if acc.NombaAccountRef != nil {
 		return // already provisioned
+	}
+	// No BVN → no Nigerian account (BVN is required by Nomba/CBN for a NGN account
+	// and is only collected, optionally, at signup).
+	if user.Bvn == nil || *user.Bvn == "" {
+		s.logger.Info("no BVN on file — skipping NGN account provisioning", zap.String("user_id", user.ID.String()))
+		return
 	}
 
 	q := db.New(s.pool)
@@ -1066,10 +1058,7 @@ func (s *KYCService) provisionNombaNGN(ctx context.Context, user db.User, acc db
 		accountName = "DigitalFX " + accountName
 	}
 
-	req := nomba.CreateVirtualAccountRequest{AccountRef: accountRef, AccountName: accountName}
-	if user.Bvn != nil && *user.Bvn != "" {
-		req.BVN = *user.Bvn
-	}
+	req := nomba.CreateVirtualAccountRequest{AccountRef: accountRef, AccountName: accountName, BVN: *user.Bvn}
 
 	va, err := s.nombaClient.CreateVirtualAccount(ctx, req)
 	if err != nil {

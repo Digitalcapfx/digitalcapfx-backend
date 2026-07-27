@@ -198,27 +198,25 @@ type CounterpartyInput struct {
 	Purpose      string `json:"purpose"`
 }
 
-// SubmitIntakeRequest is the POST /kyc/intake payload.
+// SubmitIntakeRequest is the POST /kyc/intake payload. Registration fields (name,
+// country, BVN, company profile) are NOT accepted here — they are reused from the
+// signup record. Call GET /kyc/requirements for the exact required/optional set.
 type SubmitIntakeRequest struct {
-	LegalFirstName   string `json:"legal_first_name"`
-	LegalLastName    string `json:"legal_last_name"`
-	DateOfBirth      string `json:"date_of_birth"` // YYYY-MM-DD
-	Nationality      string `json:"nationality"`
-	BVN              string `json:"bvn"`
-	AddressLine1     string `json:"address_line1"`
-	AddressLine2     string `json:"address_line2"`
-	City             string `json:"city"`
-	State            string `json:"state"`
-	PostalCode       string `json:"postal_code"`
-	Country          string `json:"country"`
-	Occupation       string `json:"occupation"`
-	SourceOfFunds    string `json:"source_of_funds"`
-	PurposeOfAccount string `json:"purpose_of_account"`
+	DateOfBirth      string `json:"date_of_birth"` // required, YYYY-MM-DD
+	Nationality      string `json:"nationality"`   // required
+	AddressLine1     string `json:"address_line1"` // required
+	AddressLine2     string `json:"address_line2"` // optional
+	City             string `json:"city"`          // required
+	State            string `json:"state"`         // optional
+	PostalCode       string `json:"postal_code"`   // optional
+	Occupation       string `json:"occupation"`    // required
+	SourceOfFunds    string `json:"source_of_funds"`    // required
+	PurposeOfAccount string `json:"purpose_of_account"` // required
 	// Business (KYB) extras.
-	IsImporter     *bool               `json:"is_importer"`
-	Counterparties []CounterpartyInput `json:"top_3_counterparties"`
-	ContactEmail   string              `json:"contact_email"`
-	ContactPhone   string              `json:"contact_phone"`
+	IsImporter     *bool               `json:"is_importer"`         // required (business)
+	Counterparties []CounterpartyInput `json:"top_3_counterparties"` // required (business EUR/GBP)
+	ContactEmail   string              `json:"contact_email"`        // required (business EUR/GBP)
+	ContactPhone   string              `json:"contact_phone"`        // required (business EUR/GBP)
 }
 
 // KYCIntakeResponse is the POST /kyc/intake success payload.
@@ -263,17 +261,13 @@ func (h *KYCHandler) SubmitIntake(w http.ResponseWriter, r *http.Request) {
 	}
 
 	intake, err := h.svc.KYC.SubmitIntake(r.Context(), userID, services.SubmitIntakeInput{
-		LegalFirstName:   req.LegalFirstName,
-		LegalLastName:    req.LegalLastName,
 		DateOfBirth:      req.DateOfBirth,
 		Nationality:      req.Nationality,
-		BVN:              req.BVN,
 		AddressLine1:     req.AddressLine1,
 		AddressLine2:     req.AddressLine2,
 		City:             req.City,
 		State:            req.State,
 		PostalCode:       req.PostalCode,
-		Country:          req.Country,
 		Occupation:       req.Occupation,
 		SourceOfFunds:    req.SourceOfFunds,
 		PurposeOfAccount: req.PurposeOfAccount,

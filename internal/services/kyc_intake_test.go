@@ -14,8 +14,8 @@ func hasField(fields []IntakeFieldSpec, key string) (IntakeFieldSpec, bool) {
 func TestGetIntakeRequirements_Individual(t *testing.T) {
 	fields := GetIntakeRequirements("individual")
 
-	// Fields required by Nilos + AML must be present and required.
-	for _, key := range []string{"legal_first_name", "legal_last_name", "date_of_birth", "nationality", "address_line1", "city", "country", "occupation", "source_of_funds", "purpose_of_account"} {
+	// The additional (non-registration) fields must be present and required.
+	for _, key := range []string{"date_of_birth", "nationality", "address_line1", "city", "occupation", "source_of_funds", "purpose_of_account"} {
 		f, ok := hasField(fields, key)
 		if !ok {
 			t.Fatalf("individual intake missing field %q", key)
@@ -25,13 +25,18 @@ func TestGetIntakeRequirements_Individual(t *testing.T) {
 		}
 	}
 
-	// BVN is collected (for the Naira account) but optional.
-	bvn, ok := hasField(fields, "bvn")
-	if !ok {
-		t.Fatal("intake missing bvn field")
+	// Registration-collected fields must NOT be re-asked here.
+	for _, key := range []string{"legal_first_name", "legal_last_name", "bvn", "country"} {
+		if _, ok := hasField(fields, key); ok {
+			t.Errorf("field %q is collected at registration and must NOT appear in the intake", key)
+		}
 	}
-	if bvn.Required {
-		t.Error("bvn should be optional (Nomba BVN is optional)")
+
+	// Optional fields.
+	for _, key := range []string{"address_line2", "state", "postal_code"} {
+		if f, ok := hasField(fields, key); ok && f.Required {
+			t.Errorf("field %q should be optional", key)
+		}
 	}
 
 	// select fields carry options.
@@ -40,13 +45,9 @@ func TestGetIntakeRequirements_Individual(t *testing.T) {
 	}
 }
 
-func TestGetIntakeRequirements_BusinessRelabels(t *testing.T) {
+func TestGetIntakeRequirements_Business(t *testing.T) {
 	fields := GetIntakeRequirements("business")
 
-	first, _ := hasField(fields, "legal_first_name")
-	if first.Label != "Representative First Name" {
-		t.Errorf("business first-name label = %q, want representative label", first.Label)
-	}
 	addr, _ := hasField(fields, "address_line1")
 	if addr.Label == "" || addr.Label == "Address Line 1" {
 		t.Errorf("business address label not relabeled: %q", addr.Label)
@@ -58,6 +59,10 @@ func TestGetIntakeRequirements_BusinessRelabels(t *testing.T) {
 	}
 	if _, ok := hasField(fields, "is_importer"); !ok {
 		t.Error("business intake missing is_importer field")
+	}
+	// Registration company/name fields are not re-collected.
+	if _, ok := hasField(fields, "legal_first_name"); ok {
+		t.Error("business intake must not re-collect legal_first_name (from signup)")
 	}
 }
 

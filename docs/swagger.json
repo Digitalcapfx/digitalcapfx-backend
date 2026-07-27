@@ -9940,59 +9940,59 @@
             "type": "object",
             "properties": {
                 "address_line1": {
+                    "description": "required",
                     "type": "string"
                 },
                 "address_line2": {
-                    "type": "string"
-                },
-                "bvn": {
+                    "description": "optional",
                     "type": "string"
                 },
                 "city": {
+                    "description": "required",
                     "type": "string"
                 },
                 "contact_email": {
+                    "description": "required (business EUR/GBP)",
                     "type": "string"
                 },
                 "contact_phone": {
-                    "type": "string"
-                },
-                "country": {
+                    "description": "required (business EUR/GBP)",
                     "type": "string"
                 },
                 "date_of_birth": {
-                    "description": "YYYY-MM-DD",
+                    "description": "required, YYYY-MM-DD",
                     "type": "string"
                 },
                 "is_importer": {
                     "description": "Business (KYB) extras.",
                     "type": "boolean"
                 },
-                "legal_first_name": {
-                    "type": "string"
-                },
-                "legal_last_name": {
-                    "type": "string"
-                },
                 "nationality": {
+                    "description": "required",
                     "type": "string"
                 },
                 "occupation": {
+                    "description": "required",
                     "type": "string"
                 },
                 "postal_code": {
+                    "description": "optional",
                     "type": "string"
                 },
                 "purpose_of_account": {
+                    "description": "required",
                     "type": "string"
                 },
                 "source_of_funds": {
+                    "description": "required",
                     "type": "string"
                 },
                 "state": {
+                    "description": "optional",
                     "type": "string"
                 },
                 "top_3_counterparties": {
+                    "description": "required (business EUR/GBP)",
                     "type": "array",
                     "items": {
                         "$ref": "#/definitions/handlers.CounterpartyInput"
