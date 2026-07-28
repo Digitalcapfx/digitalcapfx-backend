@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
@@ -138,8 +139,8 @@ func (h *CaaSHandler) FundAccount(w http.ResponseWriter, r *http.Request) {
 
 // Send godoc
 //
-//	@Summary      Send USDC to another user (Phone Send)
-//	@Description  Transfers Stablecoin (USDC) from the caller to another DigitalFX user identified by phone number, via Rach CaaS (settles on-chain as USDC between the two EIP-4337 wallets). Amount is USD-equivalent decimal (e.g. "50.00"). Note: the `token` field selects the on-chain settlement asset (USDC/USDT) but the customer-facing unit is USDC. This is the CaaS P2P rail, distinct from WaaS on-chain crypto transfers.
+//	@Summary      Send USDC to a phone number or wallet address (Phone Send)
+//	@Description  Transfers Stablecoin (USDC) from the caller to a recipient addressed by EITHER a phone number (`receiver_phone`) OR a raw 0x SCW wallet address (`recipient_address`) — provide exactly one. Settles on-chain as USDC between the two EIP-4337 wallets via Rach CaaS. A phone that was never provisioned is created on the fly and the recipient is notified by SMS; a wallet address must already exist (it cannot be auto-provisioned). Amount is USD-equivalent decimal (e.g. "50.00"). The `token` field selects the on-chain settlement asset (USDC/USDT); the customer-facing unit is USDC. This is the CaaS P2P rail, distinct from WaaS on-chain crypto transfers.
 //	@Tags         CaaS - Stablecoin (USDC)
 //	@Accept       json
 //	@Produce      json
@@ -159,16 +160,28 @@ func (h *CaaSHandler) Send(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var body struct {
-		ReceiverPhone string `json:"receiver_phone"`
-		Token         string `json:"token"`
-		Amount        string `json:"amount"`
+		ReceiverPhone    string `json:"receiver_phone"`
+		RecipientAddress string `json:"recipient_address"`
+		Token            string `json:"token"`
+		Amount           string `json:"amount"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		response.BadRequest(w, "VALIDATION_ERROR", "invalid request body")
 		return
 	}
-	if body.ReceiverPhone == "" || body.Token == "" || body.Amount == "" {
-		response.BadRequest(w, "VALIDATION_ERROR", "receiver_phone, token and amount are required")
+	body.ReceiverPhone = strings.TrimSpace(body.ReceiverPhone)
+	body.RecipientAddress = strings.TrimSpace(body.RecipientAddress)
+	if body.Token == "" || body.Amount == "" {
+		response.BadRequest(w, "VALIDATION_ERROR", "token and amount are required")
+		return
+	}
+	// Exactly one recipient identifier.
+	if (body.ReceiverPhone == "") == (body.RecipientAddress == "") {
+		response.BadRequest(w, "VALIDATION_ERROR", "provide exactly one of receiver_phone or recipient_address")
+		return
+	}
+	if body.RecipientAddress != "" && !isWalletAddress(body.RecipientAddress) {
+		response.BadRequest(w, "INVALID_ADDRESS", "recipient_address must be a 0x-prefixed 40-character hex wallet address")
 		return
 	}
 	if body.Token != "USDT" && body.Token != "USDC" {
@@ -177,30 +190,50 @@ func (h *CaaSHandler) Send(w http.ResponseWriter, r *http.Request) {
 	}
 
 	tx, err := h.svc.CaaS.Send(r.Context(), services.SendCryptoInput{
-		SenderUserID:  userID,
-		SenderPhone:   phone,
-		ReceiverPhone: body.ReceiverPhone,
-		Token:         body.Token,
-		Amount:        body.Amount,
+		SenderUserID:    userID,
+		SenderPhone:     phone,
+		ReceiverPhone:   body.ReceiverPhone,
+		ReceiverAddress: body.RecipientAddress,
+		Token:           body.Token,
+		Amount:          body.Amount,
 	})
 	if err != nil {
 		response.InternalError(w)
 		return
 	}
 
+	recipient := body.ReceiverPhone
+	recipientKey := "receiver_phone"
+	if body.RecipientAddress != "" {
+		recipient = body.RecipientAddress
+		recipientKey = "recipient_address"
+	}
 	h.svc.Notifications.Create(r.Context(), services.CreateNotificationInput{
 		UserID: userID,
 		Type:   services.NotifCryptoSent,
 		Title:  "Crypto Sent",
-		Body:   fmt.Sprintf("You sent %s %s to %s.", body.Amount, body.Token, body.ReceiverPhone),
+		Body:   fmt.Sprintf("You sent %s %s to %s.", body.Amount, body.Token, recipient),
 		Metadata: map[string]string{
-			"token":          body.Token,
-			"amount":         body.Amount,
-			"receiver_phone": body.ReceiverPhone,
+			"token":      body.Token,
+			"amount":     body.Amount,
+			recipientKey: recipient,
 		},
 	})
 
 	response.Created(w, tx)
+}
+
+// isWalletAddress reports whether s is a 0x-prefixed 40-hex-character EVM/SCW address.
+func isWalletAddress(s string) bool {
+	if len(s) != 42 || s[0] != '0' || (s[1] != 'x' && s[1] != 'X') {
+		return false
+	}
+	for _, c := range s[2:] {
+		if !((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F')) {
+			return false
+		}
+	}
+	return true
 }
 
 // ListTransactions godoc

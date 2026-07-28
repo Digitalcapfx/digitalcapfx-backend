@@ -188,15 +188,20 @@ func (s *CaaSService) GetBalances(ctx context.Context, userID uuid.UUID) (*Insta
 }
 
 type SendCryptoInput struct {
-	SenderUserID  uuid.UUID
-	SenderPhone   string
-	ReceiverPhone string
-	Token         string // USDT | USDC
-	Amount        string // decimal string e.g. "10.50"
+	SenderUserID uuid.UUID
+	SenderPhone  string
+	// Recipient is addressed by EITHER phone OR wallet address — set exactly one.
+	// ReceiverPhone is an E.164 phone number; ReceiverAddress is a 0x SCW address.
+	ReceiverPhone   string
+	ReceiverAddress string
+	Token           string // USDT | USDC
+	Amount          string // decimal string e.g. "10.50"
 }
 
-// Send executes a gasless peer-to-peer stablecoin transfer between two DigitalFX
-// users identified by their phone numbers.
+// Send executes a gasless peer-to-peer stablecoin transfer from a DigitalFX user
+// to a recipient identified by EITHER a phone number OR a raw 0x SCW wallet
+// address. Rach CaaS auto-detects the identifier format on the recipient field,
+// so we forward whichever one the caller supplied.
 //
 // Flow:
 //  1. Submit transfer to CaaS using a DIRECT_CRYPTO quote_id — no FX conversion
@@ -204,6 +209,14 @@ type SendCryptoInput struct {
 //  2. Record the pending transaction locally; status updated via webhook.
 func (s *CaaSService) Send(ctx context.Context, in SendCryptoInput) (*db.CryptoTransaction, error) {
 	q := db.New(s.pool)
+
+	// The CaaS recipient field auto-detects phone vs. 0x address; forward whichever
+	// identifier the caller supplied (address takes precedence when both are set).
+	recipient := in.ReceiverPhone
+	byAddress := in.ReceiverAddress != ""
+	if byAddress {
+		recipient = in.ReceiverAddress
+	}
 
 	// DIRECT_CRYPTO:{TOKEN}:{AMOUNT} bypasses the FX quote step for same-token
 	// transfers. USDC ≈ USD 1:1 so no rate conversion is required.
@@ -213,7 +226,7 @@ func (s *CaaSService) Send(ctx context.Context, in SendCryptoInput) (*db.CryptoT
 	txResp, err := s.caasClient.Transfer(ctx, caas.TransferRequest{
 		IdempotencyKey:  ref,
 		SenderPhone:     in.SenderPhone,
-		RecipientPhone:  in.ReceiverPhone,
+		RecipientPhone:  recipient, // E.164 phone OR 0x wallet address (auto-detected)
 		LocalFiatAmount: in.Amount, // USDC amount (USD ≈ USDC, no conversion)
 		QuoteID:         directQuoteID,
 		TargetToken:     caas.Token(in.Token),
@@ -222,10 +235,23 @@ func (s *CaaSService) Send(ctx context.Context, in SendCryptoInput) (*db.CryptoT
 		return nil, fmt.Errorf("caas transfer: %w", err)
 	}
 
-	// Resolve receiver's local user ID if they're on DigitalFX.
+	// Resolve receiver's local user ID if they're on DigitalFX — by wallet address
+	// when addressed that way, otherwise by phone.
 	var receiverUserID *uuid.UUID
-	if receiverUser, err := q.GetUserByPhoneAny(ctx, phoneCandidates(in.ReceiverPhone)); err == nil {
+	if byAddress {
+		if wallet, werr := q.GetCaasWalletByAddress(ctx, in.ReceiverAddress); werr == nil {
+			receiverUserID = &wallet.UserID
+		}
+	} else if receiverUser, rerr := q.GetUserByPhoneAny(ctx, phoneCandidates(in.ReceiverPhone)); rerr == nil {
 		receiverUserID = &receiverUser.ID
+	}
+
+	// Store the recipient in the column that matches how it was addressed.
+	var receiverPhone, receiverAddress *string
+	if byAddress {
+		receiverAddress = &in.ReceiverAddress
+	} else {
+		receiverPhone = &in.ReceiverPhone
 	}
 
 	transferID := txResp.TransferID
@@ -233,7 +259,8 @@ func (s *CaaSService) Send(ctx context.Context, in SendCryptoInput) (*db.CryptoT
 	tx, err := q.CreateCryptoTransaction(ctx, db.CreateCryptoTransactionParams{
 		Reference:       ref,
 		SenderUserID:    in.SenderUserID,
-		ReceiverPhone:   in.ReceiverPhone,
+		ReceiverPhone:   receiverPhone,
+		ReceiverAddress: receiverAddress,
 		ReceiverUserID:  receiverUserID,
 		Token:           in.Token,
 		Amount:          in.Amount,

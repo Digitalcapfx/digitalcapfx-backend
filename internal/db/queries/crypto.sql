@@ -1,8 +1,8 @@
 -- name: CreateCryptoTransaction :one
 INSERT INTO crypto_transactions
-    (reference, sender_user_id, receiver_phone, receiver_user_id, token, amount,
+    (reference, sender_user_id, receiver_phone, receiver_address, receiver_user_id, token, amount,
      tx_hash, status, quote_id, caas_transfer_id, idempotency_key, local_fiat_amount, local_currency)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
 RETURNING *;
 
 -- name: GetCryptoTransactionByID :one

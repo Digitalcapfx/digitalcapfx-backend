@@ -281,7 +281,7 @@ func (q *Queries) GetCaasWithdrawalByIdempotencyKey(ctx context.Context, idempot
 
 const getCryptoTransactionByIdempotencyKey = `-- name: GetCryptoTransactionByIdempotencyKey :one
 
-SELECT id, reference, sender_user_id, receiver_phone, receiver_user_id, token, amount, tx_hash, status, created_at, updated_at, quote_id, caas_transfer_id, idempotency_key, local_fiat_amount, local_currency FROM crypto_transactions WHERE idempotency_key = $1 LIMIT 1
+SELECT id, reference, sender_user_id, receiver_phone, receiver_user_id, token, amount, tx_hash, status, created_at, updated_at, quote_id, caas_transfer_id, idempotency_key, local_fiat_amount, local_currency, receiver_address FROM crypto_transactions WHERE idempotency_key = $1 LIMIT 1
 `
 
 // ─── crypto_transactions CaaS extras ─────────────────────────────────────────
@@ -308,6 +308,7 @@ func (q *Queries) GetCryptoTransactionByIdempotencyKey(ctx context.Context, idem
 		&i.IdempotencyKey,
 		&i.LocalFiatAmount,
 		&i.LocalCurrency,
+		&i.ReceiverAddress,
 	)
 	return i, err
 }
@@ -480,7 +481,7 @@ const updateCryptoTransactionCaasResult = `-- name: UpdateCryptoTransactionCaasR
 UPDATE crypto_transactions
 SET status = $2, tx_hash = $3, caas_transfer_id = $4, updated_at = NOW()
 WHERE id = $1
-RETURNING id, reference, sender_user_id, receiver_phone, receiver_user_id, token, amount, tx_hash, status, created_at, updated_at, quote_id, caas_transfer_id, idempotency_key, local_fiat_amount, local_currency
+RETURNING id, reference, sender_user_id, receiver_phone, receiver_user_id, token, amount, tx_hash, status, created_at, updated_at, quote_id, caas_transfer_id, idempotency_key, local_fiat_amount, local_currency, receiver_address
 `
 
 type UpdateCryptoTransactionCaasResultParams struct {
@@ -515,6 +516,7 @@ func (q *Queries) UpdateCryptoTransactionCaasResult(ctx context.Context, arg Upd
 		&i.IdempotencyKey,
 		&i.LocalFiatAmount,
 		&i.LocalCurrency,
+		&i.ReceiverAddress,
 	)
 	return i, err
 }

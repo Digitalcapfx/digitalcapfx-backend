@@ -143,16 +143,19 @@ type FundUserResponse struct {
 
 // ── Transfer (P2P stablecoin) ─────────────────────────────────────────────────
 
-// TransferRequest sends stablecoin from one user to another by phone number.
+// TransferRequest sends stablecoin from one user to another. Sender and recipient
+// are each addressed by EITHER an E.164 phone number OR a 0x-prefixed 40-char SCW
+// wallet address — CaaS auto-detects the format on the same field.
 // CaaS handles the ERC-4337 bundler, gas sponsorship (paymaster), and on-chain
 // settlement — DigitalFX sees only a transfer_id and async status updates.
 // POST /v1/transfers/send
 type TransferRequest struct {
 	// IdempotencyKey prevents duplicate submissions. Use a UUID or reference.
 	IdempotencyKey string `json:"idempotency_key"`
-	// SenderPhone is the E.164 phone number of the sender.
+	// SenderPhone identifies the sender: an E.164 phone number OR a 0x wallet address.
 	SenderPhone string `json:"sender_phone"`
-	// RecipientPhone is the E.164 phone number of the recipient.
+	// RecipientPhone identifies the recipient: an E.164 phone number OR a 0x wallet
+	// address. A phone can be provisioned on the fly; an address must already exist.
 	RecipientPhone string `json:"recipient_phone"`
 	// LocalFiatAmount is the fiat-denominated value of the transfer (decimal string e.g. "5500.00").
 	// For a stablecoin-only transfer, obtain this by calling GetFXQuote first.
@@ -261,8 +264,9 @@ func (c *Client) FundUser(ctx context.Context, req FundUserRequest) (*FundUserRe
 	return &out, nil
 }
 
-// Transfer executes a gasless peer-to-peer stablecoin transfer identified by
-// phone number. CaaS resolves wallet addresses, sponsors gas via the paymaster,
+// Transfer executes a gasless peer-to-peer stablecoin transfer. Sender and
+// recipient are each identified by a phone number OR a raw 0x wallet address
+// (auto-detected). CaaS resolves wallet addresses, sponsors gas via the paymaster,
 // and settles on-chain asynchronously. Use webhooks or poll GetTransfer for finality.
 // POST /v1/transfers/send
 func (c *Client) Transfer(ctx context.Context, req TransferRequest) (*TransferResponse, error) {

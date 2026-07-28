@@ -24,3 +24,10 @@ coverage.html
 
 # SQLC generated (committed, but listed for clarity)
 # internal/db/sqlc/ is committed
+
+# local dev scratch scripts (never commit — may contain secrets)
+/scratch/
+/test_sms.go
+/test_nilos.go
+/test_nilos_endpoints.go
+/find_missing_swag.go

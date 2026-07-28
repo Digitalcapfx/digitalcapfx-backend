@@ -242,22 +242,32 @@ type WithdrawCryptoRequest struct {
 }
 
 type SendCryptoRequest struct {
-	ReceiverPhone string `json:"receiver_phone" example:"+237698765432"`
+	// ReceiverPhone addresses the recipient by E.164 phone number. Provide EITHER
+	// receiver_phone OR recipient_address (exactly one). A phone that has never been
+	// provisioned is created on the fly by CaaS and the recipient is notified by SMS.
+	ReceiverPhone string `json:"receiver_phone,omitempty" example:"+237698765432"`
+	// RecipientAddress addresses the recipient by a raw 0x-prefixed SCW wallet
+	// address (42 chars). Provide EITHER receiver_phone OR recipient_address. The
+	// wallet must already exist — unlike a phone, an address cannot be auto-provisioned.
+	RecipientAddress string `json:"recipient_address,omitempty" example:"0x1234567890abcdef1234567890abcdef12345678"`
 	// Token must be USDT or USDC
 	Token  string `json:"token" example:"USDC" enums:"USDT,USDC"`
 	Amount string `json:"amount" example:"50.00"`
 }
 
 type CryptoTxData struct {
-	ID            string    `json:"id"`
-	Reference     string    `json:"reference" example:"CRYPTO-REF-001"`
-	SenderUserID  string    `json:"sender_user_id"`
-	ReceiverPhone string    `json:"receiver_phone" example:"+237698765432"`
-	Token         string    `json:"token" example:"USDC"`
-	Amount        string    `json:"amount" example:"50.00"`
-	TxHash        string    `json:"tx_hash,omitempty"`
-	Status        string    `json:"status" example:"pending"`
-	CreatedAt     time.Time `json:"created_at"`
+	ID           string `json:"id"`
+	Reference    string `json:"reference" example:"CRYPTO-REF-001"`
+	SenderUserID string `json:"sender_user_id"`
+	// ReceiverPhone is set when the recipient was addressed by phone (else null).
+	ReceiverPhone string `json:"receiver_phone,omitempty" example:"+237698765432"`
+	// ReceiverAddress is set when the recipient was addressed by wallet (else null).
+	ReceiverAddress string    `json:"receiver_address,omitempty" example:"0x1234567890abcdef1234567890abcdef12345678"`
+	Token           string    `json:"token" example:"USDC"`
+	Amount          string    `json:"amount" example:"50.00"`
+	TxHash          string    `json:"tx_hash,omitempty"`
+	Status          string    `json:"status" example:"pending"`
+	CreatedAt       time.Time `json:"created_at"`
 }
 
 type CryptoTxResponse struct {

@@ -177,7 +177,7 @@ type CryptoTransaction struct {
 	ID              uuid.UUID  `json:"id"`
 	Reference       string     `json:"reference"`
 	SenderUserID    uuid.UUID  `json:"sender_user_id"`
-	ReceiverPhone   string     `json:"receiver_phone"`
+	ReceiverPhone   *string    `json:"receiver_phone"`
 	ReceiverUserID  *uuid.UUID `json:"receiver_user_id"`
 	Token           string     `json:"token"`
 	Amount          string     `json:"amount"`
@@ -190,6 +190,7 @@ type CryptoTransaction struct {
 	IdempotencyKey  *string    `json:"idempotency_key"`
 	LocalFiatAmount *string    `json:"local_fiat_amount"`
 	LocalCurrency   *string    `json:"local_currency"`
+	ReceiverAddress *string    `json:"receiver_address"`
 }
 
 type DeviceToken struct {

@@ -195,7 +195,7 @@ func (s *HUB2Service) HandleWebhook(ctx context.Context, payload hub2.WebhookPay
 		if _, txErr := q.CreateCryptoTransaction(ctx, db.CreateCryptoTransactionParams{
 			Reference:     ref,
 			SenderUserID:  user.ID,
-			ReceiverPhone: phone,
+			ReceiverPhone: &phone,
 			Token:         string(caas.TokenUSDC),
 			Amount:        quote.ExpectedOut,
 			Status:        "pending",

@@ -13,16 +13,17 @@ import (
 
 const createCryptoTransaction = `-- name: CreateCryptoTransaction :one
 INSERT INTO crypto_transactions
-    (reference, sender_user_id, receiver_phone, receiver_user_id, token, amount,
+    (reference, sender_user_id, receiver_phone, receiver_address, receiver_user_id, token, amount,
      tx_hash, status, quote_id, caas_transfer_id, idempotency_key, local_fiat_amount, local_currency)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
-RETURNING id, reference, sender_user_id, receiver_phone, receiver_user_id, token, amount, tx_hash, status, created_at, updated_at, quote_id, caas_transfer_id, idempotency_key, local_fiat_amount, local_currency
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+RETURNING id, reference, sender_user_id, receiver_phone, receiver_user_id, token, amount, tx_hash, status, created_at, updated_at, quote_id, caas_transfer_id, idempotency_key, local_fiat_amount, local_currency, receiver_address
 `
 
 type CreateCryptoTransactionParams struct {
 	Reference       string     `json:"reference"`
 	SenderUserID    uuid.UUID  `json:"sender_user_id"`
-	ReceiverPhone   string     `json:"receiver_phone"`
+	ReceiverPhone   *string    `json:"receiver_phone"`
+	ReceiverAddress *string    `json:"receiver_address"`
 	ReceiverUserID  *uuid.UUID `json:"receiver_user_id"`
 	Token           string     `json:"token"`
 	Amount          string     `json:"amount"`
@@ -40,6 +41,7 @@ func (q *Queries) CreateCryptoTransaction(ctx context.Context, arg CreateCryptoT
 		arg.Reference,
 		arg.SenderUserID,
 		arg.ReceiverPhone,
+		arg.ReceiverAddress,
 		arg.ReceiverUserID,
 		arg.Token,
 		arg.Amount,
@@ -69,12 +71,13 @@ func (q *Queries) CreateCryptoTransaction(ctx context.Context, arg CreateCryptoT
 		&i.IdempotencyKey,
 		&i.LocalFiatAmount,
 		&i.LocalCurrency,
+		&i.ReceiverAddress,
 	)
 	return i, err
 }
 
 const getCryptoTransactionByID = `-- name: GetCryptoTransactionByID :one
-SELECT id, reference, sender_user_id, receiver_phone, receiver_user_id, token, amount, tx_hash, status, created_at, updated_at, quote_id, caas_transfer_id, idempotency_key, local_fiat_amount, local_currency FROM crypto_transactions WHERE id = $1 LIMIT 1
+SELECT id, reference, sender_user_id, receiver_phone, receiver_user_id, token, amount, tx_hash, status, created_at, updated_at, quote_id, caas_transfer_id, idempotency_key, local_fiat_amount, local_currency, receiver_address FROM crypto_transactions WHERE id = $1 LIMIT 1
 `
 
 func (q *Queries) GetCryptoTransactionByID(ctx context.Context, id uuid.UUID) (CryptoTransaction, error) {
@@ -97,12 +100,13 @@ func (q *Queries) GetCryptoTransactionByID(ctx context.Context, id uuid.UUID) (C
 		&i.IdempotencyKey,
 		&i.LocalFiatAmount,
 		&i.LocalCurrency,
+		&i.ReceiverAddress,
 	)
 	return i, err
 }
 
 const getCryptoTransactionByReference = `-- name: GetCryptoTransactionByReference :one
-SELECT id, reference, sender_user_id, receiver_phone, receiver_user_id, token, amount, tx_hash, status, created_at, updated_at, quote_id, caas_transfer_id, idempotency_key, local_fiat_amount, local_currency FROM crypto_transactions WHERE reference = $1 LIMIT 1
+SELECT id, reference, sender_user_id, receiver_phone, receiver_user_id, token, amount, tx_hash, status, created_at, updated_at, quote_id, caas_transfer_id, idempotency_key, local_fiat_amount, local_currency, receiver_address FROM crypto_transactions WHERE reference = $1 LIMIT 1
 `
 
 func (q *Queries) GetCryptoTransactionByReference(ctx context.Context, reference string) (CryptoTransaction, error) {
@@ -125,12 +129,13 @@ func (q *Queries) GetCryptoTransactionByReference(ctx context.Context, reference
 		&i.IdempotencyKey,
 		&i.LocalFiatAmount,
 		&i.LocalCurrency,
+		&i.ReceiverAddress,
 	)
 	return i, err
 }
 
 const listCryptoTransactionsByUser = `-- name: ListCryptoTransactionsByUser :many
-SELECT id, reference, sender_user_id, receiver_phone, receiver_user_id, token, amount, tx_hash, status, created_at, updated_at, quote_id, caas_transfer_id, idempotency_key, local_fiat_amount, local_currency FROM crypto_transactions
+SELECT id, reference, sender_user_id, receiver_phone, receiver_user_id, token, amount, tx_hash, status, created_at, updated_at, quote_id, caas_transfer_id, idempotency_key, local_fiat_amount, local_currency, receiver_address FROM crypto_transactions
 WHERE sender_user_id = $1 OR receiver_user_id = $4
 ORDER BY created_at DESC
 LIMIT $2 OFFSET $3
@@ -174,6 +179,7 @@ func (q *Queries) ListCryptoTransactionsByUser(ctx context.Context, arg ListCryp
 			&i.IdempotencyKey,
 			&i.LocalFiatAmount,
 			&i.LocalCurrency,
+			&i.ReceiverAddress,
 		); err != nil {
 			return nil, err
 		}
@@ -189,7 +195,7 @@ const updateCryptoTransactionStatus = `-- name: UpdateCryptoTransactionStatus :o
 UPDATE crypto_transactions
 SET status = $2, tx_hash = $3, updated_at = NOW()
 WHERE id = $1
-RETURNING id, reference, sender_user_id, receiver_phone, receiver_user_id, token, amount, tx_hash, status, created_at, updated_at, quote_id, caas_transfer_id, idempotency_key, local_fiat_amount, local_currency
+RETURNING id, reference, sender_user_id, receiver_phone, receiver_user_id, token, amount, tx_hash, status, created_at, updated_at, quote_id, caas_transfer_id, idempotency_key, local_fiat_amount, local_currency, receiver_address
 `
 
 type UpdateCryptoTransactionStatusParams struct {
@@ -218,6 +224,7 @@ func (q *Queries) UpdateCryptoTransactionStatus(ctx context.Context, arg UpdateC
 		&i.IdempotencyKey,
 		&i.LocalFiatAmount,
 		&i.LocalCurrency,
+		&i.ReceiverAddress,
 	)
 	return i, err
 }

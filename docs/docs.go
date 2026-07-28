@@ -3309,7 +3309,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Transfers Stablecoin (USDC) from the caller to another DigitalFX user identified by phone number, via Rach CaaS (settles on-chain as USDC between the two EIP-4337 wallets). Amount is USD-equivalent decimal (e.g. \"50.00\"). Note: the ` + "`" + `token` + "`" + ` field selects the on-chain settlement asset (USDC/USDT) but the customer-facing unit is USDC. This is the CaaS P2P rail, distinct from WaaS on-chain crypto transfers.",
+                "description": "Transfers Stablecoin (USDC) from the caller to a recipient addressed by EITHER a phone number (` + "`" + `receiver_phone` + "`" + `) OR a raw 0x SCW wallet address (` + "`" + `recipient_address` + "`" + `) — provide exactly one. Settles on-chain as USDC between the two EIP-4337 wallets via Rach CaaS. A phone that was never provisioned is created on the fly and the recipient is notified by SMS; a wallet address must already exist (it cannot be auto-provisioned). Amount is USD-equivalent decimal (e.g. \"50.00\"). The ` + "`" + `token` + "`" + ` field selects the on-chain settlement asset (USDC/USDT); the customer-facing unit is USDC. This is the CaaS P2P rail, distinct from WaaS on-chain crypto transfers.",
                 "consumes": [
                     "application/json"
                 ],
@@ -3319,7 +3319,7 @@ const docTemplate = `{
                 "tags": [
                     "CaaS - Stablecoin (USDC)"
                 ],
-                "summary": "Send USDC to another user (Phone Send)",
+                "summary": "Send USDC to a phone number or wallet address (Phone Send)",
                 "parameters": [
                     {
                         "description": "Transfer details",
@@ -8639,7 +8639,13 @@ const docTemplate = `{
                 "id": {
                     "type": "string"
                 },
+                "receiver_address": {
+                    "description": "ReceiverAddress is set when the recipient was addressed by wallet (else null).",
+                    "type": "string",
+                    "example": "0x1234567890abcdef1234567890abcdef12345678"
+                },
                 "receiver_phone": {
+                    "description": "ReceiverPhone is set when the recipient was addressed by phone (else null).",
                     "type": "string",
                     "example": "+237698765432"
                 },
@@ -9883,8 +9889,14 @@ const docTemplate = `{
                     "example": "50.00"
                 },
                 "receiver_phone": {
+                    "description": "ReceiverPhone addresses the recipient by E.164 phone number. Provide EITHER\nreceiver_phone OR recipient_address (exactly one). A phone that has never been\nprovisioned is created on the fly by CaaS and the recipient is notified by SMS.",
                     "type": "string",
                     "example": "+237698765432"
+                },
+                "recipient_address": {
+                    "description": "RecipientAddress addresses the recipient by a raw 0x-prefixed SCW wallet\naddress (42 chars). Provide EITHER receiver_phone OR recipient_address. The\nwallet must already exist — unlike a phone, an address cannot be auto-provisioned.",
+                    "type": "string",
+                    "example": "0x1234567890abcdef1234567890abcdef12345678"
                 },
                 "token": {
                     "description": "Token must be USDT or USDC",
