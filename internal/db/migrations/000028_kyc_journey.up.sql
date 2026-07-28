@@ -3,12 +3,14 @@
 -- 1. kyc_intake: raw saved answers (for prefill/resume) + draft/submitted status.
 ALTER TABLE kyc_intake ADD COLUMN IF NOT EXISTS saved_values JSONB;
 
--- Migrate the old status vocabulary (pending|completed) to the new one
--- (draft|submitted) before swapping the CHECK constraint.
+-- Drop the OLD constraint FIRST: it only allowed pending|completed, so it would
+-- reject the status conversions below if left in place during the UPDATE.
+ALTER TABLE kyc_intake DROP CONSTRAINT IF EXISTS chk_kyc_intake_status;
+
+-- Migrate the old status vocabulary (pending|completed) to the new (draft|submitted).
 UPDATE kyc_intake SET status = 'submitted' WHERE status = 'completed';
 UPDATE kyc_intake SET status = 'draft'     WHERE status = 'pending';
 
-ALTER TABLE kyc_intake DROP CONSTRAINT IF EXISTS chk_kyc_intake_status;
 ALTER TABLE kyc_intake ALTER COLUMN status SET DEFAULT 'draft';
 ALTER TABLE kyc_intake ADD CONSTRAINT chk_kyc_intake_status CHECK (status IN ('draft','submitted'));
 
