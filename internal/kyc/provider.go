@@ -20,6 +20,14 @@ type VerificationEvent struct {
 	UserID     string // Our internal user ID (parsed from metadata)
 	Status     string // Normalized status: pending, processing, under_review, approved, rejected
 	RawPayload []byte // Full webhook body for audit or debugging
+
+	// Identity-journey detail (populated by Sumsub) for the consolidated
+	// GET /kyc/status and retry UX. Empty for providers/events that don't apply.
+	IdentityStatus    string   // not_started|in_progress|in_review|approved|rejected|resubmit
+	ReviewAnswer      string   // GREEN | RED
+	RejectLabels      []string // Sumsub moderation labels
+	RejectType        string   // FINAL | RETRY
+	ModerationComment string   // human-readable reason, when available
 }
 
 // KYCProvider is the abstraction that all KYC vendors must implement.

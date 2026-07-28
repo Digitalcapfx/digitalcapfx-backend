@@ -113,6 +113,7 @@ type Querier interface {
 	GetHub2PaymentByReference(ctx context.Context, hub2Reference string) (Hub2Payment, error)
 	GetHub2PaymentByReferenceForFunding(ctx context.Context, hub2Reference string) (Hub2Payment, error)
 	GetKYCDocumentsByUserID(ctx context.Context, userID uuid.UUID) ([]KycDocument, error)
+	GetKYCIdentity(ctx context.Context, userID uuid.UUID) (KycIdentity, error)
 	GetKYCIntake(ctx context.Context, userID uuid.UUID) (KycIntake, error)
 	// Most recent time a code of this purpose was sent to an email — powers the
 	// resend cooldown.
@@ -192,6 +193,9 @@ type Querier interface {
 	MarkFXQuoteUsed(ctx context.Context, quoteID string) error
 	// ─── hub2_payments CaaS funding ───────────────────────────────────────────────
 	MarkHub2PaymentCaasFunded(ctx context.Context, id uuid.UUID) error
+	// Called on POST /kyc/init. Sets in_progress the first time; never regresses a
+	// terminal/in-review state back to in_progress.
+	MarkKYCIdentityStarted(ctx context.Context, userID uuid.UUID) error
 	MarkNotificationRead(ctx context.Context, arg MarkNotificationReadParams) (Notification, error)
 	MarkOTPUsed(ctx context.Context, id uuid.UUID) error
 	PromoteUserToOwnerByPhone(ctx context.Context, phoneNumber string) (PromoteUserToOwnerByPhoneRow, error)
@@ -201,6 +205,10 @@ type Querier interface {
 	RevokeStaffInvite(ctx context.Context, id uuid.UUID) (int64, error)
 	RevokeUserSessionByID(ctx context.Context, arg RevokeUserSessionByIDParams) error
 	SaveBusinessProfile(ctx context.Context, arg SaveBusinessProfileParams) (BusinessProfile, error)
+	// Persist partial progress (no required-field validation). Merges the supplied
+	// values into any existing draft (last-write-wins per key) and never downgrades
+	// a submitted intake back to draft.
+	SaveKYCIntakeDraft(ctx context.Context, arg SaveKYCIntakeDraftParams) (KycIntake, error)
 	// Flags (or clears) admin manual control over a user's KYC decision.
 	SetKycManualOverride(ctx context.Context, arg SetKycManualOverrideParams) error
 	// Records the KYC provider's latest automated decision (does not touch the
@@ -237,6 +245,7 @@ type Querier interface {
 	UpdateVTUTransactionStatus(ctx context.Context, arg UpdateVTUTransactionStatusParams) (VtuTransaction, error)
 	UpdateVirtualCard(ctx context.Context, arg UpdateVirtualCardParams) (VirtualCard, error)
 	UpsertDeviceToken(ctx context.Context, arg UpsertDeviceTokenParams) error
+	UpsertKYCIdentityFromWebhook(ctx context.Context, arg UpsertKYCIdentityFromWebhookParams) error
 	UpsertKYCIntake(ctx context.Context, arg UpsertKYCIntakeParams) (KycIntake, error)
 	UpsertPlatformLimit(ctx context.Context, arg UpsertPlatformLimitParams) (PlatformLimit, error)
 	UpsertUserLimitOverride(ctx context.Context, arg UpsertUserLimitOverrideParams) (UserLimitOverride, error)

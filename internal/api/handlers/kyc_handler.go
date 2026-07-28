@@ -23,12 +23,12 @@ func NewKYCHandler(svc *services.Services) *KYCHandler {
 
 // GetStatus godoc
 //
-//	@Summary      Get KYC status
-//	@Description  Returns the current KYC verification status for the authenticated user. Possible values: pending, approved, rejected.
+//	@Summary      Get KYC journey status
+//	@Description  Returns the consolidated KYC journey the app switches on. `stage` is canonical — one of: not_started, draft, submitted, identity_started, in_review, approved, rejected, resubmit. `kyc_status` (pending|approved|rejected) is kept for back-compat. `intake` gives the intake sub-state (+ submitted_at); `identity` gives the Sumsub sub-state (+ applicant_id, review_answer, reject_labels, moderation_comment) for the retry UX. All identity sub-fields are optional and default when absent.
 //	@Tags         kyc
 //	@Produce      json
 //	@Security     BearerAuth
-//	@Success      200  {object}  KYCStatusResponse
+//	@Success      200  {object}  services.JourneyStatus
 //	@Failure      401  {object}  ErrorResponse
 //	@Failure      500  {object}  ErrorResponse
 //	@Router       /kyc/status [get]
@@ -39,13 +39,13 @@ func (h *KYCHandler) GetStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	status, err := h.svc.KYC.GetStatus(r.Context(), userID)
+	status, err := h.svc.KYC.GetJourneyStatus(r.Context(), userID)
 	if err != nil {
 		response.InternalError(w)
 		return
 	}
 
-	response.OK(w, map[string]string{"kyc_status": status})
+	response.OK(w, status)
 }
 
 // ListDocuments godoc
@@ -166,8 +166,8 @@ func (h *KYCHandler) Initiate(w http.ResponseWriter, r *http.Request) {
 
 // IntakeRequirements godoc
 //
-//	@Summary      Get KYC intake fields
-//	@Description  Returns everything DigitalFX collects on its own form BEFORE the Sumsub identity dialog is launched. For individuals this is identity + address fields (Nilos) plus BVN (Nomba, for the Naira account); ID + liveness are handled by Sumsub afterwards. For business (KYB) accounts it additionally returns the full Nilos merchant-onboarding `documents` checklist (Certificate of Incorporation, Director/Shareholder registers, MEMART, proof of address/activity, bank statement, plus importer & EUR/GBP-NRE conditional items) — upload each via POST /kyc/documents with the matching doc_type. `completed` indicates whether intake was already submitted. Only after POST /kyc/intake does POST /kyc/init return a Sumsub token.
+//	@Summary      Get KYC intake fields (+ saved answers for resume)
+//	@Description  Returns everything DigitalFX collects on its own form BEFORE the Sumsub identity dialog is launched. `fields[]` carry `group` (identity|address|contact|financial) and `order` for the multi-step stepper, and `type` (text|date|select|country|boolean|repeatable). `values` holds previously-saved answers (from PUT /kyc/intake/draft or a prior submit) to PREFILL the form on resume; `intake_status` is not_started|draft|submitted (`completed` kept for back-compat). For business (KYB) accounts it also returns the Nilos merchant-onboarding `documents` checklist — upload each via POST /kyc/documents. Only after POST /kyc/intake (status submitted) does POST /kyc/init return a Sumsub token.
 //	@Tags         kyc
 //	@Produce      json
 //	@Security     BearerAuth
@@ -185,10 +185,54 @@ func (h *KYCHandler) IntakeRequirements(w http.ResponseWriter, r *http.Request) 
 		response.InternalError(w)
 		return
 	}
-	// Returned as the typed IntakeRequirements shape: account_type, completed,
-	// fields[] (key/label/type/required/options), documents[] (Nilos KYB
-	// checklist for business), and notes[].
+	// Returned as the typed IntakeRequirements shape: account_type, intake_status,
+	// values (prefill), fields[] (key/label/type/required/options/group/order),
+	// documents[] (Nilos KYB checklist for business), and notes[].
 	response.OK(w, req)
+}
+
+// SaveDraftRequest is the PUT /kyc/intake/draft payload: a partial map of intake
+// field keys → values (any subset).
+type SaveDraftRequest struct {
+	Values map[string]interface{} `json:"values"`
+}
+
+// SaveDraft godoc
+//
+//	@Summary      Save partial KYC intake progress (draft)
+//	@Description  Persists whatever the user has entered so far — NO required-field validation. Values merge into any existing draft (last-write-wins per key) and never downgrade a submitted intake (that PUT is a no-op). Call it after each step and on back-out; it is idempotent and safe to call repeatedly. GET /kyc/requirements returns these back as `values` to prefill on resume. Value shapes must round-trip what POST /kyc/intake accepts (date as YYYY-MM-DD, country as ISO-3166 alpha-2, boolean as JSON boolean, top_3_counterparties as an array of {country,relationship,purpose}).
+//	@Tags         kyc
+//	@Accept       json
+//	@Produce      json
+//	@Security     BearerAuth
+//	@Param        body  body      SaveDraftRequest  true  "Partial intake values"
+//	@Success      200   {object}  map[string]any
+//	@Failure      401   {object}  ErrorResponse
+//	@Router       /kyc/intake/draft [put]
+func (h *KYCHandler) SaveDraft(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		response.Unauthorized(w, "unauthorized")
+		return
+	}
+	var body SaveDraftRequest
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		response.BadRequest(w, "VALIDATION_ERROR", "invalid request body")
+		return
+	}
+	intake, err := h.svc.KYC.SaveIntakeDraft(r.Context(), userID, body.Values)
+	if err != nil {
+		if errors.Is(err, services.ErrUserNotFound) {
+			response.NotFound(w, "user not found")
+			return
+		}
+		response.InternalError(w)
+		return
+	}
+	response.OK(w, map[string]any{
+		"intake_status": intake.Status,
+		"saved_at":      intake.UpdatedAt,
+	})
 }
 
 // CounterpartyInput is one top counterparty (EUR/GBP NRE businesses).

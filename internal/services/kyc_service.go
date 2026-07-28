@@ -98,10 +98,10 @@ func (s *KYCService) InitiateKYC(ctx context.Context, userID uuid.UUID) (*kyc.Ve
 		return nil, ErrUserNotFound
 	}
 
-	// Gate: our own KYC intake fields must be collected and completed BEFORE the
-	// Sumsub SDK dialog is launched. This is what makes the frontend/mobile show
-	// our form first and only then pop the Sumsub flow.
-	if intake, ierr := q.GetKYCIntake(ctx, userID); ierr != nil || intake.Status != "completed" {
+	// Gate: our own KYC intake must be SUBMITTED before the Sumsub SDK dialog is
+	// launched. This is what makes the frontend/mobile show our form first and
+	// only then pop the Sumsub flow.
+	if intake, ierr := q.GetKYCIntake(ctx, userID); ierr != nil || intake.Status != IntakeStatusSubmitted {
 		return nil, ErrKYCIntakeRequired
 	}
 
@@ -113,6 +113,12 @@ func (s *KYCService) InitiateKYC(ctx context.Context, userID uuid.UUID) (*kyc.Ve
 	session, err := s.provider.Initiate(ctx, userID.String(), user.PhoneNumber, emailStr)
 	if err != nil {
 		return nil, fmt.Errorf("kyc %s initiate: %w", s.provider.Name(), err)
+	}
+
+	// Mark identity verification as started (resume-friendly): the Sumsub SDK is
+	// now open. Never regresses a later in_review/terminal state.
+	if err := q.MarkKYCIdentityStarted(ctx, userID); err != nil {
+		s.logger.Error("mark kyc identity started", zap.Error(err))
 	}
 
 	return session, nil
@@ -128,14 +134,25 @@ var ErrKYCIntakeRequired = errors.New("kyc intake required: complete the KYC for
 
 // IntakeFieldSpec describes one field the frontend should render on the intake
 // form. Options is populated for enum-like fields (e.g. source_of_funds).
+// Group/Order drive the multi-step stepper (see the group constants below).
 type IntakeFieldSpec struct {
 	Key      string   `json:"key"`
 	Label    string   `json:"label"`
-	Type     string   `json:"type"` // text | date | select | country | boolean | counterparties
+	Type     string   `json:"type"` // text | date | select | country | boolean | repeatable
 	Required bool     `json:"required"`
 	Options  []string `json:"options,omitempty"`
 	Help     string   `json:"help,omitempty"`
+	Group    string   `json:"group,omitempty"` // identity | address | contact | financial
+	Order    int      `json:"order,omitempty"` // sort within the group
 }
+
+// Stepper group ids (drive the mobile multi-step form).
+const (
+	GroupIdentity  = "identity"
+	GroupAddress   = "address"
+	GroupContact   = "contact"
+	GroupFinancial = "financial"
+)
 
 // KYC document types. The business set mirrors the Nilos merchant-onboarding
 // requirements — these documents are collected here and submitted to Nilos
@@ -175,14 +192,31 @@ type IntakeOptions struct {
 }
 
 // IntakeRequirements is the full, account-type-aware checklist the frontend
-// renders: structured fields, document uploads, and notes.
+// renders: structured fields, document uploads, notes, plus any previously-saved
+// answers (for prefill/resume) and the intake status.
 type IntakeRequirements struct {
-	AccountType string            `json:"account_type"`
-	Completed   bool              `json:"completed"`
-	Fields      []IntakeFieldSpec `json:"fields"`
-	Documents   []DocumentSpec    `json:"documents,omitempty"`
-	Notes       []string          `json:"notes,omitempty"`
+	AccountType  string                 `json:"account_type"`
+	IntakeStatus string                 `json:"intake_status"` // not_started | draft | submitted
+	Completed    bool                   `json:"completed"`     // back-compat (== intake_status submitted)
+	Values       map[string]interface{} `json:"values"`        // saved answers, prefills the form
+	Fields       []IntakeFieldSpec      `json:"fields"`
+	Documents    []DocumentSpec         `json:"documents,omitempty"`
+	Notes        []string               `json:"notes,omitempty"`
 }
+
+// Intake + identity status constants.
+const (
+	IntakeStatusNotStarted = "not_started"
+	IntakeStatusDraft      = "draft"
+	IntakeStatusSubmitted  = "submitted"
+
+	IdentityNotStarted = "not_started"
+	IdentityInProgress = "in_progress"
+	IdentityInReview   = "in_review"
+	IdentityApproved   = "approved"
+	IdentityRejected   = "rejected"
+	IdentityResubmit   = "resubmit"
+)
 
 // personIdentityFields are the ADDITIONAL identity + address + AML fields the
 // intake collects for an individual or a business's authorised representative.
@@ -194,17 +228,17 @@ func personIdentityFields() []IntakeFieldSpec {
 	sourceOfFunds := []string{"Salary", "Business Income", "Savings", "Investment", "Inheritance", "Gift", "Other"}
 	purpose := []string{"Personal Use", "Business Payments", "Remittance", "Savings", "Trading", "Other"}
 	return []IntakeFieldSpec{
-		{Key: "date_of_birth", Label: "Date of Birth", Type: "date", Required: true, Help: "YYYY-MM-DD"},
-		{Key: "nationality", Label: "Nationality", Type: "country", Required: true},
-		{Key: "bvn", Label: "BVN (Bank Verification Number)", Type: "text", Required: false, Help: "11 digits. Optional — provide to activate your Nigerian (NGN) account."},
-		{Key: "address_line1", Label: "Address Line 1", Type: "text", Required: true},
-		{Key: "address_line2", Label: "Address Line 2", Type: "text", Required: false},
-		{Key: "city", Label: "City", Type: "text", Required: true},
-		{Key: "state", Label: "State / Province", Type: "text", Required: false},
-		{Key: "postal_code", Label: "Postal Code", Type: "text", Required: false},
-		{Key: "occupation", Label: "Occupation", Type: "text", Required: true},
-		{Key: "source_of_funds", Label: "Source of Funds", Type: "select", Required: true, Options: sourceOfFunds},
-		{Key: "purpose_of_account", Label: "Purpose of Account", Type: "select", Required: true, Options: purpose},
+		{Key: "date_of_birth", Label: "Date of Birth", Type: "date", Required: true, Help: "YYYY-MM-DD", Group: GroupIdentity, Order: 1},
+		{Key: "nationality", Label: "Nationality", Type: "country", Required: true, Group: GroupIdentity, Order: 2},
+		{Key: "bvn", Label: "BVN (Bank Verification Number)", Type: "text", Required: false, Help: "11 digits. Optional - provide to activate your Nigerian (NGN) account.", Group: GroupIdentity, Order: 3},
+		{Key: "occupation", Label: "Occupation", Type: "text", Required: true, Group: GroupIdentity, Order: 4},
+		{Key: "address_line1", Label: "Address Line 1", Type: "text", Required: true, Group: GroupAddress, Order: 1},
+		{Key: "address_line2", Label: "Address Line 2", Type: "text", Required: false, Group: GroupAddress, Order: 2},
+		{Key: "city", Label: "City", Type: "text", Required: true, Group: GroupAddress, Order: 3},
+		{Key: "state", Label: "State / Province", Type: "text", Required: false, Group: GroupAddress, Order: 4},
+		{Key: "postal_code", Label: "Postal Code", Type: "text", Required: false, Group: GroupAddress, Order: 5},
+		{Key: "source_of_funds", Label: "Source of Funds", Type: "select", Required: true, Options: sourceOfFunds, Group: GroupFinancial, Order: 1},
+		{Key: "purpose_of_account", Label: "Purpose of Account", Type: "select", Required: true, Options: purpose, Group: GroupFinancial, Order: 2},
 	}
 }
 
@@ -219,7 +253,7 @@ func BuildIntakeRequirements(accountType string, opts IntakeOptions) IntakeRequi
 			AccountType: accountType,
 			Fields:      personIdentityFields(),
 			Documents: []DocumentSpec{
-				{Key: DocProofOfAddress, Label: "Proof of Address", Required: false, AppliesTo: "all", Scope: "director_ubo", MaxAgeMonths: 3, Help: "Utility bill or bank statement, ≤3 months old"},
+				{Key: DocProofOfAddress, Label: "Proof of Address", Required: false, AppliesTo: "all", Scope: "director_ubo", MaxAgeMonths: 3, Help: "Utility bill or bank statement, issued within the last 3 months"},
 			},
 			Notes: []string{
 				"Your name and country come from signup and are not re-collected here.",
@@ -241,13 +275,13 @@ func BuildIntakeRequirements(accountType string, opts IntakeOptions) IntakeRequi
 	}
 	// Business context fields.
 	fields = append(fields,
-		IntakeFieldSpec{Key: "is_importer", Label: "Is your business an importer?", Type: "boolean", Required: true, Help: "Importers must additionally provide proof of imports"},
+		IntakeFieldSpec{Key: "is_importer", Label: "Is your business an importer?", Type: "boolean", Required: true, Help: "Importers must additionally provide proof of imports", Group: GroupFinancial, Order: 3},
 	)
 	if opts.NeedsNRE {
 		fields = append(fields,
-			IntakeFieldSpec{Key: "top_3_counterparties", Label: "Top 3 Counterparties (inbound/outbound)", Type: "counterparties", Required: true, Help: "For each: country, business relationship, and purpose of payments (required for EUR/GBP accounts)"},
-			IntakeFieldSpec{Key: "contact_email", Label: "Contact Email (UBO/Director)", Type: "text", Required: true},
-			IntakeFieldSpec{Key: "contact_phone", Label: "Contact Phone (UBO/Director)", Type: "text", Required: true},
+			IntakeFieldSpec{Key: "top_3_counterparties", Label: "Top 3 Counterparties (inbound/outbound)", Type: "repeatable", Required: true, Help: "For each: country, business relationship, and purpose of payments (required for EUR/GBP accounts)", Group: GroupFinancial, Order: 4},
+			IntakeFieldSpec{Key: "contact_email", Label: "Contact Email (UBO/Director)", Type: "text", Required: true, Group: GroupContact, Order: 1},
+			IntakeFieldSpec{Key: "contact_phone", Label: "Contact Phone (UBO/Director)", Type: "text", Required: true, Group: GroupContact, Order: 2},
 		)
 	}
 
@@ -257,19 +291,19 @@ func BuildIntakeRequirements(accountType string, opts IntakeOptions) IntakeRequi
 		{Key: DocDirectorRegister, Label: "Director Register", Required: true, AppliesTo: "all", Scope: "company", MaxAgeMonths: 3, Help: "Dated within 3 months, signed by a director"},
 		{Key: DocShareholderRegister, Label: "Shareholder Register", Required: true, AppliesTo: "all", Scope: "company", MaxAgeMonths: 3, Help: "Dated within 3 months, signed by a director"},
 		{Key: DocArticlesOfAssociation, Label: "Articles of Association (MEMART)", Required: true, AppliesTo: "all", Scope: "company"},
-		{Key: DocProofOfAddress, Label: "Proof of Company Address", Required: true, AppliesTo: "all", Scope: "company", MaxAgeMonths: 3, Help: "Utility bill or bank statement ≤3 months. No mobile bills, personal utilities, or virtual-office statements. For USD accounts, the office IP address can be sufficient."},
+		{Key: DocProofOfAddress, Label: "Proof of Company Address", Required: true, AppliesTo: "all", Scope: "company", MaxAgeMonths: 3, Help: "Utility bill or bank statement within the last 3 months. No mobile bills, personal utilities, or virtual-office statements. For USD accounts, the office IP address can be sufficient."},
 		{Key: DocProofOfCompanyActivity, Label: "Proof of Company Activity", Required: true, AppliesTo: "all", Scope: "company", Help: "Recent invoices issued to clients. If no activity yet, a contract with future clients is accepted."},
 		{Key: DocBusinessBankStatement, Label: "Business Bank Statement (past 90 days)", Required: true, AppliesTo: "all", Scope: "company", MaxAgeMonths: 3},
 		{Key: DocProofOfImports, Label: "Proof of Imports", Required: opts.IsImporter, AppliesTo: "importers", Scope: "company", Help: "Air Waybill / Bill of Lading / CMR + Proof of Delivery, Customs Declaration, Freight/Courier Invoice. Related supplier invoices may also be accepted."},
 		// UBOs & directors
 		{Key: DocIDDocument, Label: "Director/UBO ID Document", Required: true, AppliesTo: "all", Scope: "director_ubo", Help: "Passport, National ID, Residence permit, or Driver's license (for each natural-person shareholder)"},
-		{Key: DocProofOfAddress + "_ubo", Label: "Director/UBO Proof of Address", Required: true, AppliesTo: "all", Scope: "director_ubo", MaxAgeMonths: 3, Help: "Utility bill or bank statement ≤3 months old"},
+		{Key: DocProofOfAddress + "_ubo", Label: "Director/UBO Proof of Address", Required: true, AppliesTo: "all", Scope: "director_ubo", MaxAgeMonths: 3, Help: "Utility bill or bank statement, issued within the last 3 months"},
 		{Key: DocIDVLiveness, Label: "Director Liveness Check (IDV)", Required: true, AppliesTo: "all", Scope: "director_ubo", Help: "Required for one director. Completed via the identity-verification dialog after this form."},
 		{Key: DocProofOfWealth, Label: "Proof of Wealth (UBO/Director)", Required: opts.NeedsNRE, AppliesTo: "eur_gbp_nre", Scope: "director_ubo", Help: "Sale of asset, pay-slips, bank statements, or investment-account statements (required for EUR/GBP accounts)"},
 	}
 
 	notes := []string{
-		"All documents must be dated within the specified timeframes (registers & proofs of address ≤3 months; bank statement ≤90 days). Alternatives are accepted where noted.",
+		"All documents must be dated within the specified timeframes (registers & proofs of address within the last 3 months; bank statement within the last 90 days). Alternatives are accepted where noted.",
 		"Where a shareholder is itself a company, also provide that company's Shareholder Register and Articles of Association.",
 		"Company identity fields (legal name, registration number, industry, country of incorporation) and the representative's name and country were captured at signup and are reused — not re-collected here. BVN is optional in this form and activates the Nigerian (NGN) account.",
 	}
@@ -308,16 +342,22 @@ func (s *KYCService) IntakeRequirementsForUser(ctx context.Context, userID uuid.
 	}
 
 	opts := IntakeOptions{NeedsNRE: user.AccountType == "business"}
-	completed := false
+	intakeStatus := IntakeStatusNotStarted
+	var savedValues map[string]interface{}
 	if intake, ierr := q.GetKYCIntake(ctx, userID); ierr == nil {
-		completed = intake.Status == "completed"
+		intakeStatus = intake.Status
 		if intake.IsImporter != nil {
 			opts.IsImporter = *intake.IsImporter
+		}
+		if len(intake.SavedValues) > 0 {
+			_ = json.Unmarshal(intake.SavedValues, &savedValues)
 		}
 	}
 
 	req := BuildIntakeRequirements(user.AccountType, opts)
-	req.Completed = completed
+	req.IntakeStatus = intakeStatus
+	req.Completed = intakeStatus == IntakeStatusSubmitted
+	req.Values = savedValues
 	return req, nil
 }
 
@@ -388,8 +428,8 @@ func (s *KYCService) SubmitIntake(ctx context.Context, userID uuid.UUID, in Subm
 
 	var missing []string
 	for _, spec := range BuildIntakeRequirements(user.AccountType, opts).Fields {
-		// boolean and counterparties are validated separately below.
-		if spec.Type == "boolean" || spec.Type == "counterparties" {
+		// boolean and repeatable (counterparties) are validated separately below.
+		if spec.Type == "boolean" || spec.Type == "repeatable" {
 			continue
 		}
 		if spec.Required && values[spec.Key] == "" {
@@ -429,6 +469,24 @@ func (s *KYCService) SubmitIntake(ctx context.Context, userID uuid.UUID, in Subm
 		bvnPtr = &v
 	}
 
+	// Snapshot the submitted answers into saved_values so a submitted user who
+	// reopens the form sees it prefilled (round-trips the same shape the app sends).
+	savedValues := map[string]interface{}{}
+	for k, v := range values {
+		if v != "" {
+			savedValues[k] = v
+		}
+	}
+	if user.AccountType == "business" {
+		if in.IsImporter != nil {
+			savedValues["is_importer"] = *in.IsImporter
+		}
+		if len(in.Counterparties) > 0 {
+			savedValues["top_3_counterparties"] = in.Counterparties
+		}
+	}
+	savedValuesJSON, _ := json.Marshal(savedValues)
+
 	intake, err := q.UpsertKYCIntake(ctx, db.UpsertKYCIntakeParams{
 		UserID:      userID,
 		AccountType: user.AccountType,
@@ -451,6 +509,7 @@ func (s *KYCService) SubmitIntake(ctx context.Context, userID uuid.UUID, in Subm
 		Counterparties:   counterpartiesJSON,
 		ContactEmail:     ptrOrNil(values["contact_email"]),
 		ContactPhone:     ptrOrNil(values["contact_phone"]),
+		SavedValues:      savedValuesJSON,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("save kyc intake: %w", err)
@@ -476,6 +535,123 @@ func (s *KYCService) GetIntake(ctx context.Context, userID uuid.UUID) (*db.KycIn
 		return nil, nil
 	}
 	return &intake, nil
+}
+
+// SaveIntakeDraft persists partial intake progress WITHOUT validating required
+// fields (called after each step / on back-out). Values merge into any existing
+// draft (last-write-wins per key); a submitted intake is never downgraded.
+func (s *KYCService) SaveIntakeDraft(ctx context.Context, userID uuid.UUID, values map[string]interface{}) (*db.KycIntake, error) {
+	q := db.New(s.pool)
+	user, err := q.GetUserByID(ctx, userID)
+	if err != nil {
+		return nil, ErrUserNotFound
+	}
+	if values == nil {
+		values = map[string]interface{}{}
+	}
+	b, err := json.Marshal(values)
+	if err != nil {
+		return nil, fmt.Errorf("encode draft values: %w", err)
+	}
+	intake, err := q.SaveKYCIntakeDraft(ctx, db.SaveKYCIntakeDraftParams{
+		UserID:      userID,
+		AccountType: user.AccountType,
+		SavedValues: b,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("save draft: %w", err)
+	}
+	return &intake, nil
+}
+
+// ─── Consolidated journey status ──────────────────────────────────────────────
+
+// JourneyIntake / JourneyIdentity / JourneyStatus back GET /kyc/status.
+type JourneyIntake struct {
+	Status      string     `json:"status"` // not_started | draft | submitted
+	SubmittedAt *time.Time `json:"submitted_at,omitempty"`
+}
+
+type JourneyIdentity struct {
+	Status            string   `json:"status"` // not_started | in_progress | in_review | approved | rejected | resubmit
+	ApplicantID       *string  `json:"applicant_id,omitempty"`
+	ReviewAnswer      *string  `json:"review_answer,omitempty"`
+	RejectLabels      []string `json:"reject_labels,omitempty"`
+	ModerationComment *string  `json:"moderation_comment,omitempty"`
+}
+
+type JourneyStatus struct {
+	KycStatus string          `json:"kyc_status"` // back-compat: pending | approved | rejected
+	Stage     string          `json:"stage"`      // canonical (see computeKYCStage)
+	Intake    JourneyIntake   `json:"intake"`
+	Identity  JourneyIdentity `json:"identity"`
+}
+
+// GetJourneyStatus returns the consolidated KYC journey status the app switches on.
+func (s *KYCService) GetJourneyStatus(ctx context.Context, userID uuid.UUID) (*JourneyStatus, error) {
+	q := db.New(s.pool)
+	user, err := q.GetUserByID(ctx, userID)
+	if err != nil {
+		return nil, ErrUserNotFound
+	}
+
+	intakeStatus := IntakeStatusNotStarted
+	var submittedAt *time.Time
+	if intake, ierr := q.GetKYCIntake(ctx, userID); ierr == nil {
+		intakeStatus = intake.Status
+		submittedAt = intake.SubmittedAt
+	}
+
+	identity := JourneyIdentity{Status: IdentityNotStarted}
+	if id, ierr := q.GetKYCIdentity(ctx, userID); ierr == nil {
+		identity.Status = id.Status
+		identity.ApplicantID = id.ApplicantID
+		identity.ReviewAnswer = id.ReviewAnswer
+		identity.ModerationComment = id.ModerationComment
+		if len(id.RejectLabels) > 0 {
+			_ = json.Unmarshal(id.RejectLabels, &identity.RejectLabels)
+		}
+	}
+
+	return &JourneyStatus{
+		KycStatus: user.KycStatus,
+		Stage:     computeKYCStage(user.KycStatus, intakeStatus, identity.Status),
+		Intake:    JourneyIntake{Status: intakeStatus, SubmittedAt: submittedAt},
+		Identity:  identity,
+	}, nil
+}
+
+// computeKYCStage derives the single canonical stage the app keys off. Final
+// decision (possibly admin-set) wins; then the identity sub-state; then intake.
+func computeKYCStage(kycStatus, intakeStatus, identityStatus string) string {
+	switch kycStatus {
+	case "approved":
+		return "approved"
+	case "rejected":
+		if identityStatus == IdentityResubmit {
+			return "resubmit"
+		}
+		return "rejected"
+	}
+	switch identityStatus {
+	case IdentityApproved:
+		return "approved"
+	case IdentityRejected:
+		return "rejected"
+	case IdentityResubmit:
+		return "resubmit"
+	case IdentityInReview:
+		return "in_review"
+	case IdentityInProgress:
+		return "identity_started"
+	}
+	switch intakeStatus {
+	case IntakeStatusSubmitted:
+		return "submitted"
+	case IntakeStatusDraft:
+		return "draft"
+	}
+	return "not_started"
 }
 
 // ─── Admin KYC/KYB review ─────────────────────────────────────────────────────
@@ -540,7 +716,7 @@ func (s *KYCService) AdminGetKYCReview(ctx context.Context, userID uuid.UUID) (*
 
 	// Intake (nil if never submitted).
 	if intake, ierr := q.GetKYCIntake(ctx, userID); ierr == nil {
-		review.IntakeCompleted = intake.Status == "completed"
+		review.IntakeCompleted = intake.Status == IntakeStatusSubmitted
 		var cps []Counterparty
 		if len(intake.Counterparties) > 0 {
 			_ = json.Unmarshal(intake.Counterparties, &cps)
@@ -745,6 +921,40 @@ func (s *KYCService) HandleProviderWebhook(ctx context.Context, body []byte, hea
 	providerStatus := event.Status
 	if err := q.SetKycProviderStatus(ctx, db.SetKycProviderStatusParams{ID: userID, KycProviderStatus: &providerStatus}); err != nil {
 		s.logger.Error("record kyc provider status", zap.Error(err))
+	}
+
+	// Record the identity (Sumsub) sub-state + retry context so GET /kyc/status
+	// can report a precise stage. Independent of the admin-override on the final
+	// kyc_status below.
+	if event.IdentityStatus != "" {
+		var applicantID, reviewAnswer, rejectType, moderation *string
+		if event.ExternalID != "" {
+			applicantID = &event.ExternalID
+		}
+		if event.ReviewAnswer != "" {
+			reviewAnswer = &event.ReviewAnswer
+		}
+		if event.RejectType != "" {
+			rejectType = &event.RejectType
+		}
+		if event.ModerationComment != "" {
+			moderation = &event.ModerationComment
+		}
+		var rejectLabelsJSON []byte
+		if len(event.RejectLabels) > 0 {
+			rejectLabelsJSON, _ = json.Marshal(event.RejectLabels)
+		}
+		if err := q.UpsertKYCIdentityFromWebhook(ctx, db.UpsertKYCIdentityFromWebhookParams{
+			UserID:            userID,
+			Status:            event.IdentityStatus,
+			ApplicantID:       applicantID,
+			ReviewAnswer:      reviewAnswer,
+			RejectLabels:      rejectLabelsJSON,
+			RejectType:        rejectType,
+			ModerationComment: moderation,
+		}); err != nil {
+			s.logger.Error("record kyc identity from webhook", zap.Error(err))
+		}
 	}
 
 	user, err := q.GetUserByID(ctx, userID)

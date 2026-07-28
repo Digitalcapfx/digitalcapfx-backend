@@ -309,6 +309,18 @@ type KycDocument struct {
 	UpdatedAt       time.Time `json:"updated_at"`
 }
 
+type KycIdentity struct {
+	UserID            uuid.UUID  `json:"user_id"`
+	Status            string     `json:"status"`
+	ApplicantID       *string    `json:"applicant_id"`
+	ReviewAnswer      *string    `json:"review_answer"`
+	RejectLabels      []byte     `json:"reject_labels"`
+	RejectType        *string    `json:"reject_type"`
+	ModerationComment *string    `json:"moderation_comment"`
+	StartedAt         *time.Time `json:"started_at"`
+	UpdatedAt         time.Time  `json:"updated_at"`
+}
+
 type KycIntake struct {
 	UserID           uuid.UUID  `json:"user_id"`
 	AccountType      string     `json:"account_type"`
@@ -334,6 +346,7 @@ type KycIntake struct {
 	Counterparties   []byte     `json:"counterparties"`
 	ContactEmail     *string    `json:"contact_email"`
 	ContactPhone     *string    `json:"contact_phone"`
+	SavedValues      []byte     `json:"saved_values"`
 }
 
 type MerchantStaff struct {

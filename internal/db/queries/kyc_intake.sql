@@ -8,14 +8,14 @@ INSERT INTO kyc_intake (
     address_line1, address_line2, city, state, postal_code, country,
     occupation, source_of_funds, purpose_of_account,
     is_importer, counterparties, contact_email, contact_phone,
-    status, submitted_at, updated_at
+    saved_values, status, submitted_at, updated_at
 ) VALUES (
     $1, $2,
     $3, $4, $5, $6, $7,
     $8, $9, $10, $11, $12, $13,
     $14, $15, $16,
     $17, $18, $19, $20,
-    'completed', now(), now()
+    $21, 'submitted', now(), now()
 )
 ON CONFLICT (user_id) DO UPDATE SET
     account_type       = EXCLUDED.account_type,
@@ -37,7 +37,21 @@ ON CONFLICT (user_id) DO UPDATE SET
     counterparties     = EXCLUDED.counterparties,
     contact_email      = EXCLUDED.contact_email,
     contact_phone      = EXCLUDED.contact_phone,
-    status             = 'completed',
+    saved_values       = EXCLUDED.saved_values,
+    status             = 'submitted',
     submitted_at       = now(),
     updated_at         = now()
+RETURNING *;
+
+-- name: SaveKYCIntakeDraft :one
+-- Persist partial progress (no required-field validation). Merges the supplied
+-- values into any existing draft (last-write-wins per key) and never downgrades
+-- a submitted intake back to draft.
+INSERT INTO kyc_intake (user_id, account_type, saved_values, status, updated_at)
+VALUES ($1, $2, $3, 'draft', now())
+ON CONFLICT (user_id) DO UPDATE SET
+    account_type = EXCLUDED.account_type,
+    saved_values = COALESCE(kyc_intake.saved_values, '{}'::jsonb) || EXCLUDED.saved_values,
+    status       = CASE WHEN kyc_intake.status = 'submitted' THEN 'submitted' ELSE 'draft' END,
+    updated_at   = now()
 RETURNING *;

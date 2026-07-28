@@ -12,7 +12,7 @@ import (
 )
 
 const getKYCIntake = `-- name: GetKYCIntake :one
-SELECT user_id, account_type, legal_first_name, legal_last_name, date_of_birth, nationality, bvn, address_line1, address_line2, city, state, postal_code, country, occupation, source_of_funds, purpose_of_account, status, submitted_at, created_at, updated_at, is_importer, counterparties, contact_email, contact_phone FROM kyc_intake WHERE user_id = $1 LIMIT 1
+SELECT user_id, account_type, legal_first_name, legal_last_name, date_of_birth, nationality, bvn, address_line1, address_line2, city, state, postal_code, country, occupation, source_of_funds, purpose_of_account, status, submitted_at, created_at, updated_at, is_importer, counterparties, contact_email, contact_phone, saved_values FROM kyc_intake WHERE user_id = $1 LIMIT 1
 `
 
 func (q *Queries) GetKYCIntake(ctx context.Context, userID uuid.UUID) (KycIntake, error) {
@@ -43,6 +43,60 @@ func (q *Queries) GetKYCIntake(ctx context.Context, userID uuid.UUID) (KycIntake
 		&i.Counterparties,
 		&i.ContactEmail,
 		&i.ContactPhone,
+		&i.SavedValues,
+	)
+	return i, err
+}
+
+const saveKYCIntakeDraft = `-- name: SaveKYCIntakeDraft :one
+INSERT INTO kyc_intake (user_id, account_type, saved_values, status, updated_at)
+VALUES ($1, $2, $3, 'draft', now())
+ON CONFLICT (user_id) DO UPDATE SET
+    account_type = EXCLUDED.account_type,
+    saved_values = COALESCE(kyc_intake.saved_values, '{}'::jsonb) || EXCLUDED.saved_values,
+    status       = CASE WHEN kyc_intake.status = 'submitted' THEN 'submitted' ELSE 'draft' END,
+    updated_at   = now()
+RETURNING user_id, account_type, legal_first_name, legal_last_name, date_of_birth, nationality, bvn, address_line1, address_line2, city, state, postal_code, country, occupation, source_of_funds, purpose_of_account, status, submitted_at, created_at, updated_at, is_importer, counterparties, contact_email, contact_phone, saved_values
+`
+
+type SaveKYCIntakeDraftParams struct {
+	UserID      uuid.UUID `json:"user_id"`
+	AccountType string    `json:"account_type"`
+	SavedValues []byte    `json:"saved_values"`
+}
+
+// Persist partial progress (no required-field validation). Merges the supplied
+// values into any existing draft (last-write-wins per key) and never downgrades
+// a submitted intake back to draft.
+func (q *Queries) SaveKYCIntakeDraft(ctx context.Context, arg SaveKYCIntakeDraftParams) (KycIntake, error) {
+	row := q.db.QueryRow(ctx, saveKYCIntakeDraft, arg.UserID, arg.AccountType, arg.SavedValues)
+	var i KycIntake
+	err := row.Scan(
+		&i.UserID,
+		&i.AccountType,
+		&i.LegalFirstName,
+		&i.LegalLastName,
+		&i.DateOfBirth,
+		&i.Nationality,
+		&i.Bvn,
+		&i.AddressLine1,
+		&i.AddressLine2,
+		&i.City,
+		&i.State,
+		&i.PostalCode,
+		&i.Country,
+		&i.Occupation,
+		&i.SourceOfFunds,
+		&i.PurposeOfAccount,
+		&i.Status,
+		&i.SubmittedAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.IsImporter,
+		&i.Counterparties,
+		&i.ContactEmail,
+		&i.ContactPhone,
+		&i.SavedValues,
 	)
 	return i, err
 }
@@ -54,14 +108,14 @@ INSERT INTO kyc_intake (
     address_line1, address_line2, city, state, postal_code, country,
     occupation, source_of_funds, purpose_of_account,
     is_importer, counterparties, contact_email, contact_phone,
-    status, submitted_at, updated_at
+    saved_values, status, submitted_at, updated_at
 ) VALUES (
     $1, $2,
     $3, $4, $5, $6, $7,
     $8, $9, $10, $11, $12, $13,
     $14, $15, $16,
     $17, $18, $19, $20,
-    'completed', now(), now()
+    $21, 'submitted', now(), now()
 )
 ON CONFLICT (user_id) DO UPDATE SET
     account_type       = EXCLUDED.account_type,
@@ -83,10 +137,11 @@ ON CONFLICT (user_id) DO UPDATE SET
     counterparties     = EXCLUDED.counterparties,
     contact_email      = EXCLUDED.contact_email,
     contact_phone      = EXCLUDED.contact_phone,
-    status             = 'completed',
+    saved_values       = EXCLUDED.saved_values,
+    status             = 'submitted',
     submitted_at       = now(),
     updated_at         = now()
-RETURNING user_id, account_type, legal_first_name, legal_last_name, date_of_birth, nationality, bvn, address_line1, address_line2, city, state, postal_code, country, occupation, source_of_funds, purpose_of_account, status, submitted_at, created_at, updated_at, is_importer, counterparties, contact_email, contact_phone
+RETURNING user_id, account_type, legal_first_name, legal_last_name, date_of_birth, nationality, bvn, address_line1, address_line2, city, state, postal_code, country, occupation, source_of_funds, purpose_of_account, status, submitted_at, created_at, updated_at, is_importer, counterparties, contact_email, contact_phone, saved_values
 `
 
 type UpsertKYCIntakeParams struct {
@@ -110,6 +165,7 @@ type UpsertKYCIntakeParams struct {
 	Counterparties   []byte    `json:"counterparties"`
 	ContactEmail     *string   `json:"contact_email"`
 	ContactPhone     *string   `json:"contact_phone"`
+	SavedValues      []byte    `json:"saved_values"`
 }
 
 func (q *Queries) UpsertKYCIntake(ctx context.Context, arg UpsertKYCIntakeParams) (KycIntake, error) {
@@ -134,6 +190,7 @@ func (q *Queries) UpsertKYCIntake(ctx context.Context, arg UpsertKYCIntakeParams
 		arg.Counterparties,
 		arg.ContactEmail,
 		arg.ContactPhone,
+		arg.SavedValues,
 	)
 	var i KycIntake
 	err := row.Scan(
@@ -161,6 +218,7 @@ func (q *Queries) UpsertKYCIntake(ctx context.Context, arg UpsertKYCIntakeParams
 		&i.Counterparties,
 		&i.ContactEmail,
 		&i.ContactPhone,
+		&i.SavedValues,
 	)
 	return i, err
 }

@@ -29,3 +29,23 @@ func TestMapSumsubEvent(t *testing.T) {
 		}
 	}
 }
+
+func TestMapSumsubIdentityStatus(t *testing.T) {
+	cases := []struct{ event, answer, rejectType, want string }{
+		{"applicantCreated", "", "", "in_progress"},
+		{"applicantPending", "", "", "in_review"},
+		{"applicantOnHold", "GREEN", "", "in_review"},
+		{"applicantReviewed", "GREEN", "", "approved"},
+		{"applicantReviewed", "RED", "FINAL", "rejected"},
+		{"applicantReviewed", "RED", "RETRY", "resubmit"},
+		{"applicantWorkflowCompleted", "GREEN", "", "approved"},
+		{"applicantWorkflowCompleted", "RED", "RETRY", "resubmit"},
+		{"applicantWorkflowFailed", "RED", "FINAL", "rejected"},
+		{"applicantDeleted", "", "", ""},
+	}
+	for _, c := range cases {
+		if got := mapSumsubIdentityStatus(c.event, c.answer, c.rejectType); got != c.want {
+			t.Errorf("mapSumsubIdentityStatus(%q,%q,%q) = %q, want %q", c.event, c.answer, c.rejectType, got, c.want)
+		}
+	}
+}

@@ -157,7 +157,8 @@ func newRouter(cfg *config.Config, svc *services.Services, pool *pgxpool.Pool, l
 			// KYC (status + doc upload available pre-approval; metamap init too)
 			r.Route("/kyc", func(r chi.Router) {
 				r.Get("/status", kycH.GetStatus)
-				r.Get("/requirements", kycH.IntakeRequirements) // fields to collect before Sumsub
+				r.Get("/requirements", kycH.IntakeRequirements) // fields to collect before Sumsub (+ saved values)
+				r.Put("/intake/draft", kycH.SaveDraft)          // save partial progress (resume)
 				r.Post("/intake", kycH.SubmitIntake)            // submit our own KYC fields first
 				r.Get("/documents", kycH.ListDocuments)
 				r.Post("/documents", kycH.UploadDocument)

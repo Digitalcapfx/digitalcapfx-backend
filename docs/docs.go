@@ -4035,6 +4035,52 @@ const docTemplate = `{
                 }
             }
         },
+        "/kyc/intake/draft": {
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Persists whatever the user has entered so far — NO required-field validation. Values merge into any existing draft (last-write-wins per key) and never downgrade a submitted intake (that PUT is a no-op). Call it after each step and on back-out; it is idempotent and safe to call repeatedly. GET /kyc/requirements returns these back as ` + "`" + `values` + "`" + ` to prefill on resume. Value shapes must round-trip what POST /kyc/intake accepts (date as YYYY-MM-DD, country as ISO-3166 alpha-2, boolean as JSON boolean, top_3_counterparties as an array of {country,relationship,purpose}).",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "kyc"
+                ],
+                "summary": "Save partial KYC intake progress (draft)",
+                "parameters": [
+                    {
+                        "description": "Partial intake values",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.SaveDraftRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/kyc/metamap/init": {
             "post": {
                 "security": [
@@ -4079,14 +4125,14 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Returns everything DigitalFX collects on its own form BEFORE the Sumsub identity dialog is launched. For individuals this is identity + address fields (Nilos) plus BVN (Nomba, for the Naira account); ID + liveness are handled by Sumsub afterwards. For business (KYB) accounts it additionally returns the full Nilos merchant-onboarding ` + "`" + `documents` + "`" + ` checklist (Certificate of Incorporation, Director/Shareholder registers, MEMART, proof of address/activity, bank statement, plus importer \u0026 EUR/GBP-NRE conditional items) — upload each via POST /kyc/documents with the matching doc_type. ` + "`" + `completed` + "`" + ` indicates whether intake was already submitted. Only after POST /kyc/intake does POST /kyc/init return a Sumsub token.",
+                "description": "Returns everything DigitalFX collects on its own form BEFORE the Sumsub identity dialog is launched. ` + "`" + `fields[]` + "`" + ` carry ` + "`" + `group` + "`" + ` (identity|address|contact|financial) and ` + "`" + `order` + "`" + ` for the multi-step stepper, and ` + "`" + `type` + "`" + ` (text|date|select|country|boolean|repeatable). ` + "`" + `values` + "`" + ` holds previously-saved answers (from PUT /kyc/intake/draft or a prior submit) to PREFILL the form on resume; ` + "`" + `intake_status` + "`" + ` is not_started|draft|submitted (` + "`" + `completed` + "`" + ` kept for back-compat). For business (KYB) accounts it also returns the Nilos merchant-onboarding ` + "`" + `documents` + "`" + ` checklist — upload each via POST /kyc/documents. Only after POST /kyc/intake (status submitted) does POST /kyc/init return a Sumsub token.",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
                     "kyc"
                 ],
-                "summary": "Get KYC intake fields",
+                "summary": "Get KYC intake fields (+ saved answers for resume)",
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -4110,19 +4156,19 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Returns the current KYC verification status for the authenticated user. Possible values: pending, approved, rejected.",
+                "description": "Returns the consolidated KYC journey the app switches on. ` + "`" + `stage` + "`" + ` is canonical — one of: not_started, draft, submitted, identity_started, in_review, approved, rejected, resubmit. ` + "`" + `kyc_status` + "`" + ` (pending|approved|rejected) is kept for back-compat. ` + "`" + `intake` + "`" + ` gives the intake sub-state (+ submitted_at); ` + "`" + `identity` + "`" + ` gives the Sumsub sub-state (+ applicant_id, review_answer, reject_labels, moderation_comment) for the retry UX. All identity sub-fields are optional and default when absent.",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
                     "kyc"
                 ],
-                "summary": "Get KYC status",
+                "summary": "Get KYC journey status",
                 "responses": {
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/handlers.KYCStatusResponse"
+                            "$ref": "#/definitions/services.JourneyStatus"
                         }
                     },
                     "401": {
@@ -9315,32 +9361,6 @@ const docTemplate = `{
                 }
             }
         },
-        "handlers.KYCStatusData": {
-            "type": "object",
-            "properties": {
-                "kyc_status": {
-                    "type": "string",
-                    "enum": [
-                        "pending",
-                        "approved",
-                        "rejected"
-                    ],
-                    "example": "pending"
-                }
-            }
-        },
-        "handlers.KYCStatusResponse": {
-            "type": "object",
-            "properties": {
-                "data": {
-                    "$ref": "#/definitions/handlers.KYCStatusData"
-                },
-                "success": {
-                    "type": "boolean",
-                    "example": true
-                }
-            }
-        },
         "handlers.LimitsUsage": {
             "type": "object",
             "properties": {
@@ -9843,6 +9863,15 @@ const docTemplate = `{
                 },
                 "type": {
                     "type": "string"
+                }
+            }
+        },
+        "handlers.SaveDraftRequest": {
+            "type": "object",
+            "properties": {
+                "values": {
+                    "type": "object",
+                    "additionalProperties": true
                 }
             }
         },
@@ -11637,6 +11666,10 @@ const docTemplate = `{
         "services.IntakeFieldSpec": {
             "type": "object",
             "properties": {
+                "group": {
+                    "description": "identity | address | contact | financial",
+                    "type": "string"
+                },
                 "help": {
                     "type": "string"
                 },
@@ -11652,11 +11685,15 @@ const docTemplate = `{
                         "type": "string"
                     }
                 },
+                "order": {
+                    "description": "sort within the group",
+                    "type": "integer"
+                },
                 "required": {
                     "type": "boolean"
                 },
                 "type": {
-                    "description": "text | date | select | country | boolean | counterparties",
+                    "description": "text | date | select | country | boolean | repeatable",
                     "type": "string"
                 }
             }
@@ -11668,6 +11705,7 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "completed": {
+                    "description": "back-compat (== intake_status submitted)",
                     "type": "boolean"
                 },
                 "documents": {
@@ -11682,11 +11720,75 @@ const docTemplate = `{
                         "$ref": "#/definitions/services.IntakeFieldSpec"
                     }
                 },
+                "intake_status": {
+                    "description": "not_started | draft | submitted",
+                    "type": "string"
+                },
                 "notes": {
                     "type": "array",
                     "items": {
                         "type": "string"
                     }
+                },
+                "values": {
+                    "description": "saved answers, prefills the form",
+                    "type": "object",
+                    "additionalProperties": true
+                }
+            }
+        },
+        "services.JourneyIdentity": {
+            "type": "object",
+            "properties": {
+                "applicant_id": {
+                    "type": "string"
+                },
+                "moderation_comment": {
+                    "type": "string"
+                },
+                "reject_labels": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "review_answer": {
+                    "type": "string"
+                },
+                "status": {
+                    "description": "not_started | in_progress | in_review | approved | rejected | resubmit",
+                    "type": "string"
+                }
+            }
+        },
+        "services.JourneyIntake": {
+            "type": "object",
+            "properties": {
+                "status": {
+                    "description": "not_started | draft | submitted",
+                    "type": "string"
+                },
+                "submitted_at": {
+                    "type": "string"
+                }
+            }
+        },
+        "services.JourneyStatus": {
+            "type": "object",
+            "properties": {
+                "identity": {
+                    "$ref": "#/definitions/services.JourneyIdentity"
+                },
+                "intake": {
+                    "$ref": "#/definitions/services.JourneyIntake"
+                },
+                "kyc_status": {
+                    "description": "back-compat: pending | approved | rejected",
+                    "type": "string"
+                },
+                "stage": {
+                    "description": "canonical (see computeKYCStage)",
+                    "type": "string"
                 }
             }
         },

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/rachfinance/digitalfx/internal/clients/sumsub"
 )
@@ -60,12 +61,48 @@ func (p *SumsubProvider) HandleWebhook(ctx context.Context, body []byte, headers
 
 	status := mapSumsubEvent(payload.Type, payload.ReviewResult.ReviewAnswer)
 
+	moderation := payload.ReviewResult.ModerationComment
+	if moderation == "" {
+		moderation = payload.ReviewResult.ClientComment
+	}
+
 	return &VerificationEvent{
 		ExternalID: payload.ApplicantId,
 		UserID:     payload.ExternalUserId,
 		Status:     status,
 		RawPayload: body,
+
+		IdentityStatus:    mapSumsubIdentityStatus(payload.Type, payload.ReviewResult.ReviewAnswer, payload.ReviewResult.ReviewRejectType),
+		ReviewAnswer:      payload.ReviewResult.ReviewAnswer,
+		RejectLabels:      payload.ReviewResult.RejectLabels,
+		RejectType:        payload.ReviewResult.ReviewRejectType,
+		ModerationComment: moderation,
 	}, nil
+}
+
+// mapSumsubIdentityStatus maps a Sumsub event to the identity sub-state used by
+// GET /kyc/status. A RED review with reviewRejectType RETRY is a resubmit (the
+// user can retry on the same applicant); FINAL is a hard rejection. Returns ""
+// for events that don't change the identity state.
+func mapSumsubIdentityStatus(eventType, reviewAnswer, rejectType string) string {
+	switch eventType {
+	case "applicantReviewed", "applicantWorkflowCompleted":
+		if reviewAnswer == "GREEN" {
+			return "approved"
+		}
+		if strings.EqualFold(rejectType, "RETRY") {
+			return "resubmit"
+		}
+		return "rejected"
+	case "applicantWorkflowFailed":
+		return "rejected"
+	case "applicantPending", "applicantOnHold":
+		return "in_review"
+	case "applicantCreated", "applicantActivated":
+		return "in_progress"
+	default:
+		return "" // not an identity-state change
+	}
 }
 
 func mapSumsubEvent(eventType, reviewAnswer string) string {

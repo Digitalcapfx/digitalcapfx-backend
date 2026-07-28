@@ -57,8 +57,11 @@ type WebhookPayload struct {
 }
 
 type ReviewResult struct {
-	ReviewAnswer string   `json:"reviewAnswer"`
-	RejectLabels []string `json:"rejectLabels,omitempty"`
+	ReviewAnswer      string   `json:"reviewAnswer"`
+	RejectLabels      []string `json:"rejectLabels,omitempty"`
+	ReviewRejectType  string   `json:"reviewRejectType,omitempty"` // FINAL | RETRY
+	ModerationComment string   `json:"moderationComment,omitempty"`
+	ClientComment     string   `json:"clientComment,omitempty"`
 }
 
 func (c *Client) signRequest(req *http.Request, body []byte) {
