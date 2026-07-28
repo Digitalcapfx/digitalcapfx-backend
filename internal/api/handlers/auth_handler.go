@@ -86,7 +86,7 @@ func (h *AuthHandler) VerifyOTP(w http.ResponseWriter, r *http.Request) {
 // Register godoc
 //
 //	@Summary      Register
-//	@Description  Creates a new user account (individual or business), provisions fiat accounts, and returns a JWT pair. Set account_type to "individual" or "business". Business accounts require company-level fields; director info and documents are submitted post-signup via /business/* endpoints. BVN is REQUIRED for Nigerian customers (country "NG" or a +234 phone) — returns 400 BVN_REQUIRED otherwise.
+//	@Description  Creates a new user account (individual or business), provisions fiat accounts, and returns a JWT pair. Set account_type to "individual" or "business". Business accounts require company-level fields; director info and documents are submitted post-signup via /business/* endpoints. BVN is NOT collected at signup — it is an optional field in the KYC intake (GET /kyc/requirements → POST /kyc/intake) and is what activates the Nigerian (NGN) account.
 //	@Tags         auth
 //	@Accept       json
 //	@Produce      json
@@ -108,10 +108,6 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 		response.BadRequest(w, "VALIDATION_ERROR", "phone, first_name, last_name, and pin are required")
 		return
 	}
-	if body.BVN != "" && !isValidBVN(body.BVN) {
-		response.BadRequest(w, "VALIDATION_ERROR", "bvn must be exactly 11 digits")
-		return
-	}
 
 	in := services.RegisterInput{
 		AccountType: body.AccountType,
@@ -121,7 +117,6 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 		LastName:    body.LastName,
 		PIN:         body.PIN,
 		Country:     body.Country,
-		BVN:         body.BVN,
 		DeviceIP:    realIP(r),
 		DeviceUA:    r.UserAgent(),
 	}
@@ -145,10 +140,6 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 	pair, err := h.svc.Auth.Register(r.Context(), in)
 	if errors.Is(err, services.ErrUserExists) {
 		response.Conflict(w, "USER_EXISTS", "a user with this phone number already exists")
-		return
-	}
-	if errors.Is(err, services.ErrBVNRequired) {
-		response.BadRequest(w, "BVN_REQUIRED", "BVN is required for Nigerian customers")
 		return
 	}
 	if err != nil {

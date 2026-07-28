@@ -26,10 +26,18 @@ func TestGetIntakeRequirements_Individual(t *testing.T) {
 	}
 
 	// Registration-collected fields must NOT be re-asked here.
-	for _, key := range []string{"legal_first_name", "legal_last_name", "bvn", "country"} {
+	for _, key := range []string{"legal_first_name", "legal_last_name", "country"} {
 		if _, ok := hasField(fields, key); ok {
 			t.Errorf("field %q is collected at registration and must NOT appear in the intake", key)
 		}
+	}
+
+	// BVN is collected in the intake but OPTIONAL (it activates the NGN account).
+	bvn, ok := hasField(fields, "bvn")
+	if !ok {
+		t.Error("bvn should be collected in the KYC intake")
+	} else if bvn.Required {
+		t.Error("bvn must be optional (not required)")
 	}
 
 	// Optional fields.

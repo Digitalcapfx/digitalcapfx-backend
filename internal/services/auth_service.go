@@ -38,7 +38,6 @@ var (
 	ErrSessionNotFound = errors.New("session not found")
 	ErrInvalidToken    = errors.New("invalid or expired token")
 	ErrSocialAuthUser  = errors.New("account uses social login — PIN not set")
-	ErrBVNRequired     = errors.New("BVN is required for Nigerian customers")
 )
 
 // isNigerianCustomer reports whether a customer should be treated as Nigerian
@@ -149,7 +148,6 @@ type RegisterInput struct {
 	LastName    string
 	PIN         string
 	Country     string // ISO 3166-1 alpha-2
-	BVN         string // Nigerian Bank Verification Number (11 digits), optional
 	DeviceIP    string
 	DeviceUA    string
 	// Business accounts only — company-level KYB fields collected at signup.
@@ -247,12 +245,6 @@ func (s *AuthService) Register(ctx context.Context, in RegisterInput) (*token.Pa
 		}
 	}
 
-	// Persist BVN if supplied at signup (Nigerian bank-account provisioning).
-	if bvn := strings.TrimSpace(in.BVN); bvn != "" {
-		if _, err := q.SetUserBVN(ctx, db.SetUserBVNParams{ID: user.ID, Bvn: &bvn}); err != nil {
-			s.logger.Error("set bvn on register", zap.Error(err))
-		}
-	}
 
 	// Generate and set referral code.
 	refCode := generateReferralCode(in.FirstName, in.LastName)

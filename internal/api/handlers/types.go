@@ -41,8 +41,9 @@ type RegisterRequest struct {
 	FirstName   string `json:"first_name" example:"Alice"`
 	LastName    string `json:"last_name" example:"Dupont"`
 	PIN         string `json:"pin" example:"123456"`
-	Country     string `json:"country" example:"CM"`                // ISO 3166-1 alpha-2
-	BVN         string `json:"bvn,omitempty" example:"12345678901"` // Nigerian Bank Verification Number (11 digits).
+	Country     string `json:"country" example:"CM"` // ISO 3166-1 alpha-2
+	// NOTE: BVN is NOT collected at signup — it is an optional field in the KYC
+	// intake (POST /kyc/intake) and activates the Nigerian (NGN) account.
 	// Business accounts only — company-level KYB fields collected at signup.
 	CompanyLegalName       string `json:"company_legal_name,omitempty" example:"Acme SARL"`
 	CompanyRegistrationNo  string `json:"company_registration_no,omitempty" example:"RC/DLA/2020/B/1234"`

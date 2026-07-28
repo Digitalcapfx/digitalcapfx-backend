@@ -2879,7 +2879,7 @@ const docTemplate = `{
         },
         "/auth/register": {
             "post": {
-                "description": "Creates a new user account (individual or business), provisions fiat accounts, and returns a JWT pair. Set account_type to \"individual\" or \"business\". Business accounts require company-level fields; director info and documents are submitted post-signup via /business/* endpoints. BVN is REQUIRED for Nigerian customers (country \"NG\" or a +234 phone) — returns 400 BVN_REQUIRED otherwise.",
+                "description": "Creates a new user account (individual or business), provisions fiat accounts, and returns a JWT pair. Set account_type to \"individual\" or \"business\". Business accounts require company-level fields; director info and documents are submitted post-signup via /business/* endpoints. BVN is NOT collected at signup — it is an optional field in the KYC intake (GET /kyc/requirements → POST /kyc/intake) and is what activates the Nigerian (NGN) account.",
                 "consumes": [
                     "application/json"
                 ],
@@ -9693,13 +9693,8 @@ const docTemplate = `{
                     "type": "string",
                     "example": "https://acme.example.com"
                 },
-                "bvn": {
-                    "description": "Nigerian Bank Verification Number (11 digits).",
-                    "type": "string",
-                    "example": "12345678901"
-                },
                 "company_legal_name": {
-                    "description": "Business accounts only — company-level KYB fields collected at signup.",
+                    "description": "NOTE: BVN is NOT collected at signup — it is an optional field in the KYC\nintake (POST /kyc/intake) and activates the Nigerian (NGN) account.\nBusiness accounts only — company-level KYB fields collected at signup.",
                     "type": "string",
                     "example": "Acme SARL"
                 },
@@ -9951,6 +9946,10 @@ const docTemplate = `{
                 },
                 "address_line2": {
                     "description": "optional",
+                    "type": "string"
+                },
+                "bvn": {
+                    "description": "optional, 11 digits — activates the NGN account",
                     "type": "string"
                 },
                 "city": {

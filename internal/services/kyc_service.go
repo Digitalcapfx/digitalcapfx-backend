@@ -196,6 +196,7 @@ func personIdentityFields() []IntakeFieldSpec {
 	return []IntakeFieldSpec{
 		{Key: "date_of_birth", Label: "Date of Birth", Type: "date", Required: true, Help: "YYYY-MM-DD"},
 		{Key: "nationality", Label: "Nationality", Type: "country", Required: true},
+		{Key: "bvn", Label: "BVN (Bank Verification Number)", Type: "text", Required: false, Help: "11 digits. Optional — provide to activate your Nigerian (NGN) account."},
 		{Key: "address_line1", Label: "Address Line 1", Type: "text", Required: true},
 		{Key: "address_line2", Label: "Address Line 2", Type: "text", Required: false},
 		{Key: "city", Label: "City", Type: "text", Required: true},
@@ -221,9 +222,9 @@ func BuildIntakeRequirements(accountType string, opts IntakeOptions) IntakeRequi
 				{Key: DocProofOfAddress, Label: "Proof of Address", Required: false, AppliesTo: "all", Scope: "director_ubo", MaxAgeMonths: 3, Help: "Utility bill or bank statement, ≤3 months old"},
 			},
 			Notes: []string{
-				"Your name, country and BVN come from signup and are not re-collected here.",
+				"Your name and country come from signup and are not re-collected here.",
 				"Your ID document and liveness check are completed via the identity-verification dialog after this form.",
-				"A Nigerian (NGN) account is only activated if a BVN was provided at signup.",
+				"BVN is optional. Provide it here to activate your Nigerian (NGN) account; without it, no NGN account is created.",
 			},
 		}
 	}
@@ -270,7 +271,7 @@ func BuildIntakeRequirements(accountType string, opts IntakeOptions) IntakeRequi
 	notes := []string{
 		"All documents must be dated within the specified timeframes (registers & proofs of address ≤3 months; bank statement ≤90 days). Alternatives are accepted where noted.",
 		"Where a shareholder is itself a company, also provide that company's Shareholder Register and Articles of Association.",
-		"Company identity fields (legal name, registration number, industry, country of incorporation) and the representative's name, country and BVN were captured at signup and are reused — not re-collected here.",
+		"Company identity fields (legal name, registration number, industry, country of incorporation) and the representative's name and country were captured at signup and are reused — not re-collected here. BVN is optional in this form and activates the Nigerian (NGN) account.",
 	}
 	if opts.IsImporter {
 		notes = append(notes, "As an importer, Proof of Imports documentation is required.")
@@ -328,11 +329,12 @@ type Counterparty struct {
 }
 
 // SubmitIntakeInput is the payload for POST /kyc/intake. Fields captured at
-// registration (name, country, BVN, company profile) are NOT part of this input
-// — they are reused from the user record.
+// registration (name, country, company profile) are NOT part of this input —
+// they are reused from the user record. BVN IS collected here (optional).
 type SubmitIntakeInput struct {
 	DateOfBirth      string // YYYY-MM-DD
 	Nationality      string
+	BVN              string // optional; 11 digits; activates the Nigerian (NGN) account
 	AddressLine1     string
 	AddressLine2     string
 	City             string
@@ -351,10 +353,10 @@ type SubmitIntakeInput struct {
 
 // SubmitIntake validates the collected fields against the account-type
 // requirements and persists them (marking the intake completed). Registration
-// fields (name, country, BVN) are copied from the user record into the intake
-// snapshot but never re-asked. BVN is NOT collected here; a Nigerian account is
-// only provisioned when a BVN was supplied at signup. Once this succeeds,
-// InitiateKYC will issue the Sumsub token.
+// fields (name, country) are copied from the user record into the intake
+// snapshot but never re-asked. BVN is collected here (optional) and mirrored onto
+// the user record; a Nigerian (NGN) account is only provisioned when a BVN is on
+// file. Once this succeeds, InitiateKYC will issue the Sumsub token.
 func (s *KYCService) SubmitIntake(ctx context.Context, userID uuid.UUID, in SubmitIntakeInput) (*db.KycIntake, error) {
 	q := db.New(s.pool)
 	user, err := q.GetUserByID(ctx, userID)
@@ -366,6 +368,7 @@ func (s *KYCService) SubmitIntake(ctx context.Context, userID uuid.UUID, in Subm
 	values := map[string]string{
 		"date_of_birth":      strings.TrimSpace(in.DateOfBirth),
 		"nationality":        strings.TrimSpace(in.Nationality),
+		"bvn":                strings.TrimSpace(in.BVN),
 		"address_line1":      strings.TrimSpace(in.AddressLine1),
 		"address_line2":      strings.TrimSpace(in.AddressLine2),
 		"city":               strings.TrimSpace(in.City),
@@ -396,6 +399,10 @@ func (s *KYCService) SubmitIntake(ctx context.Context, userID uuid.UUID, in Subm
 	if len(missing) > 0 {
 		return nil, fmt.Errorf("missing required KYC fields: %s", strings.Join(missing, ", "))
 	}
+	// BVN is optional, but must be 11 digits when supplied.
+	if bvn := values["bvn"]; bvn != "" && len(bvn) != 11 {
+		return nil, fmt.Errorf("BVN must be exactly 11 digits")
+	}
 	// Business-specific validation: importer flag is mandatory; EUR/GBP (NRE)
 	// businesses must list at least one counterparty.
 	if user.AccountType == "business" {
@@ -415,14 +422,21 @@ func (s *KYCService) SubmitIntake(ctx context.Context, userID uuid.UUID, in Subm
 		}
 	}
 
+	// BVN: prefer the value supplied in this intake; fall back to any existing one
+	// so a resubmission without BVN does not wipe it.
+	bvnPtr := user.Bvn
+	if v := values["bvn"]; v != "" {
+		bvnPtr = &v
+	}
+
 	intake, err := q.UpsertKYCIntake(ctx, db.UpsertKYCIntakeParams{
 		UserID:      userID,
 		AccountType: user.AccountType,
-		// Name / country / BVN are reused from the signup record (not re-asked).
+		// Name / country are reused from the signup record (not re-asked).
 		LegalFirstName:   ptrOrNil(user.FirstName),
 		LegalLastName:    ptrOrNil(user.LastName),
-		Bvn:              user.Bvn,
 		Country:          user.Country,
+		Bvn:              bvnPtr,
 		DateOfBirth:      ptrOrNil(values["date_of_birth"]),
 		Nationality:      ptrOrNil(values["nationality"]),
 		AddressLine1:     ptrOrNil(values["address_line1"]),
@@ -440,6 +454,14 @@ func (s *KYCService) SubmitIntake(ctx context.Context, userID uuid.UUID, in Subm
 	})
 	if err != nil {
 		return nil, fmt.Errorf("save kyc intake: %w", err)
+	}
+
+	// Mirror a newly-supplied BVN onto the user record so NGN (Nomba) provisioning
+	// can attach it on KYC approval.
+	if v := values["bvn"]; v != "" {
+		if _, err := q.SetUserBVN(ctx, db.SetUserBVNParams{ID: userID, Bvn: &v}); err != nil {
+			s.logger.Error("mirror bvn to user on intake", zap.Error(err))
+		}
 	}
 
 	s.logger.Info("kyc intake completed", zap.String("user_id", userID.String()), zap.String("account_type", user.AccountType))

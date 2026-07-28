@@ -1211,13 +1211,11 @@ definitions:
       business_website:
         example: https://acme.example.com
         type: string
-      bvn:
-        description: Nigerian Bank Verification Number (11 digits).
-        example: "12345678901"
-        type: string
       company_legal_name:
-        description: Business accounts only — company-level KYB fields collected at
-          signup.
+        description: |-
+          NOTE: BVN is NOT collected at signup — it is an optional field in the KYC
+          intake (POST /kyc/intake) and activates the Nigerian (NGN) account.
+          Business accounts only — company-level KYB fields collected at signup.
         example: Acme SARL
         type: string
       company_registration_no:
@@ -1392,6 +1390,9 @@ definitions:
         type: string
       address_line2:
         description: optional
+        type: string
+      bvn:
+        description: optional, 11 digits — activates the NGN account
         type: string
       city:
         description: required
@@ -4691,8 +4692,8 @@ paths:
         fiat accounts, and returns a JWT pair. Set account_type to "individual" or
         "business". Business accounts require company-level fields; director info
         and documents are submitted post-signup via /business/* endpoints. BVN is
-        REQUIRED for Nigerian customers (country "NG" or a +234 phone) — returns 400
-        BVN_REQUIRED otherwise.
+        NOT collected at signup — it is an optional field in the KYC intake (GET /kyc/requirements
+        → POST /kyc/intake) and is what activates the Nigerian (NGN) account.
       parameters:
       - description: New user details
         in: body

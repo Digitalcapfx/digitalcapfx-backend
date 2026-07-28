@@ -204,6 +204,7 @@ type CounterpartyInput struct {
 type SubmitIntakeRequest struct {
 	DateOfBirth      string `json:"date_of_birth"` // required, YYYY-MM-DD
 	Nationality      string `json:"nationality"`   // required
+	BVN              string `json:"bvn"`           // optional, 11 digits — activates the NGN account
 	AddressLine1     string `json:"address_line1"` // required
 	AddressLine2     string `json:"address_line2"` // optional
 	City             string `json:"city"`          // required
@@ -263,6 +264,7 @@ func (h *KYCHandler) SubmitIntake(w http.ResponseWriter, r *http.Request) {
 	intake, err := h.svc.KYC.SubmitIntake(r.Context(), userID, services.SubmitIntakeInput{
 		DateOfBirth:      req.DateOfBirth,
 		Nationality:      req.Nationality,
+		BVN:              req.BVN,
 		AddressLine1:     req.AddressLine1,
 		AddressLine2:     req.AddressLine2,
 		City:             req.City,
