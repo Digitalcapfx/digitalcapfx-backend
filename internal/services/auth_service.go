@@ -89,11 +89,14 @@ func (s *AuthService) SendOTP(ctx context.Context, phone string) error {
 		return fmt.Errorf("create otp: %w", err)
 	}
 
-	// Log the OTP code directly so developers can bypass SMS issues during testing.
-	s.logger.Info("GENERATED OTP (DEV/TESTING)", 
-		zap.String("phone", phone),
-		zap.String("code", code),
-	)
+	// Only log the plaintext OTP in debug builds — never leak real codes to
+	// production logs now that SMS delivery works.
+	if s.cfg.Server.Debug {
+		s.logger.Info("GENERATED OTP (DEV/TESTING)",
+			zap.String("phone", phone),
+			zap.String("code", code),
+		)
+	}
 
 	// Deliver the OTP via Brevo transactional SMS.
 	if s.smsClient != nil {
@@ -119,12 +122,6 @@ func (s *AuthService) SendOTP(ctx context.Context, phone string) error {
 }
 
 func (s *AuthService) VerifyOTP(ctx context.Context, phone, code string) error {
-	// DEV BACKDOOR: Accept 123456 unconditionally in debug mode to unblock frontend testing
-	if s.cfg.Server.Debug && code == "123456" {
-		s.logger.Warn("TEST OTP 123456 USED - DEV BACKDOOR", zap.String("phone", phone))
-		return nil
-	}
-
 	q := db.New(s.pool)
 
 	otp, err := q.GetValidOTP(ctx, db.GetValidOTPParams{
