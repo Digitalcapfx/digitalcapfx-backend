@@ -237,6 +237,47 @@ func (h *AdminUsersHandler) ResetUserKYC(w http.ResponseWriter, r *http.Request)
 	response.OKWithMessage(w, "KYC status reset — user can resubmit documents", nil)
 }
 
+// ReprovisionFiat godoc
+//
+//	@Summary      Re-provision a user's fiat accounts (admin backfill/retry)
+//	@Description  Re-runs fiat account provisioning (Nilos EUR/GBP + Nomba NGN) for a verified user. Provisioning normally runs automatically the moment KYC is approved, but it is fire-and-forget with no automatic retry — so a provider failure at that instant leaves the customer without the bank account permanently. This endpoint lets an admin backfill or retry it (e.g. after a provider outage or a credentials fix) without the user re-doing KYC. It is idempotent — accounts already provisioned are skipped. Returns a per-currency status map, e.g. {"EUR":"provisioned","GBP":"error: nilos 403: Forbidden resource","NGN":"skipped: no BVN on file"}.
+//	@Tags         admin-users
+//	@Produce      json
+//	@Security     BearerAuth
+//	@Param        id   path      string  true  "User ID"
+//	@Success      200  {object}  map[string]interface{}
+//	@Failure      403  {object}  ErrorResponse
+//	@Failure      404  {object}  ErrorResponse
+//	@Router       /admin/users/{id}/reprovision-fiat [post]
+func (h *AdminUsersHandler) ReprovisionFiat(w http.ResponseWriter, r *http.Request) {
+	set, ok := middleware.StaffPermissionsFromContext(r.Context())
+	if !ok {
+		response.Forbidden(w, "staff permissions not loaded")
+		return
+	}
+
+	userID, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		response.BadRequest(w, "VALIDATION_ERROR", "invalid user id")
+		return
+	}
+
+	results, err := h.svc.KYC.ReprovisionFiat(r.Context(), userID)
+	switch err {
+	case nil:
+	case services.ErrUserNotFound:
+		response.NotFound(w, err.Error())
+		return
+	default:
+		response.InternalError(w)
+		return
+	}
+
+	h.svc.Staff.LogAction(r.Context(), set, "user.reprovision_fiat", "user", userID.String(),
+		map[string]any{"results": results}, r.RemoteAddr)
+	response.OK(w, map[string]any{"user_id": userID.String(), "results": results})
+}
+
 // ListUserTransactions godoc
 //
 //	@Summary      List transactions for a specific user (admin view)

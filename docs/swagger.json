@@ -2200,6 +2200,53 @@
                 }
             }
         },
+        "/admin/users/{id}/reprovision-fiat": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Re-runs fiat account provisioning (Nilos EUR/GBP + Nomba NGN) for a verified user. Provisioning normally runs automatically the moment KYC is approved, but it is fire-and-forget with no automatic retry — so a provider failure at that instant leaves the customer without the bank account permanently. This endpoint lets an admin backfill or retry it (e.g. after a provider outage or a credentials fix) without the user re-doing KYC. It is idempotent — accounts already provisioned are skipped. Returns a per-currency status map, e.g. {\"EUR\":\"provisioned\",\"GBP\":\"error: nilos 403: Forbidden resource\",\"NGN\":\"skipped: no BVN on file\"}.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin-users"
+                ],
+                "summary": "Re-provision a user's fiat accounts (admin backfill/retry)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "User ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/admin/users/{id}/transactions": {
             "get": {
                 "security": [

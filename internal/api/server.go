@@ -65,7 +65,8 @@ func NewServer(cfg *config.Config) (*Server, error) {
 		cfg.MetaMap.ClientSecret,
 		cfg.MetaMap.FlowID,
 	)
-	nilosClient := nilos.New(cfg.Nilos.APIKey, cfg.Nilos.APISecret, nilos.WithBaseURL(cfg.Nilos.BaseURL))
+	nilosClient := nilos.New(cfg.Nilos.APIKey, cfg.Nilos.APISecret,
+		nilos.WithBaseURL(cfg.Nilos.BaseURL), nilos.WithOrgID(cfg.Nilos.OrgID))
 	nombaClient := nomba.New(cfg.Nomba.ClientID, cfg.Nomba.ClientSecret, cfg.Nomba.AccountID, nomba.WithBaseURL(cfg.Nomba.BaseURL))
 
 	// SMS client (Brevo transactional SMS REST API v3).

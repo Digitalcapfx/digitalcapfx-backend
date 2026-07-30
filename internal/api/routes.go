@@ -406,6 +406,8 @@ func newRouter(cfg *config.Config, svc *services.Services, pool *pgxpool.Pool, l
 					Post("/admin/users/{id}/enable", adminUsersH.EnableUser)
 				r.With(middleware.RequirePermission(services.PermUsersResetKYC)).
 					Post("/admin/users/{id}/kyc/reset", adminUsersH.ResetUserKYC)
+				r.With(middleware.RequirePermission(services.PermUsersManage)).
+					Post("/admin/users/{id}/reprovision-fiat", adminUsersH.ReprovisionFiat)
 				r.With(middleware.RequirePermission(services.PermTxView)).
 					Get("/admin/users/{id}/transactions", adminUsersH.ListUserTransactions)
 

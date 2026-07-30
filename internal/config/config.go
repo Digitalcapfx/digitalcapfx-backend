@@ -156,6 +156,7 @@ type NilosConfig struct {
 	BaseURL       string
 	APIKey        string // key ID sent as X-Api-Key
 	APISecret     string // signing secret for HMAC-SHA256
+	OrgID         string // organisation id sent as x-nilos-org (required by multi-org keys)
 	WebhookSecret string // secret for verifying inbound Nilos deposit webhooks
 }
 
@@ -251,6 +252,7 @@ func Load() (*Config, error) {
 	cfg.Nilos.BaseURL = getEnv("NILOS_BASE_URL", "https://app-demo.nilos.io")
 	cfg.Nilos.APIKey = getEnv("NILOS_API_KEY", "")
 	cfg.Nilos.APISecret = getEnv("NILOS_API_SECRET", "")
+	cfg.Nilos.OrgID = getEnv("NILOS_ORG_ID", "")
 	cfg.Nilos.WebhookSecret = getEnv("NILOS_WEBHOOK_SECRET", "")
 
 	cfg.Nomba.BaseURL = getEnv("NOMBA_BASE_URL", "https://api.nomba.com")

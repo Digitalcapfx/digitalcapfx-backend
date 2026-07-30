@@ -15,7 +15,9 @@ import (
 	"time"
 )
 
-// Sandbox: https://app-demo.nilos.io  |  Production: https://app.nilos.io
+// Sandbox: https://app-demo.nilos.io  |  Production: https://api.nilos.io
+// (app.nilos.io / app-demo.nilos.io are the web app hosts and only redirect; the
+// REST API lives at api.nilos.io in production.)
 const defaultBaseURL = "https://app-demo.nilos.io"
 
 // Payment rail constants for DigitalFX's supported corridors.

@@ -1182,29 +1182,50 @@ func (s *KYCService) AdminReleaseKYCToProvider(ctx context.Context, userID, admi
 // It is idempotent per account: an account that already carries provider details
 // is skipped. Every customer gets an NGN account regardless of their country, so
 // this runs for all users.
-func (s *KYCService) provisionFiatAccounts(ctx context.Context, user db.User) {
+func (s *KYCService) provisionFiatAccounts(ctx context.Context, user db.User) map[string]string {
+	results := map[string]string{}
 	q := db.New(s.pool)
 	accounts, err := q.GetAccountsByUserID(ctx, user.ID)
 	if err != nil {
 		s.logger.Error("failed to get user accounts for fiat provisioning", zap.Error(err))
-		return
+		return results
 	}
 
 	for _, acc := range accounts {
 		switch acc.Currency {
 		case "EUR", "GBP":
-			s.provisionNilosAccount(ctx, user, acc)
+			results[acc.Currency] = s.provisionNilosAccount(ctx, user, acc)
 		case "NGN":
-			s.provisionNombaNGN(ctx, user, acc)
+			results[acc.Currency] = s.provisionNombaNGN(ctx, user, acc)
 		}
 	}
+	return results
+}
+
+// ReprovisionFiat re-runs fiat account provisioning for a single user on demand.
+// Provisioning normally runs fire-and-forget when KYC is approved; there is no
+// automatic retry, so a provider failure at that moment leaves the customer
+// without the account permanently. This lets an admin backfill/retry it (e.g.
+// after a provider outage or a credentials fix) without the user re-doing KYC.
+// Returns a per-currency status map: "provisioned" | "already provisioned" |
+// "skipped: ..." | "error: ...".
+func (s *KYCService) ReprovisionFiat(ctx context.Context, userID uuid.UUID) (map[string]string, error) {
+	q := db.New(s.pool)
+	user, err := q.GetUserByID(ctx, userID)
+	if err != nil {
+		return nil, ErrUserNotFound
+	}
+	return s.provisionFiatAccounts(ctx, user), nil
 }
 
 // provisionNilosAccount provisions a Nilos SEPA/FPS virtual account for a single
 // EUR or GBP account (idempotent — skips accounts already linked to Nilos).
-func (s *KYCService) provisionNilosAccount(ctx context.Context, user db.User, acc db.Account) {
-	if s.nilosClient == nil || acc.NilosAccountID != nil {
-		return
+func (s *KYCService) provisionNilosAccount(ctx context.Context, user db.User, acc db.Account) string {
+	if s.nilosClient == nil {
+		return "skipped: nilos not configured"
+	}
+	if acc.NilosAccountID != nil {
+		return "already provisioned"
 	}
 
 	var rail string
@@ -1214,7 +1235,7 @@ func (s *KYCService) provisionNilosAccount(ctx context.Context, user db.User, ac
 	case "GBP":
 		rail = nilos.RailFPS
 	default:
-		return
+		return "skipped: unsupported currency"
 	}
 
 	q := db.New(s.pool)
@@ -1223,7 +1244,7 @@ func (s *KYCService) provisionNilosAccount(ctx context.Context, user db.User, ac
 	if err != nil {
 		s.logger.Error("failed to provision nilos account",
 			zap.String("user_id", user.ID.String()), zap.String("currency", acc.Currency), zap.Error(err))
-		return
+		return "error: " + err.Error()
 	}
 
 	var iban, bic, sortCode, accountNumberUK *string
@@ -1253,29 +1274,30 @@ func (s *KYCService) provisionNilosAccount(ctx context.Context, user db.User, ac
 	}); err != nil {
 		s.logger.Error("failed to save nilos account details",
 			zap.String("user_id", user.ID.String()), zap.String("currency", acc.Currency), zap.Error(err))
-		return
+		return "error: saving details: " + err.Error()
 	}
 	s.logger.Info("provisioned nilos virtual account",
 		zap.String("user_id", user.ID.String()), zap.String("currency", acc.Currency), zap.String("nilos_id", nilosAcc.ID))
+	return "provisioned"
 }
 
 // provisionNombaNGN provisions a real NGN virtual bank account via Nomba for the
 // user's NGN account (idempotent — skips if already provisioned). It is ONLY
 // provisioned when the user supplied a BVN at signup; without a BVN the customer
 // simply does not get a Nigerian account.
-func (s *KYCService) provisionNombaNGN(ctx context.Context, user db.User, acc db.Account) {
+func (s *KYCService) provisionNombaNGN(ctx context.Context, user db.User, acc db.Account) string {
 	if s.nombaClient == nil || !s.nombaClient.Configured() {
 		s.logger.Warn("nomba not configured, skipping NGN virtual account", zap.String("user_id", user.ID.String()))
-		return
+		return "skipped: nomba not configured"
 	}
 	if acc.NombaAccountRef != nil {
-		return // already provisioned
+		return "already provisioned"
 	}
 	// No BVN → no Nigerian account (BVN is required by Nomba/CBN for a NGN account
 	// and is only collected, optionally, at signup).
 	if user.Bvn == nil || *user.Bvn == "" {
 		s.logger.Info("no BVN on file — skipping NGN account provisioning", zap.String("user_id", user.ID.String()))
-		return
+		return "skipped: no BVN on file"
 	}
 
 	q := db.New(s.pool)
@@ -1296,7 +1318,7 @@ func (s *KYCService) provisionNombaNGN(ctx context.Context, user db.User, acc db
 	if err != nil {
 		s.logger.Error("failed to provision nomba NGN account",
 			zap.String("user_id", user.ID.String()), zap.Error(err))
-		return
+		return "error: " + err.Error()
 	}
 
 	ref := va.AccountRef
@@ -1317,10 +1339,11 @@ func (s *KYCService) provisionNombaNGN(ctx context.Context, user db.User, acc db
 	}); err != nil {
 		s.logger.Error("failed to save nomba NGN account details",
 			zap.String("user_id", user.ID.String()), zap.Error(err))
-		return
+		return "error: saving details: " + err.Error()
 	}
 	s.logger.Info("provisioned nomba NGN virtual account",
 		zap.String("user_id", user.ID.String()),
 		zap.String("bank", va.BankName),
 		zap.String("account_number", va.BankAccountNumber))
+	return "provisioned"
 }
