@@ -174,13 +174,16 @@ func (s *CaaSService) GetBalances(ctx context.Context, userID uuid.UUID) (*Insta
 
 	out := &InstantUSDBalance{Symbol: StablecoinSymbol, Name: StablecoinName, BalanceUSDC: "0"}
 
-	// Wallet address comes from our own caas_wallets record — it is the
-	// deterministic SCW address captured at provisioning, so it is always
-	// available even when the live balance call below fails. Sourcing it solely
-	// from the CaaS balance response made wallet_address disappear whenever that
-	// call errored or returned an empty address.
-	if wallet, werr := q.GetCaasWalletByUserID(ctx, userID); werr == nil {
+	// Ensure the user's SCW is provisioned (idempotent — only calls CaaS when we
+	// have no local record). This guarantees wallet_address is always present and
+	// resolves the "Wallet not found" 404 that CaaS returns on the balance read
+	// for a user who was never provisioned. The address is the deterministic SCW
+	// address, so it is stable across calls.
+	if wallet, werr := s.GetOrCreateWallet(ctx, userID, user.PhoneNumber); werr == nil {
 		out.WalletAddress = wallet.AbstractionAddress
+	} else {
+		s.logger.Warn("crypto balances: ensure wallet failed",
+			zap.String("user_id", userID.String()), zap.Error(werr))
 	}
 
 	// Best-effort: an unfunded / freshly-provisioned SCW should read as 0 USDC,
