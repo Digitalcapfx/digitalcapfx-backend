@@ -3,6 +3,7 @@ package middleware
 import (
 	"context"
 	"net/http"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -30,11 +31,23 @@ func LoadStaffPermissions(pool *pgxpool.Pool) func(http.Handler) http.Handler {
 
 			role := RoleFromContext(r.Context())
 
-			// Owner: trust JWT, no DB query required.
+			// Owner: trust the JWT role. The bootstrap owner has NO admin_staff row,
+			// so StaffID must be empty — otherwise downstream writes would store the
+			// owner's user_id in columns that FK-reference admin_staff(id) (invited_by,
+			// audit staff_id, updated_by) and violate the constraint. We still pull the
+			// owner's name/email so their actions leave a meaningful audit trail.
 			if role == "owner" {
+				var firstName, lastName, ownerEmail string
+				_ = pool.QueryRow(r.Context(),
+					`SELECT first_name, last_name, COALESCE(email, '') FROM users WHERE id = $1`,
+					userID,
+				).Scan(&firstName, &lastName, &ownerEmail)
+
 				set := services.StaffPermissionSet{
-					StaffID: userID.String(),
-					Role:    "owner",
+					StaffID:    "", // no admin_staff row for the owner
+					StaffName:  strings.TrimSpace(firstName + " " + lastName),
+					StaffEmail: ownerEmail,
+					Role:       "owner",
 				}
 				ctx := context.WithValue(r.Context(), staffPermCtxKey{}, set)
 				next.ServeHTTP(w, r.WithContext(ctx))

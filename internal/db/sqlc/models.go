@@ -36,16 +36,16 @@ type Account struct {
 }
 
 type AdminAuditLog struct {
-	ID         uuid.UUID `json:"id"`
-	StaffID    uuid.UUID `json:"staff_id"`
-	StaffName  string    `json:"staff_name"`
-	StaffEmail string    `json:"staff_email"`
-	Action     string    `json:"action"`
-	Resource   string    `json:"resource"`
-	ResourceID *string   `json:"resource_id"`
-	Details    []byte    `json:"details"`
-	IPAddress  *string   `json:"ip_address"`
-	CreatedAt  time.Time `json:"created_at"`
+	ID         uuid.UUID  `json:"id"`
+	StaffID    *uuid.UUID `json:"staff_id"`
+	StaffName  string     `json:"staff_name"`
+	StaffEmail string     `json:"staff_email"`
+	Action     string     `json:"action"`
+	Resource   string     `json:"resource"`
+	ResourceID *string    `json:"resource_id"`
+	Details    []byte     `json:"details"`
+	IPAddress  *string    `json:"ip_address"`
+	CreatedAt  time.Time  `json:"created_at"`
 }
 
 type AdminDepartment struct {

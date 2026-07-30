@@ -87,14 +87,14 @@ INSERT INTO admin_audit_logs (
 `
 
 type CreateAdminAuditLogParams struct {
-	StaffID    uuid.UUID `json:"staff_id"`
-	StaffName  string    `json:"staff_name"`
-	StaffEmail string    `json:"staff_email"`
-	Action     string    `json:"action"`
-	Resource   string    `json:"resource"`
-	ResourceID *string   `json:"resource_id"`
-	Details    []byte    `json:"details"`
-	IPAddress  *string   `json:"ip_address"`
+	StaffID    *uuid.UUID `json:"staff_id"`
+	StaffName  string     `json:"staff_name"`
+	StaffEmail string     `json:"staff_email"`
+	Action     string     `json:"action"`
+	Resource   string     `json:"resource"`
+	ResourceID *string    `json:"resource_id"`
+	Details    []byte     `json:"details"`
+	IPAddress  *string    `json:"ip_address"`
 }
 
 func (q *Queries) CreateAdminAuditLog(ctx context.Context, arg CreateAdminAuditLogParams) (AdminAuditLog, error) {

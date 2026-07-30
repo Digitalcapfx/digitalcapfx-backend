@@ -135,14 +135,21 @@ func (s *StaffService) InviteStaff(ctx context.Context, in InviteStaffInput) (*S
 	}
 	expires := time.Now().Add(inviteOTPTTL)
 
-	inviterID := in.InviterStaffID
+	// invited_by FK-references admin_staff(id). The bootstrap owner has no staff
+	// row (InviterStaffID is the zero UUID), so record their invites with a NULL
+	// inviter rather than a bogus id that would violate the constraint.
+	var invitedBy *uuid.UUID
+	if in.InviterStaffID != uuid.Nil {
+		id := in.InviterStaffID
+		invitedBy = &id
+	}
 	member, err := q.CreateStaffMember(ctx, db.CreateStaffMemberParams{
 		Email:              in.Email,
 		Name:               in.Name,
 		Role:               in.Role,
 		CustomPermissions:  permsJSON(in.CustomPerms),
 		RevokedPermissions: permsJSON(in.RevokedPerms),
-		InvitedBy:          &inviterID,
+		InvitedBy:          invitedBy,
 		InviteToken:        &token,
 		DepartmentID:       in.DepartmentID,
 		InviteOtpHash:      &otpHash,
@@ -428,8 +435,14 @@ func (s *StaffService) LogAction(
 ) {
 	raw, _ := json.Marshal(details)
 	q := db.New(s.pool)
+	// staff_id FK-references admin_staff(id). The owner has no staff row, so store
+	// NULL rather than a bogus id — staff_name/staff_email still identify the actor.
+	var staffID *uuid.UUID
+	if id, perr := uuid.Parse(set.StaffID); perr == nil && id != uuid.Nil {
+		staffID = &id
+	}
 	_, err := q.CreateAdminAuditLog(ctx, db.CreateAdminAuditLogParams{
-		StaffID:    mustParseUUID(set.StaffID),
+		StaffID:    staffID,
 		StaffName:  set.StaffName,
 		StaffEmail: set.StaffEmail,
 		Action:     action,
@@ -542,11 +555,6 @@ func generateStaffInviteOTP() string {
 		b[i] = digits[int(b[i])%len(digits)]
 	}
 	return string(b)
-}
-
-func mustParseUUID(s string) uuid.UUID {
-	id, _ := uuid.Parse(s)
-	return id
 }
 
 // deliverInvite emails the invite (OTP + accept link). When no email client is
