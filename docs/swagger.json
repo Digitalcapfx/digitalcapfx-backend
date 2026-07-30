@@ -8423,13 +8423,35 @@
         "handlers.BalanceData": {
             "type": "object",
             "properties": {
+                "balance": {
+                    "description": "Balance is the numeric USDC balance.",
+                    "type": "number",
+                    "example": 100
+                },
+                "balance_formatted": {
+                    "description": "BalanceFormatted is a display string, e.g. \"100.00 USDC\".",
+                    "type": "string",
+                    "example": "100.00 USDC"
+                },
                 "balance_usdc": {
+                    "description": "BalanceUSDC is the raw on-chain USDC balance (decimal string).",
                     "type": "string",
                     "example": "100.000000"
                 },
-                "wallet_address": {
+                "name": {
+                    "description": "Name is the customer-facing asset name (always \"Stablecoin\").",
                     "type": "string",
-                    "example": "0xSCW123..."
+                    "example": "Stablecoin"
+                },
+                "symbol": {
+                    "description": "Symbol is the customer-facing asset symbol (always \"USDC\").",
+                    "type": "string",
+                    "example": "USDC"
+                },
+                "wallet_address": {
+                    "description": "WalletAddress is the customer's on-chain SCW address (always present).",
+                    "type": "string",
+                    "example": "0x1234567890abcdef1234567890abcdef12345678"
                 }
             }
         },

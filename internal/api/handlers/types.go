@@ -203,8 +203,18 @@ type CaasWalletResponse struct {
 }
 
 type BalanceData struct {
-	BalanceUSDC   string `json:"balance_usdc" example:"100.000000"`
-	WalletAddress string `json:"wallet_address" example:"0xSCW123..."`
+	// Symbol is the customer-facing asset symbol (always "USDC").
+	Symbol string `json:"symbol" example:"USDC"`
+	// Name is the customer-facing asset name (always "Stablecoin").
+	Name string `json:"name" example:"Stablecoin"`
+	// Balance is the numeric USDC balance.
+	Balance float64 `json:"balance" example:"100"`
+	// BalanceUSDC is the raw on-chain USDC balance (decimal string).
+	BalanceUSDC string `json:"balance_usdc" example:"100.000000"`
+	// BalanceFormatted is a display string, e.g. "100.00 USDC".
+	BalanceFormatted string `json:"balance_formatted" example:"100.00 USDC"`
+	// WalletAddress is the customer's on-chain SCW address (always present).
+	WalletAddress string `json:"wallet_address" example:"0x1234567890abcdef1234567890abcdef12345678"`
 }
 
 type CryptoBalanceResponse struct {

@@ -160,7 +160,7 @@ type InstantUSDBalance struct {
 	Balance          float64 `json:"balance"`      // numeric USDC balance
 	BalanceUSDC      string  `json:"balance_usdc"` // raw on-chain USDC (compat)
 	BalanceFormatted string  `json:"balance_formatted"`
-	WalletAddress    string  `json:"wallet_address,omitempty"`
+	WalletAddress    string  `json:"wallet_address"` // always present (from our caas_wallets record)
 }
 
 func (s *CaaSService) GetBalances(ctx context.Context, userID uuid.UUID) (*InstantUSDBalance, error) {
@@ -173,12 +173,24 @@ func (s *CaaSService) GetBalances(ctx context.Context, userID uuid.UUID) (*Insta
 	}
 
 	out := &InstantUSDBalance{Symbol: StablecoinSymbol, Name: StablecoinName, BalanceUSDC: "0"}
+
+	// Wallet address comes from our own caas_wallets record — it is the
+	// deterministic SCW address captured at provisioning, so it is always
+	// available even when the live balance call below fails. Sourcing it solely
+	// from the CaaS balance response made wallet_address disappear whenever that
+	// call errored or returned an empty address.
+	if wallet, werr := q.GetCaasWalletByUserID(ctx, userID); werr == nil {
+		out.WalletAddress = wallet.AbstractionAddress
+	}
+
 	// Best-effort: an unfunded / freshly-provisioned SCW should read as 0 USDC,
 	// not 500.
 	if bal, berr := s.caasClient.GetBalance(ctx, user.PhoneNumber); berr == nil {
 		out.BalanceUSDC = bal.BalanceUSDC
 		out.Balance = parseFloatSafe(bal.BalanceUSDC)
-		out.WalletAddress = bal.WalletAddress
+		if bal.WalletAddress != "" {
+			out.WalletAddress = bal.WalletAddress
+		}
 	} else {
 		s.logger.Warn("crypto balances: caas balance unavailable, returning 0 USDC",
 			zap.String("user_id", userID.String()), zap.Error(berr))
