@@ -33,6 +33,12 @@ const (
 	PermWithdrawalsReject  = "withdrawals:reject"
 	PermWithdrawalsRates   = "withdrawals:rates"
 
+	// Manual mobile money (business collection numbers + manual deposit/withdrawal review)
+	PermMomoView        = "momo:view"        // view numbers, deposit claims and cash-out requests
+	PermMomoManage      = "momo:manage"      // add/edit/remove the business collection numbers
+	PermMomoDeposits    = "momo:deposits"    // confirm / reject manual deposit claims (credits ledger)
+	PermMomoWithdrawals = "momo:withdrawals" // complete / reject manual cash-out requests
+
 	// Limits & tiers
 	PermLimitsView   = "limits:view"
 	PermLimitsManage = "limits:manage" // edit tier limits + per-user overrides
@@ -136,6 +142,15 @@ var permissionCatalogue = []PermissionGroup{
 			{PermWithdrawalsApprove, "Approve withdrawals", "Approve a withdrawal.", "withdrawals", "approve"},
 			{PermWithdrawalsReject, "Reject withdrawals", "Reject a withdrawal.", "withdrawals", "reject"},
 			{PermWithdrawalsRates, "Manage FX rates", "Set withdrawal FX rates.", "withdrawals", "rates"},
+		},
+	},
+	{
+		Resource: "momo", Label: "Manual Mobile Money", Description: "Business collection numbers and manual deposit/cash-out review.", Wildcard: "momo:*",
+		Permissions: []PermissionMeta{
+			{PermMomoView, "View manual momo", "View collection numbers, deposit claims and cash-out requests.", "momo", "view"},
+			{PermMomoManage, "Manage numbers", "Add, edit and remove the business mobile-money collection numbers.", "momo", "manage"},
+			{PermMomoDeposits, "Review deposits", "Confirm or reject manual deposit claims (credits the customer's ledger).", "momo", "deposits"},
+			{PermMomoWithdrawals, "Review cash-outs", "Complete or reject manual cash-out requests.", "momo", "withdrawals"},
 		},
 	},
 	{
@@ -259,6 +274,7 @@ var rolePermissions = map[string][]string{
 		"kyc:*",
 		PermTxView, PermTxExport,
 		"withdrawals:*",
+		"momo:*",
 		"limits:*",
 		"fees:*",
 		"staff:*",
@@ -283,6 +299,7 @@ var rolePermissions = map[string][]string{
 		PermUsersView,
 		PermTxView, PermTxExport,
 		"withdrawals:*",
+		"momo:*",
 		PermLimitsView,
 		PermFeesView,
 		PermAnalyticsView,

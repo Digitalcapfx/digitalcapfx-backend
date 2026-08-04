@@ -52,6 +52,7 @@ type Services struct {
 	VTU            *VTUService
 	Limits         *LimitsService
 	Rates          *RatesService
+	ManualMomo     *ManualMomoService // manual mobile-money rails (parallel to Hub2)
 }
 
 func New(
@@ -127,5 +128,6 @@ func New(
 		VTU:            NewVTUService(pool, hub2Client, logger),
 		Market:         NewMarketService(cfg, logger, notif),
 		Rates:          NewRatesService(pool),
+		ManualMomo:     NewManualMomoService(pool, notif, emailClient, cfg.App.AdminNotifyEmail, cfg.App.BaseURL, logger),
 	}
 }

@@ -350,6 +350,63 @@ type KycIntake struct {
 	SavedValues      []byte     `json:"saved_values"`
 }
 
+type ManualDeposit struct {
+	ID             uuid.UUID  `json:"id"`
+	UserID         uuid.UUID  `json:"user_id"`
+	AccountID      uuid.UUID  `json:"account_id"`
+	MomoAccountID  *uuid.UUID `json:"momo_account_id"`
+	Provider       string     `json:"provider"`
+	Currency       string     `json:"currency"`
+	ClaimedAmount  string     `json:"claimed_amount"`
+	CreditedAmount *string    `json:"credited_amount"`
+	Charge         *string    `json:"charge"`
+	SenderPhone    *string    `json:"sender_phone"`
+	SenderName     *string    `json:"sender_name"`
+	Reference      *string    `json:"reference"`
+	Note           *string    `json:"note"`
+	Status         string     `json:"status"`
+	AdminNote      *string    `json:"admin_note"`
+	ReviewedBy     *uuid.UUID `json:"reviewed_by"`
+	ReviewedAt     *time.Time `json:"reviewed_at"`
+	CreatedAt      time.Time  `json:"created_at"`
+	UpdatedAt      time.Time  `json:"updated_at"`
+}
+
+type ManualMomoAccount struct {
+	ID           uuid.UUID `json:"id"`
+	Provider     string    `json:"provider"`
+	DisplayName  string    `json:"display_name"`
+	PhoneNumber  string    `json:"phone_number"`
+	AccountName  *string   `json:"account_name"`
+	Currency     string    `json:"currency"`
+	Country      string    `json:"country"`
+	Instructions *string   `json:"instructions"`
+	IsActive     bool      `json:"is_active"`
+	SortOrder    int32     `json:"sort_order"`
+	CreatedAt    time.Time `json:"created_at"`
+	UpdatedAt    time.Time `json:"updated_at"`
+}
+
+type ManualWithdrawal struct {
+	ID             uuid.UUID  `json:"id"`
+	UserID         uuid.UUID  `json:"user_id"`
+	AccountID      uuid.UUID  `json:"account_id"`
+	Provider       string     `json:"provider"`
+	Currency       string     `json:"currency"`
+	Amount         string     `json:"amount"`
+	Charge         *string    `json:"charge"`
+	PayoutAmount   *string    `json:"payout_amount"`
+	RecipientPhone string     `json:"recipient_phone"`
+	RecipientName  *string    `json:"recipient_name"`
+	Note           *string    `json:"note"`
+	Status         string     `json:"status"`
+	AdminNote      *string    `json:"admin_note"`
+	ReviewedBy     *uuid.UUID `json:"reviewed_by"`
+	ReviewedAt     *time.Time `json:"reviewed_at"`
+	CreatedAt      time.Time  `json:"created_at"`
+	UpdatedAt      time.Time  `json:"updated_at"`
+}
+
 type MerchantStaff struct {
 	ID             uuid.UUID  `json:"id"`
 	BusinessUserID uuid.UUID  `json:"business_user_id"`

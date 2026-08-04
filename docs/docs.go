@@ -1093,6 +1093,535 @@ const docTemplate = `{
                 }
             }
         },
+        "/admin/momo/accounts": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns every collection number including inactive ones. Requires momo:view.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin-momo"
+                ],
+                "summary": "List all business mobile-money numbers (admin)",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/db.ManualMomoAccount"
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Adds a collection number customers can pay to. Requires momo:manage. Currency must be XOF or XAF.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin-momo"
+                ],
+                "summary": "Add a business mobile-money number (admin)",
+                "parameters": [
+                    {
+                        "description": "Number details",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.MomoAccountRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/db.ManualMomoAccount"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/momo/accounts/{id}": {
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Edits a collection number (e.g. change the number, toggle active, reorder). Requires momo:manage.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin-momo"
+                ],
+                "summary": "Update a business mobile-money number (admin)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Momo account ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Number details",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.MomoAccountRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/db.ManualMomoAccount"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Removes a collection number. Requires momo:manage. (Prefer toggling is_active off to keep history.)",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin-momo"
+                ],
+                "summary": "Delete a business mobile-money number (admin)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Momo account ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.MessageResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/momo/deposits": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns customer deposit claims for review, newest first. Filter with ?status=pending|confirmed|rejected. Requires momo:view.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin-momo"
+                ],
+                "summary": "List manual deposit claims (admin)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Filter by status (pending|confirmed|rejected)",
+                        "name": "status",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Page (default 1)",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Per page, max 100 (default 20)",
+                        "name": "per_page",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/db.ManualDeposit"
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/momo/deposits/{id}/confirm": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Confirms a customer's deposit claim and credits their ledger with credited_amount (the amount after your charge). Idempotent — a second confirm is rejected. Requires momo:deposits.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin-momo"
+                ],
+                "summary": "Confirm a manual deposit (admin)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Deposit ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Net amount to credit",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ConfirmMomoDepositRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/db.ManualDeposit"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/momo/deposits/{id}/reject": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Rejects a deposit claim (no funds are credited). Requires momo:deposits.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin-momo"
+                ],
+                "summary": "Reject a manual deposit (admin)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Deposit ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Reason",
+                        "name": "body",
+                        "in": "body",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.MomoReviewNoteRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/db.ManualDeposit"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/momo/withdrawals": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns customer cash-out requests for review, newest first. Filter with ?status=pending|completed|rejected. Requires momo:view.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin-momo"
+                ],
+                "summary": "List manual cash-out requests (admin)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Filter by status (pending|completed|rejected)",
+                        "name": "status",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Page (default 1)",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Per page, max 100 (default 20)",
+                        "name": "per_page",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/db.ManualWithdrawal"
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/momo/withdrawals/{id}/complete": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Marks a cash-out paid after you've sent the money manually. The customer was already debited the full amount at request time; charge records your fee (recipient got amount - charge). Idempotent. Requires momo:withdrawals.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin-momo"
+                ],
+                "summary": "Complete a manual cash-out (admin)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Withdrawal ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Charge taken",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.CompleteMomoWithdrawalRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/db.ManualWithdrawal"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/momo/withdrawals/{id}/reject": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Cancels a pending cash-out and refunds the held amount to the customer's balance. Requires momo:withdrawals.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin-momo"
+                ],
+                "summary": "Reject a manual cash-out (admin)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Withdrawal ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Reason",
+                        "name": "body",
+                        "in": "body",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.MomoReviewNoteRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/db.ManualWithdrawal"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/admin/permissions": {
             "get": {
                 "security": [
@@ -4299,6 +4828,234 @@ const docTemplate = `{
                 ],
                 "summary": "Connect to market data websocket",
                 "responses": {}
+            }
+        },
+        "/momo/accounts": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns the active mobile-money collection numbers the customer can pay to for a manual deposit, one per provider (Wave, Orange Money, MTN, Moov, KBINE …). Display these and let the customer pick the one matching the app they'll pay from, then submit the claim via POST /momo/deposits. This is the manual rail; it runs alongside the automated Hub2 flow.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Manual Mobile Money"
+                ],
+                "summary": "List business mobile-money numbers",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/db.ManualMomoAccount"
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/momo/deposits": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns the customer's manual mobile-money deposit claims and their status (pending, confirmed, rejected), newest first.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Manual Mobile Money"
+                ],
+                "summary": "List my manual deposits",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Page (default 1)",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Per page, max 100 (default 20)",
+                        "name": "per_page",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/db.ManualDeposit"
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "After paying one of the business numbers out-of-band, the customer submits this to log the payment. It is recorded as pending, admins are emailed to confirm receipt, and the customer's ledger is credited (in the number's currency, minus the business charge) only once an admin confirms. Nothing is credited automatically.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Manual Mobile Money"
+                ],
+                "summary": "Claim a manual mobile-money deposit (\"I have paid\")",
+                "parameters": [
+                    {
+                        "description": "Deposit claim",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.SubmitMomoDepositRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/db.ManualDeposit"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/momo/withdrawals": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns the customer's manual mobile-money cash-out requests and their status (pending, completed, rejected), newest first.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Manual Mobile Money"
+                ],
+                "summary": "List my manual cash-outs",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Page (default 1)",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Per page, max 100 (default 20)",
+                        "name": "per_page",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/db.ManualWithdrawal"
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Requests a payout to a mobile-money number. The amount is debited (held) from the customer's balance immediately to prevent double-spend, admins are emailed, and an admin sends the money manually then marks it complete (the charge is taken out of the amount). If rejected, the held amount is refunded. Supports XOF and XAF.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Manual Mobile Money"
+                ],
+                "summary": "Request a manual mobile-money cash-out",
+                "parameters": [
+                    {
+                        "description": "Cash-out request",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.RequestMomoWithdrawalRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/db.ManualWithdrawal"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    }
+                }
             }
         },
         "/nomba/banks": {
@@ -8274,6 +9031,165 @@ const docTemplate = `{
                 }
             }
         },
+        "db.ManualDeposit": {
+            "type": "object",
+            "properties": {
+                "account_id": {
+                    "type": "string"
+                },
+                "admin_note": {
+                    "type": "string"
+                },
+                "charge": {
+                    "type": "string"
+                },
+                "claimed_amount": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "credited_amount": {
+                    "type": "string"
+                },
+                "currency": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "momo_account_id": {
+                    "type": "string"
+                },
+                "note": {
+                    "type": "string"
+                },
+                "provider": {
+                    "type": "string"
+                },
+                "reference": {
+                    "type": "string"
+                },
+                "reviewed_at": {
+                    "type": "string"
+                },
+                "reviewed_by": {
+                    "type": "string"
+                },
+                "sender_name": {
+                    "type": "string"
+                },
+                "sender_phone": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "user_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "db.ManualMomoAccount": {
+            "type": "object",
+            "properties": {
+                "account_name": {
+                    "type": "string"
+                },
+                "country": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "currency": {
+                    "type": "string"
+                },
+                "display_name": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "instructions": {
+                    "type": "string"
+                },
+                "is_active": {
+                    "type": "boolean"
+                },
+                "phone_number": {
+                    "type": "string"
+                },
+                "provider": {
+                    "type": "string"
+                },
+                "sort_order": {
+                    "type": "integer"
+                },
+                "updated_at": {
+                    "type": "string"
+                }
+            }
+        },
+        "db.ManualWithdrawal": {
+            "type": "object",
+            "properties": {
+                "account_id": {
+                    "type": "string"
+                },
+                "admin_note": {
+                    "type": "string"
+                },
+                "amount": {
+                    "type": "string"
+                },
+                "charge": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "currency": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "note": {
+                    "type": "string"
+                },
+                "payout_amount": {
+                    "type": "string"
+                },
+                "provider": {
+                    "type": "string"
+                },
+                "recipient_name": {
+                    "type": "string"
+                },
+                "recipient_phone": {
+                    "type": "string"
+                },
+                "reviewed_at": {
+                    "type": "string"
+                },
+                "reviewed_by": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "user_id": {
+                    "type": "string"
+                }
+            }
+        },
         "db.MerchantStaff": {
             "type": "object",
             "properties": {
@@ -8594,6 +9510,36 @@ const docTemplate = `{
                 },
                 "event": {
                     "type": "string"
+                }
+            }
+        },
+        "handlers.CompleteMomoWithdrawalRequest": {
+            "type": "object",
+            "properties": {
+                "charge": {
+                    "description": "Charge is the business fee taken out of the amount (recipient receives amount - charge).",
+                    "type": "number",
+                    "example": 100
+                },
+                "note": {
+                    "description": "Note is an optional internal note (payout reference, …).",
+                    "type": "string",
+                    "example": "Paid via Wave, ref WD-778"
+                }
+            }
+        },
+        "handlers.ConfirmMomoDepositRequest": {
+            "type": "object",
+            "properties": {
+                "credited_amount": {
+                    "description": "CreditedAmount is the amount to credit to the customer's ledger, after your charge.",
+                    "type": "number",
+                    "example": 9800
+                },
+                "note": {
+                    "description": "Note is an optional internal note (why this net amount, receipt ref, …).",
+                    "type": "string",
+                    "example": "Received 10000, 200 charge"
                 }
             }
         },
@@ -9506,6 +10452,60 @@ const docTemplate = `{
                 }
             }
         },
+        "handlers.MomoAccountRequest": {
+            "type": "object",
+            "properties": {
+                "account_name": {
+                    "type": "string",
+                    "example": "DigitalCapFX SARL"
+                },
+                "country": {
+                    "type": "string",
+                    "example": "CI"
+                },
+                "currency": {
+                    "type": "string",
+                    "enum": [
+                        "XOF",
+                        "XAF"
+                    ],
+                    "example": "XOF"
+                },
+                "display_name": {
+                    "type": "string",
+                    "example": "Wave"
+                },
+                "instructions": {
+                    "type": "string",
+                    "example": "Send exactly the amount, then submit your reference."
+                },
+                "is_active": {
+                    "type": "boolean",
+                    "example": true
+                },
+                "phone_number": {
+                    "type": "string",
+                    "example": "+225 01 04 88 56 42"
+                },
+                "provider": {
+                    "type": "string",
+                    "example": "wave"
+                },
+                "sort_order": {
+                    "type": "integer",
+                    "example": 1
+                }
+            }
+        },
+        "handlers.MomoReviewNoteRequest": {
+            "type": "object",
+            "properties": {
+                "note": {
+                    "type": "string",
+                    "example": "No payment received against this reference"
+                }
+            }
+        },
         "handlers.NombaBanksResponse": {
             "type": "object",
             "properties": {
@@ -9832,6 +10832,45 @@ const docTemplate = `{
                 }
             }
         },
+        "handlers.RequestMomoWithdrawalRequest": {
+            "type": "object",
+            "properties": {
+                "amount": {
+                    "description": "Amount to send (debited from the customer immediately; charge is taken out of this).",
+                    "type": "number",
+                    "example": 5000
+                },
+                "currency": {
+                    "description": "Currency to withdraw — XOF or XAF.",
+                    "type": "string",
+                    "enum": [
+                        "XOF",
+                        "XAF"
+                    ],
+                    "example": "XOF"
+                },
+                "note": {
+                    "description": "Note for the reviewer (optional).",
+                    "type": "string",
+                    "example": "Rent payment"
+                },
+                "provider": {
+                    "description": "Provider is the mobile-money network to pay the recipient on.",
+                    "type": "string",
+                    "example": "wave"
+                },
+                "recipient_name": {
+                    "description": "RecipientName of the payee (optional).",
+                    "type": "string",
+                    "example": "Kofi Mensah"
+                },
+                "recipient_phone": {
+                    "description": "RecipientPhone is the mobile-money number to pay out to.",
+                    "type": "string",
+                    "example": "+225 05 00 00 00 00"
+                }
+            }
+        },
         "handlers.ResendVerificationRequest": {
             "type": "object",
             "properties": {
@@ -10112,6 +11151,41 @@ const docTemplate = `{
                     "items": {
                         "$ref": "#/definitions/handlers.CounterpartyInput"
                     }
+                }
+            }
+        },
+        "handlers.SubmitMomoDepositRequest": {
+            "type": "object",
+            "properties": {
+                "amount": {
+                    "description": "Amount the customer paid (in the number's currency, e.g. XOF).",
+                    "type": "number",
+                    "example": 10000
+                },
+                "momo_account_id": {
+                    "description": "MomoAccountID is the business collection number (from GET /momo/accounts) the customer paid to.",
+                    "type": "string",
+                    "example": "6f1c2e4a-8b2d-4c9a-9f3e-1a2b3c4d5e6f"
+                },
+                "note": {
+                    "description": "Note is any extra context for the reviewer (optional).",
+                    "type": "string",
+                    "example": "Paid at 14:32"
+                },
+                "reference": {
+                    "description": "Reference is the mobile-money transaction id/reference from the payment (optional but speeds confirmation).",
+                    "type": "string",
+                    "example": "WAVE-TXN-123456"
+                },
+                "sender_name": {
+                    "description": "SenderName on the customer's mobile-money account (optional).",
+                    "type": "string",
+                    "example": "Ama Kone"
+                },
+                "sender_phone": {
+                    "description": "SenderPhone is the customer's own mobile-money number they paid from (optional).",
+                    "type": "string",
+                    "example": "+225 07 00 00 00 00"
                 }
             }
         },

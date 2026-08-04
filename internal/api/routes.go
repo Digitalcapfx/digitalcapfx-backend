@@ -71,6 +71,8 @@ func newRouter(cfg *config.Config, svc *services.Services, pool *pgxpool.Pool, l
 	nombaWebhookH := handlers.NewNombaWebhookHandler(svc, logger)
 	nilosWebhookH := handlers.NewNilosWebhookHandler(svc, logger)
 	nombaH := handlers.NewNombaHandler(svc)
+	momoH := handlers.NewMomoHandler(svc)
+	adminMomoH := handlers.NewAdminMomoHandler(svc)
 
 	kycRequired := middleware.KYCRequired(pool)
 
@@ -263,6 +265,16 @@ func newRouter(cfg *config.Config, svc *services.Services, pool *pgxpool.Pool, l
 					r.Get("/transactions/{id}", caasH.GetTransaction)
 				})
 
+				// Manual mobile money (parallel to Hub2): pay the business numbers
+				// out-of-band and claim it; cash out to a momo number. Admin confirms.
+				r.Route("/momo", func(r chi.Router) {
+					r.Get("/accounts", momoH.ListMomoAccounts)
+					r.Post("/deposits", momoH.SubmitDeposit)
+					r.Get("/deposits", momoH.ListMyDeposits)
+					r.Post("/withdrawals", momoH.RequestWithdrawal)
+					r.Get("/withdrawals", momoH.ListMyWithdrawals)
+				})
+
 				// Transfers (fiat internal)
 				r.Route("/transfers", func(r chi.Router) {
 					r.Post("/internal", transferH.InternalTransfer)
@@ -420,6 +432,28 @@ func newRouter(cfg *config.Config, svc *services.Services, pool *pgxpool.Pool, l
 					Put("/admin/users/{id}/limits", adminLimitsH.SetUserLimits)
 				r.With(middleware.RequirePermission(services.PermLimitsManage)).
 					Delete("/admin/users/{id}/limits", adminLimitsH.ClearUserLimits)
+
+				// Manual mobile money: collection numbers + deposit/cash-out review
+				r.With(middleware.RequirePermission(services.PermMomoView)).
+					Get("/admin/momo/accounts", adminMomoH.ListMomoAccounts)
+				r.With(middleware.RequirePermission(services.PermMomoManage)).
+					Post("/admin/momo/accounts", adminMomoH.CreateMomoAccount)
+				r.With(middleware.RequirePermission(services.PermMomoManage)).
+					Put("/admin/momo/accounts/{id}", adminMomoH.UpdateMomoAccount)
+				r.With(middleware.RequirePermission(services.PermMomoManage)).
+					Delete("/admin/momo/accounts/{id}", adminMomoH.DeleteMomoAccount)
+				r.With(middleware.RequirePermission(services.PermMomoView)).
+					Get("/admin/momo/deposits", adminMomoH.ListDeposits)
+				r.With(middleware.RequirePermission(services.PermMomoDeposits)).
+					Post("/admin/momo/deposits/{id}/confirm", adminMomoH.ConfirmDeposit)
+				r.With(middleware.RequirePermission(services.PermMomoDeposits)).
+					Post("/admin/momo/deposits/{id}/reject", adminMomoH.RejectDeposit)
+				r.With(middleware.RequirePermission(services.PermMomoView)).
+					Get("/admin/momo/withdrawals", adminMomoH.ListWithdrawals)
+				r.With(middleware.RequirePermission(services.PermMomoWithdrawals)).
+					Post("/admin/momo/withdrawals/{id}/complete", adminMomoH.CompleteWithdrawal)
+				r.With(middleware.RequirePermission(services.PermMomoWithdrawals)).
+					Post("/admin/momo/withdrawals/{id}/reject", adminMomoH.RejectWithdrawal)
 
 				// KYC review
 				r.With(middleware.RequirePermission(services.PermKYCView)).

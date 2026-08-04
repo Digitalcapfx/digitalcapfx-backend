@@ -53,6 +53,26 @@ sql:
               import: "time"
               type: "Time"
               pointer: true
+          - column: "manual_deposits.claimed_amount"
+            go_type: "string"
+          - column: "manual_deposits.credited_amount"
+            go_type:
+              type: "string"
+              pointer: true
+          - column: "manual_deposits.charge"
+            go_type:
+              type: "string"
+              pointer: true
+          - column: "manual_withdrawals.amount"
+            go_type: "string"
+          - column: "manual_withdrawals.charge"
+            go_type:
+              type: "string"
+              pointer: true
+          - column: "manual_withdrawals.payout_amount"
+            go_type:
+              type: "string"
+              pointer: true
           - column: "crypto_transactions.amount"
             go_type: "string"
           - column: "caas_withdrawals.amount"

@@ -27,6 +27,14 @@ const (
 	NotifCryptoSent       = "crypto_sent"
 	NotifCryptoRecvd      = "crypto_received"
 	NotifExchange         = "exchange_completed"
+
+	// Manual mobile-money flow
+	NotifManualDepositSubmitted    = "manual_deposit_submitted"
+	NotifManualDepositConfirmed    = "manual_deposit_confirmed"
+	NotifManualDepositRejected     = "manual_deposit_rejected"
+	NotifManualWithdrawalRequested = "manual_withdrawal_requested"
+	NotifManualWithdrawalCompleted = "manual_withdrawal_completed"
+	NotifManualWithdrawalRejected  = "manual_withdrawal_rejected"
 )
 
 type NotificationService struct {

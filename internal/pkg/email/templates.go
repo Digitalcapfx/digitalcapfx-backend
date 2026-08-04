@@ -285,3 +285,62 @@ func KYCRejected(toEmail, firstName, reason string) (subject, html string) {
 	html = render(subject, toEmail, content)
 	return
 }
+
+// ManualMomoAlertData carries the details of a manual mobile-money action that
+// needs a human to confirm (a customer claiming a deposit, or requesting a
+// cash-out). Sent to the ops/admin notification inbox.
+type ManualMomoAlertData struct {
+	Kind        string // "deposit" | "withdrawal"
+	Customer    string // name / email / phone of the customer
+	Provider    string // Wave, Orange Money, MTN, …
+	Currency    string
+	Amount      string
+	Counterpart string // sender's momo number (deposit) or recipient number (withdrawal)
+	Reference   string // customer-supplied reference (deposit) or empty
+	Note        string
+	ReviewURL   string // deep link into the admin panel (optional)
+	SubmittedAt string
+}
+
+// ManualMomoAlert composes the admin notification for a manual mobile-money
+// deposit claim or cash-out request awaiting confirmation.
+func ManualMomoAlert(toEmail string, d ManualMomoAlertData) (subject, html string) {
+	action := "deposit claim"
+	verb := "paid"
+	partyLabel := "Sender number"
+	if d.Kind == "withdrawal" {
+		action = "cash-out request"
+		verb = "wants to withdraw"
+		partyLabel = "Recipient number"
+	}
+	subject = fmt.Sprintf("Action needed: manual %s — %s %s via %s", action, d.Amount, d.Currency, d.Provider)
+
+	extra := ""
+	if d.Reference != "" {
+		extra += fmt.Sprintf(`<p><span class="label">Customer reference</span><br/>%s</p>`, d.Reference)
+	}
+	if d.Note != "" {
+		extra += fmt.Sprintf(`<p><span class="label">Note</span><br/>%s</p>`, d.Note)
+	}
+	cta := ""
+	if d.ReviewURL != "" {
+		cta = fmt.Sprintf(`<p><a href="%s" style="color:#0f3460"><strong>Review in the admin panel →</strong></a></p>`, d.ReviewURL)
+	}
+
+	content := fmt.Sprintf(`
+<h2>Manual %s awaiting confirmation</h2>
+<p>%s %s <strong>%s %s</strong> via <strong>%s</strong>. Verify it manually, then confirm (or reject) in the admin panel.</p>
+<div class="device-card">
+  <p><span class="label">Customer</span><br/>%s</p>
+  <p><span class="label">Amount claimed</span><br/>%s %s</p>
+  <p><span class="label">Provider</span><br/>%s</p>
+  <p><span class="label">%s</span><br/>%s</p>
+  %s
+  <p><span class="label">Submitted</span><br/>%s</p>
+</div>
+%s
+`, action, d.Customer, verb, d.Amount, d.Currency, d.Provider,
+		d.Customer, d.Amount, d.Currency, d.Provider, partyLabel, d.Counterpart, extra, d.SubmittedAt, cta)
+	html = render(subject, toEmail, content)
+	return
+}

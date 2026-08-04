@@ -16,6 +16,8 @@ type Querier interface {
 	AcceptMerchantStaffInvite(ctx context.Context, arg AcceptMerchantStaffInviteParams) error
 	AcceptStaffInvite(ctx context.Context, arg AcceptStaffInviteParams) error
 	AcceptStaffInviteByID(ctx context.Context, arg AcceptStaffInviteByIDParams) error
+	CompleteManualWithdrawal(ctx context.Context, arg CompleteManualWithdrawalParams) (ManualWithdrawal, error)
+	ConfirmManualDeposit(ctx context.Context, arg ConfirmManualDepositParams) (ManualDeposit, error)
 	CountActiveVirtualCards(ctx context.Context, userID uuid.UUID) (int64, error)
 	CountActivity(ctx context.Context, arg CountActivityParams) (int64, error)
 	CountAdminAuditLogs(ctx context.Context, arg CountAdminAuditLogsParams) (int64, error)
@@ -45,10 +47,15 @@ type Querier interface {
 	CreateHub2Payment(ctx context.Context, arg CreateHub2PaymentParams) (Hub2Payment, error)
 	CreateIndividualUser(ctx context.Context, arg CreateIndividualUserParams) (User, error)
 	CreateKYCDocument(ctx context.Context, arg CreateKYCDocumentParams) (KycDocument, error)
+	// ─── Manual deposits (customer top-up claims) ────────────────────────────────
+	CreateManualDeposit(ctx context.Context, arg CreateManualDepositParams) (ManualDeposit, error)
+	// ─── Manual withdrawals (customer cash-out requests) ─────────────────────────
+	CreateManualWithdrawal(ctx context.Context, arg CreateManualWithdrawalParams) (ManualWithdrawal, error)
 	// Merchant staff queries
 	CreateMerchantStaff(ctx context.Context, arg CreateMerchantStaffParams) (MerchantStaff, error)
 	// MetaMap verification queries
 	CreateMetamapVerification(ctx context.Context, arg CreateMetamapVerificationParams) (MetamapVerification, error)
+	CreateMomoAccount(ctx context.Context, arg CreateMomoAccountParams) (ManualMomoAccount, error)
 	CreateNotification(ctx context.Context, arg CreateNotificationParams) (Notification, error)
 	CreateOTP(ctx context.Context, arg CreateOTPParams) (Otp, error)
 	CreatePointsRecord(ctx context.Context, arg CreatePointsRecordParams) (PointsLedger, error)
@@ -74,6 +81,7 @@ type Querier interface {
 	DeleteExpiredFXQuotes(ctx context.Context) error
 	DeleteExpiredOTPs(ctx context.Context) error
 	DeleteMerchantStaff(ctx context.Context, arg DeleteMerchantStaffParams) error
+	DeleteMomoAccount(ctx context.Context, id uuid.UUID) error
 	DeleteStaffMember(ctx context.Context, id uuid.UUID) (int64, error)
 	DeleteUserLimitOverride(ctx context.Context, userID uuid.UUID) error
 	DisableStaffMember(ctx context.Context, id uuid.UUID) error
@@ -118,11 +126,14 @@ type Querier interface {
 	// Most recent time a code of this purpose was sent to an email — powers the
 	// resend cooldown.
 	GetLatestEmailOTPSentAt(ctx context.Context, arg GetLatestEmailOTPSentAtParams) (time.Time, error)
+	GetManualDeposit(ctx context.Context, id uuid.UUID) (ManualDeposit, error)
+	GetManualWithdrawal(ctx context.Context, id uuid.UUID) (ManualWithdrawal, error)
 	GetMerchantStaffByEmailAndBusiness(ctx context.Context, arg GetMerchantStaffByEmailAndBusinessParams) (MerchantStaff, error)
 	GetMerchantStaffByID(ctx context.Context, id uuid.UUID) (MerchantStaff, error)
 	GetMerchantStaffByInviteToken(ctx context.Context, inviteToken *string) (MerchantStaff, error)
 	GetMetamapVerificationByApplicantID(ctx context.Context, applicantID string) (MetamapVerification, error)
 	GetMetamapVerificationByUserID(ctx context.Context, userID uuid.UUID) (MetamapVerification, error)
+	GetMomoAccount(ctx context.Context, id uuid.UUID) (ManualMomoAccount, error)
 	GetMonthlyFlow(ctx context.Context, arg GetMonthlyFlowParams) ([]GetMonthlyFlowRow, error)
 	GetPlatformLimit(ctx context.Context, tier string) (PlatformLimit, error)
 	GetPointsBalance(ctx context.Context, userID uuid.UUID) (int64, error)
@@ -169,15 +180,22 @@ type Querier interface {
 	GetWaasWalletByIDAndUser(ctx context.Context, arg GetWaasWalletByIDAndUserParams) (WaasWallet, error)
 	GetWaasWalletByNetwork(ctx context.Context, arg GetWaasWalletByNetworkParams) (WaasWallet, error)
 	GetWaasWalletsByUserID(ctx context.Context, userID uuid.UUID) ([]WaasWallet, error)
+	// ─── Business mobile-money collection accounts ───────────────────────────────
+	ListActiveMomoAccounts(ctx context.Context) ([]ManualMomoAccount, error)
 	ListActiveSessionsByUserID(ctx context.Context, userID uuid.UUID) ([]UserSession, error)
 	ListActivity(ctx context.Context, arg ListActivityParams) ([]ListActivityRow, error)
 	ListAdminAuditLogs(ctx context.Context, arg ListAdminAuditLogsParams) ([]AdminAuditLog, error)
+	ListAllMomoAccounts(ctx context.Context) ([]ManualMomoAccount, error)
 	ListBusinessDirectors(ctx context.Context, userID uuid.UUID) ([]BusinessDirector, error)
 	ListCaasWithdrawalsByUser(ctx context.Context, arg ListCaasWithdrawalsByUserParams) ([]CaasWithdrawal, error)
 	ListCardTransactions(ctx context.Context, cardID uuid.UUID) ([]CardTransaction, error)
 	ListCryptoTransactionsByUser(ctx context.Context, arg ListCryptoTransactionsByUserParams) ([]CryptoTransaction, error)
 	ListDepartments(ctx context.Context) ([]ListDepartmentsRow, error)
 	ListDeviceTokensByUser(ctx context.Context, userID uuid.UUID) ([]string, error)
+	ListManualDepositsByStatus(ctx context.Context, arg ListManualDepositsByStatusParams) ([]ManualDeposit, error)
+	ListManualDepositsByUser(ctx context.Context, arg ListManualDepositsByUserParams) ([]ManualDeposit, error)
+	ListManualWithdrawalsByStatus(ctx context.Context, arg ListManualWithdrawalsByStatusParams) ([]ManualWithdrawal, error)
+	ListManualWithdrawalsByUser(ctx context.Context, arg ListManualWithdrawalsByUserParams) ([]ManualWithdrawal, error)
 	ListMerchantStaff(ctx context.Context, businessUserID uuid.UUID) ([]MerchantStaff, error)
 	ListNotifications(ctx context.Context, arg ListNotificationsParams) ([]Notification, error)
 	ListPlatformLimits(ctx context.Context) ([]PlatformLimit, error)
@@ -200,6 +218,8 @@ type Querier interface {
 	MarkOTPUsed(ctx context.Context, id uuid.UUID) error
 	PromoteUserToOwnerByPhone(ctx context.Context, phoneNumber string) (PromoteUserToOwnerByPhoneRow, error)
 	RecordDepositEvent(ctx context.Context, arg RecordDepositEventParams) (int64, error)
+	RejectManualDeposit(ctx context.Context, arg RejectManualDepositParams) (ManualDeposit, error)
+	RejectManualWithdrawal(ctx context.Context, arg RejectManualWithdrawalParams) (ManualWithdrawal, error)
 	RevokeAllOtherSessions(ctx context.Context, arg RevokeAllOtherSessionsParams) error
 	RevokeAllUserSessions(ctx context.Context, userID uuid.UUID) error
 	RevokeStaffInvite(ctx context.Context, id uuid.UUID) (int64, error)
@@ -229,6 +249,7 @@ type Querier interface {
 	UpdateKYCDocumentStatus(ctx context.Context, arg UpdateKYCDocumentStatusParams) (KycDocument, error)
 	UpdateMerchantStaffRole(ctx context.Context, arg UpdateMerchantStaffRoleParams) error
 	UpdateMetamapVerificationStatus(ctx context.Context, arg UpdateMetamapVerificationStatusParams) (MetamapVerification, error)
+	UpdateMomoAccount(ctx context.Context, arg UpdateMomoAccountParams) (ManualMomoAccount, error)
 	UpdateNilosAccountDetails(ctx context.Context, arg UpdateNilosAccountDetailsParams) error
 	UpdateNombaAccountDetails(ctx context.Context, arg UpdateNombaAccountDetailsParams) error
 	UpdateSessionLastUsed(ctx context.Context, id uuid.UUID) error

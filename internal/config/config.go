@@ -59,6 +59,9 @@ type Config struct {
 type AppConfig struct {
 	Name    string
 	BaseURL string
+	// AdminNotifyEmail receives operational alerts that need a human (e.g. a
+	// customer claiming a manual mobile-money payment awaiting confirmation).
+	AdminNotifyEmail string
 }
 
 type ServerConfig struct {
@@ -189,6 +192,7 @@ func Load() (*Config, error) {
 
 	cfg.App.Name = getEnv("APP_NAME", "DigitalFX")
 	cfg.App.BaseURL = getEnv("APP_BASE_URL", "https://api.digitalfx.finance")
+	cfg.App.AdminNotifyEmail = getEnv("ADMIN_NOTIFY_EMAIL", "")
 
 	cfg.Server.Port = getEnv("PORT", "8080")
 	cfg.Server.Env = getEnv("ENV", "development")
