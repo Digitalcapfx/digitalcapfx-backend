@@ -372,25 +372,36 @@ definitions:
   handlers.BalanceData:
     properties:
       balance:
-        description: Balance is the numeric USDC balance.
+        description: Balance is the numeric USDC balance (back-compat; see tokens
+          for USDT).
         example: 100
         type: number
       balance_formatted:
-        description: BalanceFormatted is a display string, e.g. "100.00 USDC".
+        description: BalanceFormatted is a display string for USDC, e.g. "100.00 USDC".
         example: 100.00 USDC
         type: string
       balance_usdc:
         description: BalanceUSDC is the raw on-chain USDC balance (decimal string).
         example: "100.000000"
         type: string
+      balance_usdt:
+        description: BalanceUSDT is the raw on-chain USDT balance (decimal string).
+        example: "50.000000"
+        type: string
       name:
         description: Name is the customer-facing asset name (always "Stablecoin").
         example: Stablecoin
         type: string
       symbol:
-        description: Symbol is the customer-facing asset symbol (always "USDC").
+        description: Symbol is the back-compat asset symbol (USDC).
         example: USDC
         type: string
+      tokens:
+        description: Tokens holds the per-stablecoin balances — USDC and USDT (CaaS
+          supports both). Prefer this.
+        items:
+          $ref: '#/definitions/handlers.TokenBalanceData'
+        type: array
       wallet_address:
         description: WalletAddress is the customer's on-chain SCW address (always
           present).
@@ -1739,6 +1750,24 @@ definitions:
       success:
         example: true
         type: boolean
+    type: object
+  handlers.TokenBalanceData:
+    properties:
+      balance:
+        example: 50
+        type: number
+      balance_formatted:
+        example: 50.00 USDT
+        type: string
+      balance_raw:
+        example: "50.000000"
+        type: string
+      name:
+        example: Stablecoin
+        type: string
+      symbol:
+        example: USDT
+        type: string
     type: object
   handlers.TokenPairData:
     properties:

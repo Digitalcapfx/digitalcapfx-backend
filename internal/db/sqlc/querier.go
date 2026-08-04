@@ -237,6 +237,7 @@ type Querier interface {
 	SetReferralCode(ctx context.Context, arg SetReferralCodeParams) error
 	SetStaffDepartment(ctx context.Context, arg SetStaffDepartmentParams) error
 	SetStaffInviteOTP(ctx context.Context, arg SetStaffInviteOTPParams) error
+	SetTransactionStatusByReference(ctx context.Context, arg SetTransactionStatusByReferenceParams) error
 	SetUserAccountType(ctx context.Context, arg SetUserAccountTypeParams) (SetUserAccountTypeRow, error)
 	SetUserBVN(ctx context.Context, arg SetUserBVNParams) (User, error)
 	SumAccountBalanceByCurrency(ctx context.Context, currency string) (pgtype.Numeric, error)

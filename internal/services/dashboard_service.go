@@ -137,11 +137,12 @@ func (s *DashboardService) GetDashboard(ctx context.Context, userID uuid.UUID) (
 
 	// ── CaaS USDC balance (Rach CaaS — phone send) ───────────────────────────
 	// CaaS identifies users by phone number.
-	var caasUSDC float64
+	var caasUSDC, caasUSDT float64
 	user, err := q.GetUserByID(ctx, userID)
 	if err == nil && user.PhoneNumber != "" {
 		if balResp, err := s.caasClient.GetBalance(ctx, user.PhoneNumber); err == nil {
 			caasUSDC = parseFloatSafe(balResp.BalanceUSDC)
+			caasUSDT = parseFloatSafe(balResp.BalanceUSDT)
 		} else {
 			s.logger.Warn("caas balance unavailable", zap.Error(err))
 		}
@@ -151,7 +152,7 @@ func (s *DashboardService) GetDashboard(ctx context.Context, userID uuid.UUID) (
 	// Balances are computed from local transaction history (deposits - withdrawals).
 	// Live balance queries require on-chain RPC which is handled asynchronously.
 	var cryptoTotalUSD float64
-	cryptoTotalUSD += caasUSDC // USDC is crypto
+	cryptoTotalUSD += caasUSDC + caasUSDT // both stablecoins count toward the crypto total
 
 	// ── Asset allocation ─────────────────────────────────────────────────────
 	totalUSD := fiatTotalUSD + cryptoTotalUSD

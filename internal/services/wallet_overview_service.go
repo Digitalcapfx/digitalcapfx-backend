@@ -202,31 +202,24 @@ func (s *WalletOverviewService) GetOverview(ctx context.Context, userID uuid.UUI
 	}
 
 	// ── Instant USD (CaaS) — settles on-chain as USDC, shown as iUSD ──────────
-	var caasUSDC float64
+	var caasUSDC, caasUSDT float64
 	if walletType == "" || walletType == "stablecoin" {
 		if user.PhoneNumber != "" {
 			var addr string
 			if bal, err := s.caasClient.GetBalance(ctx, user.PhoneNumber); err == nil {
 				caasUSDC = parseFloatSafe(bal.BalanceUSDC)
+				caasUSDT = parseFloatSafe(bal.BalanceUSDT)
 				addr = bal.WalletAddress
 			} else {
 				// Balance read can fail for a freshly-provisioned, unfunded SCW —
 				// still show the iUSD wallet at 0 rather than hiding it.
 				s.logger.Warn("wallet overview: caas balance unavailable, showing 0 iUSD", zap.Error(err))
 			}
-			totalUSD += caasUSDC
-			wallets = append(wallets, WalletItem{
-				Symbol:           StablecoinSymbol,
-				Name:             StablecoinName,
-				Type:             "stablecoin",
-				Provider:         "caas",
-				Balance:          fmt.Sprintf("%.2f", caasUSDC),
-				BalanceRaw:       caasUSDC,
-				FormattedBalance: fmt.Sprintf("%s %s", formatNumber(caasUSDC, 2), StablecoinSymbol),
-				Address:          addr,
-				BalanceUSD:       roundUSD(caasUSDC),
-				HasWallet:        true,
-			})
+			totalUSD += caasUSDC + caasUSDT
+			wallets = append(wallets,
+				caasStablecoinWallet("USDC", caasUSDC, addr),
+				caasStablecoinWallet("USDT", caasUSDT, addr),
+			)
 		}
 	}
 
@@ -600,6 +593,23 @@ func (s *WalletOverviewService) GetCryptoTransactions(ctx context.Context, userI
 	}, nil
 }
 
+// caasStablecoinWallet builds a CaaS stablecoin wallet item (USDC or USDT) — both
+// live on the same SCW address and are pegged to USD.
+func caasStablecoinWallet(symbol string, bal float64, addr string) WalletItem {
+	return WalletItem{
+		Symbol:           symbol,
+		Name:             StablecoinName,
+		Type:             "stablecoin",
+		Provider:         "caas",
+		Balance:          fmt.Sprintf("%.2f", bal),
+		BalanceRaw:       bal,
+		FormattedBalance: fmt.Sprintf("%s %s", formatNumber(bal, 2), symbol),
+		Address:          addr,
+		BalanceUSD:       roundUSD(bal),
+		HasWallet:        true,
+	}
+}
+
 // ─── Stablecoin Wallet Detail ─────────────────────────────────────────────────
 
 func (s *WalletOverviewService) GetStablecoinDetail(ctx context.Context, userID uuid.UUID, symbol string) (*WalletDetailResponse, error) {
@@ -609,33 +619,41 @@ func (s *WalletOverviewService) GetStablecoinDetail(ctx context.Context, userID 
 		return nil, ErrUserNotFound
 	}
 
-	// USDC (name "Stablecoin", formerly branded iUSD) is the only supported CaaS
-	// stablecoin. "IUSD" is still accepted for backward compatibility.
+	// CaaS supports USDC and USDT equally (both named "Stablecoin"). "IUSD" is
+	// still accepted as a legacy alias for USDC.
 	sym := strings.ToUpper(symbol)
-	if sym != "USDC" && sym != "IUSD" {
+	switch sym {
+	case "IUSD":
+		sym = "USDC"
+	case "USDC", "USDT":
+	default:
 		return nil, fmt.Errorf("unsupported stablecoin: %s", symbol)
 	}
 
 	// Balance read is best-effort — a freshly-provisioned, unfunded SCW should
-	// still show iUSD 0 rather than erroring.
+	// still show 0 rather than erroring.
 	var balFloat float64
 	var addr string
 	if bal, berr := s.caasClient.GetBalance(ctx, user.PhoneNumber); berr == nil {
-		balFloat = parseFloatSafe(bal.BalanceUSDC)
+		if sym == "USDT" {
+			balFloat = parseFloatSafe(bal.BalanceUSDT)
+		} else {
+			balFloat = parseFloatSafe(bal.BalanceUSDC)
+		}
 		addr = bal.WalletAddress
 	} else {
-		s.logger.Warn("stablecoin detail: caas balance unavailable, showing 0 iUSD", zap.Error(berr))
+		s.logger.Warn("stablecoin detail: caas balance unavailable, showing 0", zap.Error(berr))
 	}
 
 	return &WalletDetailResponse{
 		Wallet: WalletItem{
-			Symbol:           StablecoinSymbol,
+			Symbol:           sym,
 			Name:             StablecoinName,
 			Type:             "stablecoin",
 			Provider:         "caas",
 			Balance:          fmt.Sprintf("%.2f", balFloat),
 			BalanceRaw:       balFloat,
-			FormattedBalance: fmt.Sprintf("%s %s", formatNumber(balFloat, 2), StablecoinSymbol),
+			FormattedBalance: fmt.Sprintf("%s %s", formatNumber(balFloat, 2), sym),
 			Address:          addr,
 			BalanceUSD:       roundUSD(balFloat),
 			HasWallet:        true,

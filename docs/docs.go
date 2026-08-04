@@ -9393,12 +9393,12 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "balance": {
-                    "description": "Balance is the numeric USDC balance.",
+                    "description": "Balance is the numeric USDC balance (back-compat; see tokens for USDT).",
                     "type": "number",
                     "example": 100
                 },
                 "balance_formatted": {
-                    "description": "BalanceFormatted is a display string, e.g. \"100.00 USDC\".",
+                    "description": "BalanceFormatted is a display string for USDC, e.g. \"100.00 USDC\".",
                     "type": "string",
                     "example": "100.00 USDC"
                 },
@@ -9407,15 +9407,27 @@ const docTemplate = `{
                     "type": "string",
                     "example": "100.000000"
                 },
+                "balance_usdt": {
+                    "description": "BalanceUSDT is the raw on-chain USDT balance (decimal string).",
+                    "type": "string",
+                    "example": "50.000000"
+                },
                 "name": {
                     "description": "Name is the customer-facing asset name (always \"Stablecoin\").",
                     "type": "string",
                     "example": "Stablecoin"
                 },
                 "symbol": {
-                    "description": "Symbol is the customer-facing asset symbol (always \"USDC\").",
+                    "description": "Symbol is the back-compat asset symbol (USDC).",
                     "type": "string",
                     "example": "USDC"
+                },
+                "tokens": {
+                    "description": "Tokens holds the per-stablecoin balances — USDC and USDT (CaaS supports both). Prefer this.",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/handlers.TokenBalanceData"
+                    }
                 },
                 "wallet_address": {
                     "description": "WalletAddress is the customer's on-chain SCW address (always present).",
@@ -11264,6 +11276,31 @@ const docTemplate = `{
                 "success": {
                     "type": "boolean",
                     "example": true
+                }
+            }
+        },
+        "handlers.TokenBalanceData": {
+            "type": "object",
+            "properties": {
+                "balance": {
+                    "type": "number",
+                    "example": 50
+                },
+                "balance_formatted": {
+                    "type": "string",
+                    "example": "50.00 USDT"
+                },
+                "balance_raw": {
+                    "type": "string",
+                    "example": "50.000000"
+                },
+                "name": {
+                    "type": "string",
+                    "example": "Stablecoin"
+                },
+                "symbol": {
+                    "type": "string",
+                    "example": "USDT"
                 }
             }
         },

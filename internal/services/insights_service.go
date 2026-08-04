@@ -121,7 +121,7 @@ func (s *InsightsService) GetInsights(ctx context.Context, userID uuid.UUID, per
 	user, _ := q.GetUserByID(ctx, userID)
 	if user.PhoneNumber != "" {
 		if balResp, err := s.caasClient.GetBalance(ctx, user.PhoneNumber); err == nil {
-			cryptoUSD += parseFloatSafe(balResp.BalanceUSDC)
+			cryptoUSD += parseFloatSafe(balResp.BalanceUSDC) + parseFloatSafe(balResp.BalanceUSDT)
 		}
 	}
 

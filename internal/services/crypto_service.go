@@ -154,13 +154,28 @@ func (s *CaaSService) InitiateFunding(ctx context.Context, in FundingInput) (str
 // InstantUSDBalance is the customer-facing CaaS balance. The value settles
 // on-chain as USDC and is presented as USDC (name "Stablecoin"). balance_usdc is
 // kept for backward compatibility.
+// StablecoinToken is one stablecoin balance on the customer's SCW (USDC or USDT).
+type StablecoinToken struct {
+	Symbol           string  `json:"symbol"` // "USDC" | "USDT"
+	Name             string  `json:"name"`   // "Stablecoin"
+	Balance          float64 `json:"balance"`
+	BalanceRaw       string  `json:"balance_raw"` // decimal string
+	BalanceFormatted string  `json:"balance_formatted"`
+}
+
 type InstantUSDBalance struct {
+	// Tokens holds the per-stablecoin balances (USDC and USDT). CaaS supports both
+	// equally — prefer this over the flat fields below.
+	Tokens        []StablecoinToken `json:"tokens"`
+	WalletAddress string            `json:"wallet_address"` // always present (from our caas_wallets record)
+
+	// Flat fields retained for backward compatibility (USDC).
 	Symbol           string  `json:"symbol"`       // "USDC"
 	Name             string  `json:"name"`         // "Stablecoin"
 	Balance          float64 `json:"balance"`      // numeric USDC balance
-	BalanceUSDC      string  `json:"balance_usdc"` // raw on-chain USDC (compat)
+	BalanceUSDC      string  `json:"balance_usdc"` // raw on-chain USDC
+	BalanceUSDT      string  `json:"balance_usdt"` // raw on-chain USDT
 	BalanceFormatted string  `json:"balance_formatted"`
-	WalletAddress    string  `json:"wallet_address"` // always present (from our caas_wallets record)
 }
 
 func (s *CaaSService) GetBalances(ctx context.Context, userID uuid.UUID) (*InstantUSDBalance, error) {
@@ -172,7 +187,7 @@ func (s *CaaSService) GetBalances(ctx context.Context, userID uuid.UUID) (*Insta
 		return nil, ErrAccountNotFound
 	}
 
-	out := &InstantUSDBalance{Symbol: StablecoinSymbol, Name: StablecoinName, BalanceUSDC: "0"}
+	out := &InstantUSDBalance{Symbol: StablecoinSymbol, Name: StablecoinName, BalanceUSDC: "0", BalanceUSDT: "0"}
 
 	// Ensure the user's SCW is provisioned (idempotent — only calls CaaS when we
 	// have no local record). This guarantees wallet_address is always present and
@@ -189,16 +204,27 @@ func (s *CaaSService) GetBalances(ctx context.Context, userID uuid.UUID) (*Insta
 	// Best-effort: an unfunded / freshly-provisioned SCW should read as 0 USDC,
 	// not 500.
 	if bal, berr := s.caasClient.GetBalance(ctx, user.PhoneNumber); berr == nil {
-		out.BalanceUSDC = bal.BalanceUSDC
-		out.Balance = parseFloatSafe(bal.BalanceUSDC)
+		if bal.BalanceUSDC != "" {
+			out.BalanceUSDC = bal.BalanceUSDC
+		}
+		if bal.BalanceUSDT != "" {
+			out.BalanceUSDT = bal.BalanceUSDT
+		}
 		if bal.WalletAddress != "" {
 			out.WalletAddress = bal.WalletAddress
 		}
 	} else {
-		s.logger.Warn("crypto balances: caas balance unavailable, returning 0 USDC",
+		s.logger.Warn("crypto balances: caas balance unavailable, returning 0",
 			zap.String("user_id", userID.String()), zap.Error(berr))
 	}
-	out.BalanceFormatted = fmt.Sprintf("%.2f %s", out.Balance, StablecoinSymbol)
+
+	usdc, usdt := parseFloatSafe(out.BalanceUSDC), parseFloatSafe(out.BalanceUSDT)
+	out.Balance = usdc // back-compat: flat balance is USDC
+	out.BalanceFormatted = fmt.Sprintf("%.2f %s", usdc, StablecoinSymbol)
+	out.Tokens = []StablecoinToken{
+		{Symbol: "USDC", Name: StablecoinName, Balance: usdc, BalanceRaw: out.BalanceUSDC, BalanceFormatted: fmt.Sprintf("%.2f USDC", usdc)},
+		{Symbol: "USDT", Name: StablecoinName, Balance: usdt, BalanceRaw: out.BalanceUSDT, BalanceFormatted: fmt.Sprintf("%.2f USDT", usdt)},
+	}
 	return out, nil
 }
 

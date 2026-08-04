@@ -165,6 +165,22 @@ func (q *Queries) ListTransactionsByAccount(ctx context.Context, arg ListTransac
 	return items, nil
 }
 
+const setTransactionStatusByReference = `-- name: SetTransactionStatusByReference :exec
+UPDATE transactions
+SET status = $2, updated_at = NOW()
+WHERE reference = $1
+`
+
+type SetTransactionStatusByReferenceParams struct {
+	Reference string `json:"reference"`
+	Status    string `json:"status"`
+}
+
+func (q *Queries) SetTransactionStatusByReference(ctx context.Context, arg SetTransactionStatusByReferenceParams) error {
+	_, err := q.db.Exec(ctx, setTransactionStatusByReference, arg.Reference, arg.Status)
+	return err
+}
+
 const updateTransactionStatus = `-- name: UpdateTransactionStatus :one
 UPDATE transactions
 SET status = $2, updated_at = NOW()

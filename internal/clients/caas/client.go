@@ -109,7 +109,10 @@ type ProvisionSCWResponse struct {
 // GET /v1/users/balance?phone_number=...
 type BalanceResponse struct {
 	// BalanceUSDC is the live USDC balance on the user's SCW (decimal string).
-	BalanceUSDC   string `json:"balance_usdc"`
+	BalanceUSDC string `json:"balance_usdc"`
+	// BalanceUSDT is the live USDT balance on the user's SCW (decimal string).
+	// CaaS supports both stablecoins equally and returns both on every read.
+	BalanceUSDT   string `json:"balance_usdt"`
 	WalletAddress string `json:"wallet_address"`
 }
 

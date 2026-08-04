@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -266,6 +267,12 @@ func (s *ManualMomoService) ConfirmDeposit(ctx context.Context, depositID, staff
 	if _, err := qtx.CreditAccount(ctx, db.CreditAccountParams{ID: dep.AccountID, Balance: amt}); err != nil {
 		return nil, fmt.Errorf("credit account: %w", err)
 	}
+	// Mirror the credit into the canonical transactions table (customer history).
+	if err := recordFiatTx(ctx, qtx, dep.AccountID, "MMD-"+dep.ID.String(), "deposit",
+		creditedS, dep.Currency, chargeS, "Mobile money deposit ("+dep.Provider+")", "completed",
+		map[string]any{"source": "manual_momo", "deposit_id": dep.ID.String(), "provider": dep.Provider}); err != nil {
+		return nil, fmt.Errorf("record deposit transaction: %w", err)
+	}
 	if err := tx.Commit(ctx); err != nil {
 		return nil, fmt.Errorf("commit confirm tx: %w", err)
 	}
@@ -364,6 +371,12 @@ func (s *ManualMomoService) RequestWithdrawal(ctx context.Context, in RequestWit
 	if err != nil {
 		return nil, fmt.Errorf("create manual withdrawal: %w", err)
 	}
+	// Mirror the held debit into the transactions table as pending (customer history).
+	if err := recordFiatTx(ctx, qtx, acc.ID, "MMW-"+w.ID.String(), "withdrawal",
+		amtStr(in.Amount), in.Currency, "0.00", "Mobile money cash-out to "+in.RecipientPhone, "pending",
+		map[string]any{"source": "manual_momo", "withdrawal_id": w.ID.String(), "provider": in.Provider}); err != nil {
+		return nil, fmt.Errorf("record withdrawal transaction: %w", err)
+	}
 	if err := tx.Commit(ctx); err != nil {
 		return nil, fmt.Errorf("commit withdrawal tx: %w", err)
 	}
@@ -420,6 +433,9 @@ func (s *ManualMomoService) CompleteWithdrawal(ctx context.Context, withdrawalID
 	if err != nil {
 		return nil, fmt.Errorf("complete manual withdrawal: %w", err)
 	}
+	if err := q.SetTransactionStatusByReference(ctx, db.SetTransactionStatusByReferenceParams{Reference: "MMW-" + w.ID.String(), Status: "completed"}); err != nil {
+		s.logger.Warn("manual momo: mark withdrawal transaction completed failed", zap.String("withdrawal_id", w.ID.String()), zap.Error(err))
+	}
 	s.notif.Create(ctx, CreateNotificationInput{
 		UserID: w.UserID,
 		Type:   NotifManualWithdrawalCompleted,
@@ -462,6 +478,10 @@ func (s *ManualMomoService) RejectWithdrawal(ctx context.Context, withdrawalID, 
 	}
 	if _, err := qtx.CreditAccount(ctx, db.CreditAccountParams{ID: w.AccountID, Balance: amt}); err != nil {
 		return nil, fmt.Errorf("refund held funds: %w", err)
+	}
+	// Mark the pending debit transaction reversed (funds returned).
+	if err := qtx.SetTransactionStatusByReference(ctx, db.SetTransactionStatusByReferenceParams{Reference: "MMW-" + w.ID.String(), Status: "reversed"}); err != nil {
+		return nil, fmt.Errorf("reverse withdrawal transaction: %w", err)
 	}
 	if err := tx.Commit(ctx); err != nil {
 		return nil, fmt.Errorf("commit reject tx: %w", err)
@@ -511,6 +531,20 @@ func staffPtr(id uuid.UUID) *uuid.UUID {
 		return nil
 	}
 	return &id
+}
+
+// recordFiatTx writes a row to the canonical transactions table so the movement
+// shows in the customer's activity feed / transaction history (which read only
+// from that table). Called inside the same DB transaction as the ledger change
+// so history and ledger stay consistent.
+func recordFiatTx(ctx context.Context, q *db.Queries, accountID uuid.UUID, ref, txType, amount, currency, fee, description, status string, meta map[string]any) error {
+	raw, _ := json.Marshal(meta)
+	desc := description
+	_, err := q.CreateFiatTransaction(ctx, db.CreateFiatTransactionParams{
+		ID: uuid.New(), AccountID: accountID, Reference: ref, Type: txType,
+		Amount: amount, Currency: currency, Fee: fee, Description: &desc, Status: status, Metadata: raw,
+	})
+	return err
 }
 
 // strPtrOrNil returns nil for an empty string so optional columns store NULL.

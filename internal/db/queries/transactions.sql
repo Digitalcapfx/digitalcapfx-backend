@@ -23,3 +23,8 @@ UPDATE transactions
 SET status = $2, updated_at = NOW()
 WHERE id = $1
 RETURNING *;
+
+-- name: SetTransactionStatusByReference :exec
+UPDATE transactions
+SET status = $2, updated_at = NOW()
+WHERE reference = $1;

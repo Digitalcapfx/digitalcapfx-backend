@@ -202,19 +202,32 @@ type CaasWalletResponse struct {
 	Data    CaasWalletData `json:"data"`
 }
 
+// TokenBalanceData is one stablecoin balance (USDC or USDT) on the SCW.
+type TokenBalanceData struct {
+	Symbol           string  `json:"symbol" example:"USDT"`
+	Name             string  `json:"name" example:"Stablecoin"`
+	Balance          float64 `json:"balance" example:"50"`
+	BalanceRaw       string  `json:"balance_raw" example:"50.000000"`
+	BalanceFormatted string  `json:"balance_formatted" example:"50.00 USDT"`
+}
+
 type BalanceData struct {
-	// Symbol is the customer-facing asset symbol (always "USDC").
+	// Tokens holds the per-stablecoin balances — USDC and USDT (CaaS supports both). Prefer this.
+	Tokens []TokenBalanceData `json:"tokens"`
+	// WalletAddress is the customer's on-chain SCW address (always present).
+	WalletAddress string `json:"wallet_address" example:"0x1234567890abcdef1234567890abcdef12345678"`
+	// Symbol is the back-compat asset symbol (USDC).
 	Symbol string `json:"symbol" example:"USDC"`
 	// Name is the customer-facing asset name (always "Stablecoin").
 	Name string `json:"name" example:"Stablecoin"`
-	// Balance is the numeric USDC balance.
+	// Balance is the numeric USDC balance (back-compat; see tokens for USDT).
 	Balance float64 `json:"balance" example:"100"`
 	// BalanceUSDC is the raw on-chain USDC balance (decimal string).
 	BalanceUSDC string `json:"balance_usdc" example:"100.000000"`
-	// BalanceFormatted is a display string, e.g. "100.00 USDC".
+	// BalanceUSDT is the raw on-chain USDT balance (decimal string).
+	BalanceUSDT string `json:"balance_usdt" example:"50.000000"`
+	// BalanceFormatted is a display string for USDC, e.g. "100.00 USDC".
 	BalanceFormatted string `json:"balance_formatted" example:"100.00 USDC"`
-	// WalletAddress is the customer's on-chain SCW address (always present).
-	WalletAddress string `json:"wallet_address" example:"0x1234567890abcdef1234567890abcdef12345678"`
 }
 
 type CryptoBalanceResponse struct {
