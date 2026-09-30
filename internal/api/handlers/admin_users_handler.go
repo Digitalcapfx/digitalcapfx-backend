@@ -155,6 +155,19 @@ func (h *AdminUsersHandler) DisableUser(w http.ResponseWriter, r *http.Request) 
 		"reason": body.Reason,
 	}, r.RemoteAddr)
 
+	// Notify the customer (in-app + push + email) that their account was disabled.
+	reasonLine := ""
+	if body.Reason != "" {
+		reasonLine = " Reason: " + body.Reason + "."
+	}
+	h.svc.Notifications.Create(r.Context(), services.CreateNotificationInput{
+		UserID: userID,
+		Type:   services.NotifAccountDisabled,
+		Title:  "Your account has been disabled",
+		Body:   "Your DigitalFX account has been disabled and access is currently suspended." + reasonLine + " Contact support if you believe this is a mistake.",
+		Metadata: map[string]string{"reason": body.Reason},
+	})
+
 	response.OKWithMessage(w, "user account has been disabled", nil)
 }
 
@@ -196,7 +209,51 @@ func (h *AdminUsersHandler) EnableUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	h.svc.Staff.LogAction(r.Context(), set, "user.enable", "user", userID.String(), nil, r.RemoteAddr)
+
+	h.svc.Notifications.Create(r.Context(), services.CreateNotificationInput{
+		UserID: userID,
+		Type:   services.NotifAccountEnabled,
+		Title:  "Your account has been re-enabled",
+		Body:   "Your DigitalFX account has been re-enabled. You can now sign in again.",
+	})
+
 	response.OKWithMessage(w, "user account has been re-enabled", nil)
+}
+
+// DeleteUser godoc
+//
+//	@Summary      Permanently delete a user (admin)
+//	@Description  Hard-deletes a user and EVERYTHING it entails — accounts, WaaS/CaaS wallets, transactions, swaps, KYC, notifications, cards, VTU, sessions, preferences, etc. — in a single transaction. Irreversible; intended for removing test users. If anything would be left dangling it rolls back and deletes nothing. Requires the `users:delete` permission.
+//	@Tags         admin-users
+//	@Produce      json
+//	@Security     BearerAuth
+//	@Param        id   path      string  true  "User ID"
+//	@Success      200  {object}  MessageResponse
+//	@Failure      404  {object}  ErrorResponse
+//	@Failure      500  {object}  ErrorResponse
+//	@Router       /admin/users/{id} [delete]
+func (h *AdminUsersHandler) DeleteUser(w http.ResponseWriter, r *http.Request) {
+	set, ok := middleware.StaffPermissionsFromContext(r.Context())
+	if !ok {
+		response.Forbidden(w, "staff permissions not loaded")
+		return
+	}
+	userID, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		response.BadRequest(w, "VALIDATION_ERROR", "invalid user id")
+		return
+	}
+	switch err := h.svc.UserManagement.HardDeleteUser(r.Context(), userID); err {
+	case nil:
+	case services.ErrUserNotFound:
+		response.NotFound(w, err.Error())
+		return
+	default:
+		response.InternalError(w)
+		return
+	}
+	h.svc.Staff.LogAction(r.Context(), set, "user.delete", "user", userID.String(), nil, r.RemoteAddr)
+	response.OKWithMessage(w, "user and all associated data have been permanently deleted", nil)
 }
 
 // ResetUserKYC godoc

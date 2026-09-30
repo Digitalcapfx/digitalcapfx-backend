@@ -114,7 +114,12 @@ func (s *InsightsService) GetInsights(ctx context.Context, userID uuid.UUID, per
 	accounts, _ := q.GetAccountsByUserID(ctx, userID)
 	for _, acc := range accounts {
 		bal := pgNumericToFloat(acc.Balance)
-		fiatUSD += bal / rates[acc.Currency]
+		// Guard the division: a missing/zero rate would yield NaN (0/0) or +Inf,
+		// which json.Marshal rejects — silently breaking the whole /insights
+		// response. Skip currencies we can't price.
+		if rate := rates[acc.Currency]; rate > 0 {
+			fiatUSD += bal / rate
+		}
 	}
 
 	// CaaS USDC.

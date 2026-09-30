@@ -23,6 +23,8 @@ sql:
           avatar_url: AvatarURL
           fiat_usd: FiatUSD
           crypto_usd: CryptoUSD
+          income_usd: IncomeUSD
+          spending_usd: SpendingUSD
           ip_address: IPAddress
           pending_kyc: PendingKYC
           approved_kyc: ApprovedKYC
@@ -75,6 +77,12 @@ sql:
               pointer: true
           - column: "crypto_transactions.amount"
             go_type: "string"
+          - column: "caas_swaps.amount_in"
+            go_type: "string"
+          - column: "caas_swaps.amount_out"
+            go_type:
+              type: "string"
+              pointer: true
           - column: "caas_withdrawals.amount"
             go_type: "string"
           - column: "card_transactions.amount"

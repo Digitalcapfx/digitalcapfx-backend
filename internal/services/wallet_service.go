@@ -260,6 +260,25 @@ func (s *WalletService) GetWalletByAddress(ctx context.Context, address string) 
 
 // CreditWaasDeposit credits a confirmed on-chain deposit to the user's fiat
 // account for the given currency. amountCents is the amount in hundredths.
+// CreditWaasDepositOnce credits a confirmed WaaS on-chain deposit into the user's
+// matching local ledger account exactly once, keyed on eventID (the WaaS
+// deposit_id) via processed_deposit_events. Returns true only on the first
+// delivery — a re-delivered webhook is a no-op that returns false, so the caller
+// neither double-credits nor re-notifies. Returns ErrAccountNotFound-style error
+// when the user has no account in that currency (the WaaS balance API stays
+// authoritative in that case).
+func (s *WalletService) CreditWaasDepositOnce(ctx context.Context, userID uuid.UUID, currency string, amount float64, eventID string) (bool, error) {
+	q := db.New(s.pool)
+	account, err := q.GetAccountByUserAndCurrency(ctx, db.GetAccountByUserAndCurrencyParams{
+		UserID:   userID,
+		Currency: currency,
+	})
+	if err != nil {
+		return false, fmt.Errorf("account not found for %s/%s: %w", userID, currency, err)
+	}
+	return creditDepositOnce(ctx, s.pool, "waas", eventID, account.ID, currency, amount)
+}
+
 func (s *WalletService) CreditWaasDeposit(ctx context.Context, userID uuid.UUID, currency string, amountCents int64, txHash string) error {
 	q := db.New(s.pool)
 

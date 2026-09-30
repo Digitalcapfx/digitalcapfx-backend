@@ -12,6 +12,115 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const adjustAccountBalanceByID = `-- name: AdjustAccountBalanceByID :one
+UPDATE accounts
+SET balance = balance + $2, available_balance = available_balance + $2, updated_at = NOW()
+WHERE id = $1
+RETURNING id, user_id, currency, balance, available_balance, account_number, status, created_at, updated_at, nilos_account_id, nilos_customer_id, iban, bic, sort_code, account_number_uk, nomba_account_ref, nomba_account_holder_id, nomba_bank_name, nomba_bank_account_number, nomba_bank_account_name
+`
+
+type AdjustAccountBalanceByIDParams struct {
+	ID      uuid.UUID      `json:"id"`
+	Balance pgtype.Numeric `json:"balance"`
+}
+
+// Admin delta adjustment (may be negative). No overdraft guard — an admin
+// override can intentionally take a balance negative for reconciliation.
+func (q *Queries) AdjustAccountBalanceByID(ctx context.Context, arg AdjustAccountBalanceByIDParams) (Account, error) {
+	row := q.db.QueryRow(ctx, adjustAccountBalanceByID, arg.ID, arg.Balance)
+	var i Account
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.Currency,
+		&i.Balance,
+		&i.AvailableBalance,
+		&i.AccountNumber,
+		&i.Status,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.NilosAccountID,
+		&i.NilosCustomerID,
+		&i.Iban,
+		&i.Bic,
+		&i.SortCode,
+		&i.AccountNumberUk,
+		&i.NombaAccountRef,
+		&i.NombaAccountHolderID,
+		&i.NombaBankName,
+		&i.NombaBankAccountNumber,
+		&i.NombaBankAccountName,
+	)
+	return i, err
+}
+
+const adminUpdateAccountBanking = `-- name: AdminUpdateAccountBanking :one
+UPDATE accounts SET
+    account_number            = COALESCE($2, account_number),
+    iban                      = COALESCE($3, iban),
+    bic                       = COALESCE($4, bic),
+    sort_code                 = COALESCE($5, sort_code),
+    account_number_uk         = COALESCE($6, account_number_uk),
+    nomba_bank_name           = COALESCE($7, nomba_bank_name),
+    nomba_bank_account_number = COALESCE($8, nomba_bank_account_number),
+    nomba_bank_account_name   = COALESCE($9, nomba_bank_account_name),
+    updated_at                = NOW()
+WHERE id = $1
+RETURNING id, user_id, currency, balance, available_balance, account_number, status, created_at, updated_at, nilos_account_id, nilos_customer_id, iban, bic, sort_code, account_number_uk, nomba_account_ref, nomba_account_holder_id, nomba_bank_name, nomba_bank_account_number, nomba_bank_account_name
+`
+
+type AdminUpdateAccountBankingParams struct {
+	ID                     uuid.UUID `json:"id"`
+	AccountNumber          *string   `json:"account_number"`
+	Iban                   *string   `json:"iban"`
+	Bic                    *string   `json:"bic"`
+	SortCode               *string   `json:"sort_code"`
+	AccountNumberUk        *string   `json:"account_number_uk"`
+	NombaBankName          *string   `json:"nomba_bank_name"`
+	NombaBankAccountNumber *string   `json:"nomba_bank_account_number"`
+	NombaBankAccountName   *string   `json:"nomba_bank_account_name"`
+}
+
+// Partial update of a customer account's banking details. NULL args leave the
+// existing value untouched.
+func (q *Queries) AdminUpdateAccountBanking(ctx context.Context, arg AdminUpdateAccountBankingParams) (Account, error) {
+	row := q.db.QueryRow(ctx, adminUpdateAccountBanking,
+		arg.ID,
+		arg.AccountNumber,
+		arg.Iban,
+		arg.Bic,
+		arg.SortCode,
+		arg.AccountNumberUk,
+		arg.NombaBankName,
+		arg.NombaBankAccountNumber,
+		arg.NombaBankAccountName,
+	)
+	var i Account
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.Currency,
+		&i.Balance,
+		&i.AvailableBalance,
+		&i.AccountNumber,
+		&i.Status,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.NilosAccountID,
+		&i.NilosCustomerID,
+		&i.Iban,
+		&i.Bic,
+		&i.SortCode,
+		&i.AccountNumberUk,
+		&i.NombaAccountRef,
+		&i.NombaAccountHolderID,
+		&i.NombaBankName,
+		&i.NombaBankAccountNumber,
+		&i.NombaBankAccountName,
+	)
+	return i, err
+}
+
 const createAccount = `-- name: CreateAccount :one
 INSERT INTO accounts (user_id, currency, account_number)
 VALUES ($1, $2, $3)
@@ -394,6 +503,90 @@ func (q *Queries) RecordDepositEvent(ctx context.Context, arg RecordDepositEvent
 		return 0, err
 	}
 	return result.RowsAffected(), nil
+}
+
+const setAccountBalanceByID = `-- name: SetAccountBalanceByID :one
+UPDATE accounts
+SET balance = $2, available_balance = $2, updated_at = NOW()
+WHERE id = $1
+RETURNING id, user_id, currency, balance, available_balance, account_number, status, created_at, updated_at, nilos_account_id, nilos_customer_id, iban, bic, sort_code, account_number_uk, nomba_account_ref, nomba_account_holder_id, nomba_bank_name, nomba_bank_account_number, nomba_bank_account_name
+`
+
+type SetAccountBalanceByIDParams struct {
+	ID      uuid.UUID      `json:"id"`
+	Balance pgtype.Numeric `json:"balance"`
+}
+
+// Admin absolute balance set. amount applies to both ledger and available.
+func (q *Queries) SetAccountBalanceByID(ctx context.Context, arg SetAccountBalanceByIDParams) (Account, error) {
+	row := q.db.QueryRow(ctx, setAccountBalanceByID, arg.ID, arg.Balance)
+	var i Account
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.Currency,
+		&i.Balance,
+		&i.AvailableBalance,
+		&i.AccountNumber,
+		&i.Status,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.NilosAccountID,
+		&i.NilosCustomerID,
+		&i.Iban,
+		&i.Bic,
+		&i.SortCode,
+		&i.AccountNumberUk,
+		&i.NombaAccountRef,
+		&i.NombaAccountHolderID,
+		&i.NombaBankName,
+		&i.NombaBankAccountNumber,
+		&i.NombaBankAccountName,
+	)
+	return i, err
+}
+
+const setAccountStatusByID = `-- name: SetAccountStatusByID :one
+UPDATE accounts
+SET status = $2, updated_at = NOW()
+WHERE id = $1
+RETURNING id, user_id, currency, balance, available_balance, account_number, status, created_at, updated_at, nilos_account_id, nilos_customer_id, iban, bic, sort_code, account_number_uk, nomba_account_ref, nomba_account_holder_id, nomba_bank_name, nomba_bank_account_number, nomba_bank_account_name
+`
+
+type SetAccountStatusByIDParams struct {
+	ID     uuid.UUID `json:"id"`
+	Status string    `json:"status"`
+}
+
+// Admin enable/disable of a single currency account. status is 'active' |
+// 'inactive' (the API keeps returning all accounts; the frontend hides
+// 'inactive' ones).
+func (q *Queries) SetAccountStatusByID(ctx context.Context, arg SetAccountStatusByIDParams) (Account, error) {
+	row := q.db.QueryRow(ctx, setAccountStatusByID, arg.ID, arg.Status)
+	var i Account
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.Currency,
+		&i.Balance,
+		&i.AvailableBalance,
+		&i.AccountNumber,
+		&i.Status,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.NilosAccountID,
+		&i.NilosCustomerID,
+		&i.Iban,
+		&i.Bic,
+		&i.SortCode,
+		&i.AccountNumberUk,
+		&i.NombaAccountRef,
+		&i.NombaAccountHolderID,
+		&i.NombaBankName,
+		&i.NombaBankAccountNumber,
+		&i.NombaBankAccountName,
+	)
+	return i, err
 }
 
 const sumAccountBalanceByCurrency = `-- name: SumAccountBalanceByCurrency :one

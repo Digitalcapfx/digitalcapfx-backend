@@ -266,6 +266,10 @@ func (s *AuthService) Register(ctx context.Context, in RegisterInput) (*token.Pa
 		}()
 	}
 
+	// Notify the ops inbox of every new customer, regardless of whether they
+	// supplied an email themselves.
+	go s.notifyAdminNewSignup(user.FirstName, user.LastName, user.PhoneNumber, user.Email, user.AccountType, "phone")
+
 	return pair, nil
 }
 
@@ -439,6 +443,8 @@ func (s *AuthService) GoogleSignIn(ctx context.Context, in GoogleSignInInput) (*
 	}
 
 	go s.sendWelcomeEmail(info.Email, googleUser.FirstName)
+	emailForAdmin := info.Email
+	go s.notifyAdminNewSignup(googleUser.FirstName, googleUser.LastName, googleUser.PhoneNumber, &emailForAdmin, googleUser.AccountType, "google")
 
 	return &GoogleSignInResult{Pair: pair, IsNewUser: true}, nil
 }
@@ -909,6 +915,42 @@ func (s *AuthService) sendWelcomeEmail(toEmail, firstName string) {
 	subj, html := email.Welcome(toEmail, firstName)
 	if err := s.emailClient.Send(toEmail, subj, html); err != nil {
 		s.logger.Error("send welcome email", zap.String("to", toEmail), zap.Error(err))
+	}
+}
+
+// notifyAdminNewSignup emails the ops inbox (ADMIN_NOTIFY_EMAIL) whenever a new
+// customer completes signup. Best-effort; never blocks registration. Fires for
+// every signup, even when the customer supplied no email of their own.
+func (s *AuthService) notifyAdminNewSignup(firstName, lastName, phone string, custEmail *string, accountType, method string) {
+	admin := s.cfg.App.AdminNotifyEmail
+	if admin == "" || s.emailClient == nil {
+		return
+	}
+	name := strings.TrimSpace(firstName + " " + lastName)
+	if name == "" {
+		name = phone
+	}
+	custEmailStr := "—"
+	if custEmail != nil && *custEmail != "" {
+		custEmailStr = *custEmail
+	}
+	if accountType == "" {
+		accountType = "individual"
+	}
+	subject := "New customer signup: " + name
+	body := fmt.Sprintf(`<div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto;color:#111">
+  <h2 style="margin:0 0 12px">New customer signup</h2>
+  <table style="font-size:14px;line-height:1.9;border-collapse:collapse">
+    <tr><td style="color:#666;padding-right:16px">Name</td><td><strong>%s</strong></td></tr>
+    <tr><td style="color:#666;padding-right:16px">Phone</td><td>%s</td></tr>
+    <tr><td style="color:#666;padding-right:16px">Email</td><td>%s</td></tr>
+    <tr><td style="color:#666;padding-right:16px">Account type</td><td>%s</td></tr>
+    <tr><td style="color:#666;padding-right:16px">Signup method</td><td>%s</td></tr>
+    <tr><td style="color:#666;padding-right:16px">When</td><td>%s</td></tr>
+  </table>
+</div>`, name, phone, custEmailStr, accountType, method, time.Now().UTC().Format("02 Jan 2006 15:04 UTC"))
+	if err := s.emailClient.Send(admin, subject, body); err != nil {
+		s.logger.Error("send new-signup admin email", zap.String("to", admin), zap.Error(err))
 	}
 }
 

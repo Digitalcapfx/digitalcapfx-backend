@@ -16,6 +16,12 @@ type Querier interface {
 	AcceptMerchantStaffInvite(ctx context.Context, arg AcceptMerchantStaffInviteParams) error
 	AcceptStaffInvite(ctx context.Context, arg AcceptStaffInviteParams) error
 	AcceptStaffInviteByID(ctx context.Context, arg AcceptStaffInviteByIDParams) error
+	// Admin delta adjustment (may be negative). No overdraft guard — an admin
+	// override can intentionally take a balance negative for reconciliation.
+	AdjustAccountBalanceByID(ctx context.Context, arg AdjustAccountBalanceByIDParams) (Account, error)
+	// Partial update of a customer account's banking details. NULL args leave the
+	// existing value untouched.
+	AdminUpdateAccountBanking(ctx context.Context, arg AdminUpdateAccountBankingParams) (Account, error)
 	CompleteManualWithdrawal(ctx context.Context, arg CompleteManualWithdrawalParams) (ManualWithdrawal, error)
 	ConfirmManualDeposit(ctx context.Context, arg ConfirmManualDepositParams) (ManualDeposit, error)
 	CountActiveVirtualCards(ctx context.Context, userID uuid.UUID) (int64, error)
@@ -33,6 +39,7 @@ type Querier interface {
 	// Business profile queries
 	CreateBusinessProfile(ctx context.Context, arg CreateBusinessProfileParams) (BusinessProfile, error)
 	CreateBusinessUser(ctx context.Context, arg CreateBusinessUserParams) (User, error)
+	CreateCaasSwap(ctx context.Context, arg CreateCaasSwapParams) (CaasSwap, error)
 	// ─── CaaS wallet queries ──────────────────────────────────────────────────────
 	CreateCaasWalletFull(ctx context.Context, arg CreateCaasWalletFullParams) (CaasWallet, error)
 	// ─── CaaS withdrawal queries ──────────────────────────────────────────────────
@@ -103,12 +110,16 @@ type Querier interface {
 	// crypto from live balances.
 	GetBalanceTrend(ctx context.Context, arg GetBalanceTrendParams) ([]GetBalanceTrendRow, error)
 	GetBusinessProfileByUserID(ctx context.Context, userID uuid.UUID) (BusinessProfile, error)
+	GetCaasSwapByCaasID(ctx context.Context, caasSwapID *string) (CaasSwap, error)
+	GetCaasSwapByID(ctx context.Context, id uuid.UUID) (CaasSwap, error)
+	GetCaasSwapByReference(ctx context.Context, reference string) (CaasSwap, error)
 	GetCaasWalletByAddress(ctx context.Context, abstractionAddress string) (CaasWallet, error)
 	GetCaasWalletByBlindIndex(ctx context.Context, blindIndex *string) (CaasWallet, error)
 	GetCaasWalletByUserID(ctx context.Context, userID uuid.UUID) (CaasWallet, error)
 	GetCaasWithdrawalByCaasID(ctx context.Context, caasWithdrawalID string) (CaasWithdrawal, error)
 	GetCaasWithdrawalByID(ctx context.Context, id uuid.UUID) (CaasWithdrawal, error)
 	GetCaasWithdrawalByIdempotencyKey(ctx context.Context, idempotencyKey string) (CaasWithdrawal, error)
+	GetCryptoTransactionByCaasTransferID(ctx context.Context, caasTransferID *string) (CryptoTransaction, error)
 	GetCryptoTransactionByID(ctx context.Context, id uuid.UUID) (CryptoTransaction, error)
 	// ─── crypto_transactions CaaS extras ─────────────────────────────────────────
 	// (CreateCryptoTransaction is defined in the existing stub; the params struct is
@@ -135,6 +146,11 @@ type Querier interface {
 	GetMetamapVerificationByUserID(ctx context.Context, userID uuid.UUID) (MetamapVerification, error)
 	GetMomoAccount(ctx context.Context, id uuid.UUID) (ManualMomoAccount, error)
 	GetMonthlyFlow(ctx context.Context, arg GetMonthlyFlowParams) ([]GetMonthlyFlowRow, error)
+	// Current-month income vs spending across BOTH fiat ledger and CaaS stablecoin
+	// movements, classified by type/direction (not by sign). USDC/USDT are treated
+	// as USD 1:1; fiat amounts are taken at face value (same simplification the rest
+	// of insights uses).
+	GetMonthlyTransactionSummary(ctx context.Context, userID uuid.UUID) (GetMonthlyTransactionSummaryRow, error)
 	GetPlatformLimit(ctx context.Context, tier string) (PlatformLimit, error)
 	GetPointsBalance(ctx context.Context, userID uuid.UUID) (int64, error)
 	GetPointsHistory(ctx context.Context, arg GetPointsHistoryParams) ([]PointsLedger, error)
@@ -183,10 +199,16 @@ type Querier interface {
 	// ─── Business mobile-money collection accounts ───────────────────────────────
 	ListActiveMomoAccounts(ctx context.Context) ([]ManualMomoAccount, error)
 	ListActiveSessionsByUserID(ctx context.Context, userID uuid.UUID) ([]UserSession, error)
+	// Activity feed = a unified view over EVERY money movement for a user:
+	//   • fiat ledger      → transactions            (internal transfers, deposits, exchanges, withdrawals)
+	//   • CaaS stablecoin  → crypto_transactions     (USDC/USDT sends & receives, direction relative to the user)
+	//   • CaaS swaps       → caas_swaps              (USDC ⇄ USDT)
+	// Column set is fixed so the generated row struct stays stable for activity_service.go.
 	ListActivity(ctx context.Context, arg ListActivityParams) ([]ListActivityRow, error)
 	ListAdminAuditLogs(ctx context.Context, arg ListAdminAuditLogsParams) ([]AdminAuditLog, error)
 	ListAllMomoAccounts(ctx context.Context) ([]ManualMomoAccount, error)
 	ListBusinessDirectors(ctx context.Context, userID uuid.UUID) ([]BusinessDirector, error)
+	ListCaasSwapsByUser(ctx context.Context, arg ListCaasSwapsByUserParams) ([]CaasSwap, error)
 	ListCaasWithdrawalsByUser(ctx context.Context, arg ListCaasWithdrawalsByUserParams) ([]CaasWithdrawal, error)
 	ListCardTransactions(ctx context.Context, cardID uuid.UUID) ([]CardTransaction, error)
 	ListCryptoTransactionsByUser(ctx context.Context, arg ListCryptoTransactionsByUserParams) ([]CryptoTransaction, error)
@@ -229,6 +251,12 @@ type Querier interface {
 	// values into any existing draft (last-write-wins per key) and never downgrades
 	// a submitted intake back to draft.
 	SaveKYCIntakeDraft(ctx context.Context, arg SaveKYCIntakeDraftParams) (KycIntake, error)
+	// Admin absolute balance set. amount applies to both ledger and available.
+	SetAccountBalanceByID(ctx context.Context, arg SetAccountBalanceByIDParams) (Account, error)
+	// Admin enable/disable of a single currency account. status is 'active' |
+	// 'inactive' (the API keeps returning all accounts; the frontend hides
+	// 'inactive' ones).
+	SetAccountStatusByID(ctx context.Context, arg SetAccountStatusByIDParams) (Account, error)
 	// Flags (or clears) admin manual control over a user's KYC decision.
 	SetKycManualOverride(ctx context.Context, arg SetKycManualOverrideParams) error
 	// Records the KYC provider's latest automated decision (does not touch the
@@ -241,6 +269,8 @@ type Querier interface {
 	SetUserAccountType(ctx context.Context, arg SetUserAccountTypeParams) (SetUserAccountTypeRow, error)
 	SetUserBVN(ctx context.Context, arg SetUserBVNParams) (User, error)
 	SumAccountBalanceByCurrency(ctx context.Context, currency string) (pgtype.Numeric, error)
+	UpdateCaasSwapCaasID(ctx context.Context, arg UpdateCaasSwapCaasIDParams) (CaasSwap, error)
+	UpdateCaasSwapResult(ctx context.Context, arg UpdateCaasSwapResultParams) (CaasSwap, error)
 	UpdateCaasWalletPhone(ctx context.Context, arg UpdateCaasWalletPhoneParams) error
 	UpdateCaasWithdrawalStatus(ctx context.Context, arg UpdateCaasWithdrawalStatusParams) (CaasWithdrawal, error)
 	UpdateCryptoTransactionCaasResult(ctx context.Context, arg UpdateCryptoTransactionCaasResultParams) (CryptoTransaction, error)

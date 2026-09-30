@@ -31,3 +31,4 @@ coverage.html
 /test_nilos.go
 /test_nilos_endpoints.go
 /find_missing_swag.go
+caas_doc.json

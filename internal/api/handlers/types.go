@@ -312,6 +312,27 @@ type InternalTransferRequest struct {
 	Description   string  `json:"description" example:"Monthly payment"`
 }
 
+// SwapRequest is the body for a USDC ⇄ USDT swap on the user's Stablecoin (CaaS) wallet.
+type SwapRequest struct {
+	TokenIn  string `json:"token_in" example:"USDC"`
+	TokenOut string `json:"token_out" example:"USDT"`
+	Amount   string `json:"amount" example:"100.00"`
+}
+
+// SwapResponse mirrors a caas_swaps record: the recorded swap and its lifecycle status.
+type SwapResponse struct {
+	ID         string  `json:"id" example:"7b2c…"`
+	Reference  string  `json:"reference" example:"SWAP-1a2b3c4d"`
+	TokenIn    string  `json:"token_in" example:"USDC"`
+	TokenOut   string  `json:"token_out" example:"USDT"`
+	AmountIn   string  `json:"amount_in" example:"100.00"`
+	AmountOut  *string `json:"amount_out" example:"99.80"`
+	Status     string  `json:"status" example:"processing"` // pending|processing|settled|failed
+	CaasSwapID *string `json:"caas_swap_id" example:"rach_swap_abc123"`
+	TxHash     *string `json:"tx_hash" example:"0x…"`
+	CreatedAt  string  `json:"created_at"`
+}
+
 type Hub2PaymentRequest struct {
 	Currency string  `json:"currency" example:"XAF"`
 	Amount   float64 `json:"amount" example:"5000"`

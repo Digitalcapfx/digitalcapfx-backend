@@ -2,7 +2,9 @@ package services
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -12,6 +14,22 @@ import (
 	"github.com/rachfinance/digitalfx/internal/clients/hub2"
 	db "github.com/rachfinance/digitalfx/internal/db/sqlc"
 )
+
+var (
+	// ErrUnsupportedToken is returned when a token is not USDC or USDT.
+	ErrUnsupportedToken = errors.New("token must be USDC or USDT")
+	// ErrSameSwapToken is returned when token_in equals token_out.
+	ErrSameSwapToken = errors.New("token_in and token_out must differ")
+	// ErrSwapInvalidAmount is returned for a missing or non-positive swap amount.
+	ErrSwapInvalidAmount = errors.New("amount must be greater than zero")
+	// ErrSwapNotFound is returned when a swap does not exist or is not owned by the caller.
+	ErrSwapNotFound = errors.New("swap not found")
+	// ErrTransferNotFound is returned when a CaaS transfer cannot be matched to a local record.
+	ErrTransferNotFound = errors.New("transfer not found")
+)
+
+// isStableToken reports whether t is one of the two supported CaaS stablecoins.
+func isStableToken(t string) bool { return t == "USDC" || t == "USDT" }
 
 // The CaaS balance settles on-chain as USDC. It is presented to customers as
 // USDC with the human-readable name "Stablecoin" (previously branded "iUSD" /
@@ -328,6 +346,256 @@ func (s *CaaSService) ListTransactions(ctx context.Context, userID uuid.UUID, pa
 		Limit:          perPage,
 		Offset:         (page - 1) * perPage,
 	})
+}
+
+// ─── Swap (USDC ⇄ USDT) ───────────────────────────────────────────────────────
+
+type SwapCryptoInput struct {
+	UserID   uuid.UUID
+	Phone    string // authenticated user's SCW phone (E.164)
+	TokenIn  string // USDC | USDT — token to spend
+	TokenOut string // USDC | USDT — token to receive (must differ from TokenIn)
+	Amount   string // input token amount, decimal string e.g. "100.00"
+}
+
+// Swap converts one stablecoin to the other on the user's SCW via the CaaS
+// /v1/swaps endpoint. CaaS settles asynchronously on-chain, so we record the
+// swap as `pending`, submit it, store the returned swap_id, and finalise the
+// record from the swap.settled / swap.failed webhook (or a status poll).
+func (s *CaaSService) Swap(ctx context.Context, in SwapCryptoInput) (*db.CaasSwap, error) {
+	in.TokenIn = strings.ToUpper(strings.TrimSpace(in.TokenIn))
+	in.TokenOut = strings.ToUpper(strings.TrimSpace(in.TokenOut))
+	in.Amount = strings.TrimSpace(in.Amount)
+	if !isStableToken(in.TokenIn) || !isStableToken(in.TokenOut) {
+		return nil, ErrUnsupportedToken
+	}
+	if in.TokenIn == in.TokenOut {
+		return nil, ErrSameSwapToken
+	}
+	if in.Amount == "" || in.Amount == "0" {
+		return nil, ErrSwapInvalidAmount
+	}
+
+	q := db.New(s.pool)
+	ref := fmt.Sprintf("SWAP-%s", uuid.New().String()[:8])
+
+	// Record intent first so a webhook racing the HTTP response still finds a row.
+	swap, err := q.CreateCaasSwap(ctx, db.CreateCaasSwapParams{
+		Reference:      ref,
+		UserID:         in.UserID,
+		TokenIn:        in.TokenIn,
+		TokenOut:       in.TokenOut,
+		AmountIn:       in.Amount,
+		Status:         "pending",
+		IdempotencyKey: &ref,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("record swap: %w", err)
+	}
+
+	resp, err := s.caasClient.Swap(ctx, caas.SwapRequest{
+		SenderPhone:    in.Phone,
+		TokenIn:        caas.Token(in.TokenIn),
+		TokenOut:       caas.Token(in.TokenOut),
+		Amount:         in.Amount,
+		IdempotencyKey: ref,
+	})
+	if err != nil {
+		// Mark the local record failed so it doesn't sit pending forever.
+		if _, uerr := q.UpdateCaasSwapResult(ctx, db.UpdateCaasSwapResultParams{
+			ID: swap.ID, Status: "failed", AmountOut: nil, TxHash: nil,
+		}); uerr != nil {
+			s.logger.Warn("mark swap failed after caas error", zap.String("reference", ref), zap.Error(uerr))
+		}
+		return nil, fmt.Errorf("caas swap: %w", err)
+	}
+
+	status := resp.Status
+	if status == "" {
+		status = "processing"
+	}
+	caasID := resp.SwapID
+	updated, err := q.UpdateCaasSwapCaasID(ctx, db.UpdateCaasSwapCaasIDParams{
+		ID:         swap.ID,
+		CaasSwapID: &caasID,
+		Status:     status,
+	})
+	if err != nil {
+		// Non-fatal: the swap is submitted; return the pre-update record.
+		s.logger.Warn("update swap caas id", zap.String("reference", ref), zap.Error(err))
+		return &swap, nil
+	}
+	return &updated, nil
+}
+
+// ListSwaps returns a user's swap history, most recent first.
+func (s *CaaSService) ListSwaps(ctx context.Context, userID uuid.UUID, page, perPage int32) ([]db.CaasSwap, error) {
+	if perPage <= 0 {
+		perPage = 20
+	}
+	if page <= 0 {
+		page = 1
+	}
+	q := db.New(s.pool)
+	return q.ListCaasSwapsByUser(ctx, db.ListCaasSwapsByUserParams{
+		UserID: userID,
+		Limit:  perPage,
+		Offset: (page - 1) * perPage,
+	})
+}
+
+// GetSwap returns a single swap by its local id, scoped to the owner.
+func (s *CaaSService) GetSwap(ctx context.Context, userID, swapID uuid.UUID) (*db.CaasSwap, error) {
+	q := db.New(s.pool)
+	swap, err := q.GetCaasSwapByID(ctx, swapID)
+	if err != nil {
+		return nil, ErrSwapNotFound
+	}
+	if swap.UserID != userID {
+		return nil, ErrSwapNotFound
+	}
+	return &swap, nil
+}
+
+// RefreshSwap polls CaaS for the latest status of a non-terminal swap and
+// persists any change. Safe to call on already-terminal swaps (no-op).
+func (s *CaaSService) RefreshSwap(ctx context.Context, userID, swapID uuid.UUID) (*db.CaasSwap, error) {
+	swap, err := s.GetSwap(ctx, userID, swapID)
+	if err != nil {
+		return nil, err
+	}
+	if isTerminalSwapStatus(swap.Status) || swap.CaasSwapID == nil || *swap.CaasSwapID == "" {
+		return swap, nil
+	}
+	st, err := s.caasClient.GetSwapStatus(ctx, *swap.CaasSwapID)
+	if err != nil {
+		return swap, nil // best-effort — return what we have
+	}
+	return s.applySwapStatus(ctx, swap.ID, st.Status, st.AmountOut, st.TxHash)
+}
+
+// applySwapStatus normalises a CaaS status and persists the swap result. Shared
+// by the poll path (RefreshSwap) and the swap.settled / swap.failed webhook.
+func (s *CaaSService) applySwapStatus(ctx context.Context, id uuid.UUID, rawStatus, amountOut, txHash string) (*db.CaasSwap, error) {
+	status := normaliseSwapStatus(rawStatus)
+	var amtPtr, hashPtr *string
+	if amountOut != "" {
+		amtPtr = &amountOut
+	}
+	if txHash != "" {
+		hashPtr = &txHash
+	}
+	updated, err := db.New(s.pool).UpdateCaasSwapResult(ctx, db.UpdateCaasSwapResultParams{
+		ID: id, Status: status, AmountOut: amtPtr, TxHash: hashPtr,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("update swap result: %w", err)
+	}
+	return &updated, nil
+}
+
+func isTerminalSwapStatus(s string) bool { return s == "settled" || s == "failed" }
+
+// normaliseSwapStatus maps CaaS status strings onto our canonical set.
+func normaliseSwapStatus(s string) string {
+	switch strings.ToLower(strings.TrimSpace(s)) {
+	case "settled", "completed", "success", "succeeded", "confirmed":
+		return "settled"
+	case "failed", "error", "reverted":
+		return "failed"
+	case "", "pending", "processing", "queued", "submitted":
+		return "processing"
+	default:
+		return strings.ToLower(s)
+	}
+}
+
+// ─── Webhook appliers (called by the CaaS webhook receiver) ───────────────────
+
+// WalletOwner resolves a CaaS smart-contract wallet address (0x…) to the local
+// user who owns it. Used by the transfer.received webhook, which identifies the
+// recipient by wallet address rather than phone.
+func (s *CaaSService) WalletOwner(ctx context.Context, address string) (uuid.UUID, bool) {
+	if address == "" {
+		return uuid.Nil, false
+	}
+	w, err := db.New(s.pool).GetCaasWalletByAddress(ctx, address)
+	if err != nil {
+		return uuid.Nil, false
+	}
+	return w.UserID, true
+}
+
+// ApplySwapWebhook finalises a swap from a swap.settled / swap.failed webhook.
+// It resolves the local swap by the CaaS swap_id and persists the terminal
+// status, output amount and on-chain tx hash. Returns the updated swap (whose
+// UserID the caller uses to notify the owner).
+func (s *CaaSService) ApplySwapWebhook(ctx context.Context, caasSwapID, status, amountOut, txHash string) (*db.CaasSwap, error) {
+	if caasSwapID == "" {
+		return nil, ErrSwapNotFound
+	}
+	swap, err := db.New(s.pool).GetCaasSwapByCaasID(ctx, &caasSwapID)
+	if err != nil {
+		return nil, ErrSwapNotFound
+	}
+	return s.applySwapStatus(ctx, swap.ID, status, amountOut, txHash)
+}
+
+// ApplyTransferWebhook finalises an outbound CaaS transfer from a
+// transfer.settled / transfer.failed webhook. It resolves the local crypto
+// transaction by the CaaS transfer_id (falling back to the reference /
+// idempotency key) and updates its status and on-chain tx hash. Returns the
+// updated transaction (whose SenderUserID the caller uses to notify the sender).
+func (s *CaaSService) ApplyTransferWebhook(ctx context.Context, transferID, reference, status, txHash string) (*db.CryptoTransaction, error) {
+	q := db.New(s.pool)
+
+	var tx db.CryptoTransaction
+	var err error
+	switch {
+	case transferID != "":
+		tx, err = q.GetCryptoTransactionByCaasTransferID(ctx, &transferID)
+	default:
+		err = ErrTransferNotFound
+	}
+	// Fall back to the reference / idempotency key when the transfer_id lookup misses.
+	if err != nil && reference != "" {
+		tx, err = q.GetCryptoTransactionByIdempotencyKey(ctx, &reference)
+	}
+	if err != nil {
+		return nil, ErrTransferNotFound
+	}
+
+	newStatus := normaliseTransferStatus(status)
+	// Keep the existing on-chain hash if the webhook didn't carry one.
+	hashPtr := tx.TxHash
+	if txHash != "" {
+		hashPtr = &txHash
+	}
+	caasID := tx.CaasTransferID
+	if transferID != "" {
+		caasID = &transferID
+	}
+	updated, err := q.UpdateCryptoTransactionCaasResult(ctx, db.UpdateCryptoTransactionCaasResultParams{
+		ID: tx.ID, Status: newStatus, TxHash: hashPtr, CaasTransferID: caasID,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("update transfer status: %w", err)
+	}
+	return &updated, nil
+}
+
+// normaliseTransferStatus maps CaaS transfer status strings onto our canonical set.
+func normaliseTransferStatus(s string) string {
+	switch strings.ToLower(strings.TrimSpace(s)) {
+	case "settled", "completed", "success", "succeeded", "confirmed":
+		return "completed"
+	case "failed", "error", "reverted":
+		return "failed"
+	case "", "pending", "processing", "queued", "submitted":
+		return "processing"
+	default:
+		return strings.ToLower(s)
+	}
 }
 
 type WithdrawCryptoInput struct {

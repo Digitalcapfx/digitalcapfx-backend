@@ -71,6 +71,9 @@ LIMIT $2 OFFSET $3;
 -- name: GetCryptoTransactionByIdempotencyKey :one
 SELECT * FROM crypto_transactions WHERE idempotency_key = $1 LIMIT 1;
 
+-- name: GetCryptoTransactionByCaasTransferID :one
+SELECT * FROM crypto_transactions WHERE caas_transfer_id = $1 LIMIT 1;
+
 -- name: UpdateCryptoTransactionCaasResult :one
 UPDATE crypto_transactions
 SET status = $2, tx_hash = $3, caas_transfer_id = $4, updated_at = NOW()

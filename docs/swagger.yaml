@@ -345,6 +345,41 @@ definitions:
         example: true
         type: boolean
     type: object
+  handlers.AdminAccountStatusRequest:
+    properties:
+      enabled:
+        example: false
+        type: boolean
+    type: object
+  handlers.AdminBalanceChangeRequest:
+    properties:
+      amount:
+        description: 'set: absolute; adjust: signed delta'
+        example: 100
+        type: number
+      mode:
+        description: '"set" | "adjust"'
+        example: adjust
+        type: string
+      reason:
+        example: 'Goodwill credit for support ticket #123'
+        type: string
+    type: object
+  handlers.AdminBalanceChangeResponse:
+    properties:
+      delta:
+        example: 100
+        type: number
+      new_balance:
+        example: 150
+        type: number
+      previous_balance:
+        example: 50
+        type: number
+      reference:
+        example: ADJ-1a2b3c4d
+        type: string
+    type: object
   handlers.AdminKYCRejectRequest:
     properties:
       reason:
@@ -367,6 +402,25 @@ definitions:
         type: string
       target_currency:
         description: e.g. "XAF"
+        type: string
+    type: object
+  handlers.AdminUpdateBankingRequest:
+    properties:
+      account_number:
+        type: string
+      account_number_uk:
+        type: string
+      bic:
+        type: string
+      iban:
+        type: string
+      nomba_bank_account_name:
+        type: string
+      nomba_bank_account_number:
+        type: string
+      nomba_bank_name:
+        type: string
+      sort_code:
         type: string
     type: object
   handlers.BalanceData:
@@ -447,24 +501,49 @@ definitions:
     type: object
   handlers.CaasWebhookPayload:
     properties:
-      data:
-        properties:
-          amount:
-            type: string
-          blind_index:
-            type: string
-          currency:
-            type: string
-          phone:
-            type: string
-          reference:
-            type: string
-          status:
-            type: string
-          tx_hash:
-            type: string
-        type: object
+      amount_in:
+        type: string
+      amount_usdc:
+        type: string
+      changed_at:
+        type: string
+      changed_by_merchant_id:
+        type: string
       event:
+        type: string
+      linked_at:
+        type: string
+      new_merchant_id:
+        type: string
+      reason:
+        description: present on *.failed
+        type: string
+      recipient_wallet:
+        type: string
+      settled_at:
+        description: Timestamps (RFC3339 UTC).
+        type: string
+      status:
+        description: Common terminal fields.
+        type: string
+      swap_id:
+        description: swap.* fields.
+        type: string
+      token:
+        type: string
+      token_in:
+        type: string
+      token_out:
+        type: string
+      transfer_id:
+        description: transfer.* — recipient is addressed by wallet, amount is amount_usdc.
+        type: string
+      tx_hash:
+        type: string
+      updated_at:
+        type: string
+      wallet_address:
+        description: Account / membership events.
         type: string
     type: object
   handlers.CompleteMomoWithdrawalRequest:
@@ -1260,8 +1339,12 @@ definitions:
         type: string
       customer_id:
         type: string
+      deposit_id:
+        type: integer
       detected_at:
         type: string
+      hash_pending:
+        type: boolean
       network:
         type: string
       safe_to_credit:
@@ -1714,6 +1797,51 @@ definitions:
       to_chain:
         type: string
       to_token:
+        type: string
+    type: object
+  handlers.SwapRequest:
+    properties:
+      amount:
+        example: "100.00"
+        type: string
+      token_in:
+        example: USDC
+        type: string
+      token_out:
+        example: USDT
+        type: string
+    type: object
+  handlers.SwapResponse:
+    properties:
+      amount_in:
+        example: "100.00"
+        type: string
+      amount_out:
+        example: "99.80"
+        type: string
+      caas_swap_id:
+        example: rach_swap_abc123
+        type: string
+      created_at:
+        type: string
+      id:
+        example: 7b2c…
+        type: string
+      reference:
+        example: SWAP-1a2b3c4d
+        type: string
+      status:
+        description: pending|processing|settled|failed
+        example: processing
+        type: string
+      token_in:
+        example: USDC
+        type: string
+      token_out:
+        example: USDT
+        type: string
+      tx_hash:
+        example: 0x…
         type: string
     type: object
   handlers.TOTPLoginRequest:
@@ -3293,7 +3421,8 @@ paths:
         crypto, stablecoin). Results are grouped by calendar day (Today / Yesterday
         / Monday / …). Supports a type filter tab and full-text search.
       parameters:
-      - description: Filter
+      - description: Filter tab — matches each item's returned 'type' value (raw ledger
+          types are also accepted)
         enum:
         - sent
         - received
@@ -3442,6 +3571,182 @@ paths:
       security:
       - BearerAuth: []
       summary: Set a currency's rates (admin)
+      tags:
+      - admin
+  /admin/customers/{id}/accounts:
+    get:
+      description: Returns every ledger account for a customer across all currencies
+        (USD/GBP/EUR/NGN/XAF/XOF), including banking details, balances and status.
+        Nothing is filtered — disabled ('inactive') accounts are returned too, so
+        you can re-enable them. Requires the `accounts:view` permission.
+      parameters:
+      - description: Customer user UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.AccountListResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List a customer's accounts (admin)
+      tags:
+      - admin
+  /admin/customers/{id}/accounts/{currency}/balance:
+    post:
+      consumes:
+      - application/json
+      description: Sets an absolute balance (mode="set") or applies a signed delta
+        (mode="adjust") to a customer's account. A reason is required. The change
+        is audit-logged and records a matching ledger transaction so it appears in
+        the customer's activity. Requires the `accounts:balance` permission.
+      parameters:
+      - description: Customer user UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Currency code
+        in: path
+        name: currency
+        required: true
+        type: string
+      - description: Balance change
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.AdminBalanceChangeRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.AdminBalanceChangeResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Set or adjust a customer's ledger balance (admin)
+      tags:
+      - admin
+  /admin/customers/{id}/accounts/{currency}/banking:
+    patch:
+      consumes:
+      - application/json
+      description: Partial update of a customer's banking details for one currency.
+        Only the fields you send are changed. Requires the `accounts:banking` permission.
+      parameters:
+      - description: Customer user UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Currency code (USD/GBP/EUR/NGN/XAF/XOF)
+        in: path
+        name: currency
+        required: true
+        type: string
+      - description: Banking fields to update
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.AdminUpdateBankingRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.AccountResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Update a customer account's banking details (admin)
+      tags:
+      - admin
+  /admin/customers/{id}/accounts/{currency}/status:
+    post:
+      consumes:
+      - application/json
+      description: Enables or disables a specific currency account for a customer.
+        The account is still returned by the API; the `status` flag ('active'/'inactive')
+        tells the frontend whether to show it. Requires the `accounts:status` permission.
+      parameters:
+      - description: Customer user UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Currency code
+        in: path
+        name: currency
+        required: true
+        type: string
+      - description: Enable or disable
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.AdminAccountStatusRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.AccountResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Enable/disable a customer's currency account (admin)
       tags:
       - admin
   /admin/dashboard:
@@ -4688,6 +4993,38 @@ paths:
       tags:
       - admin-users
   /admin/users/{id}:
+    delete:
+      description: Hard-deletes a user and EVERYTHING it entails — accounts, WaaS/CaaS
+        wallets, transactions, swaps, KYC, notifications, cards, VTU, sessions, preferences,
+        etc. — in a single transaction. Irreversible; intended for removing test users.
+        If anything would be left dangling it rolls back and deletes nothing. Requires
+        the `users:delete` permission.
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.MessageResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Permanently delete a user (admin)
+      tags:
+      - admin-users
     get:
       description: Returns complete user profile including fiat accounts, WaaS wallets,
         CaaS wallet status, KYC state, and lifetime transaction stats.
@@ -5734,6 +6071,108 @@ paths:
       security:
       - BearerAuth: []
       summary: Send USDC to a phone number or wallet address (Phone Send)
+      tags:
+      - CaaS - Stablecoin (USDC)
+  /crypto/swaps:
+    get:
+      description: Returns a paginated list of the user's USDC ⇄ USDT swaps, most
+        recent first.
+      parameters:
+      - description: Page number (default 1)
+        in: query
+        name: page
+        type: integer
+      - description: Results per page, max 100 (default 20)
+        in: query
+        name: per_page
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/handlers.SwapResponse'
+            type: array
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List stablecoin swaps
+      tags:
+      - CaaS - Stablecoin (USDC)
+    post:
+      consumes:
+      - application/json
+      description: Swaps one stablecoin for the other on the user's Stablecoin (CaaS)
+        smart-contract wallet via the Rach CaaS DEX router. Gas is sponsored and Rach's
+        fee is deducted from the input amount. Settles asynchronously on-chain — the
+        returned swap starts as `processing` and finalises via the `swap.settled`
+        / `swap.failed` webhook. Poll GET /crypto/swaps/{id} or refresh for the terminal
+        result and on-chain tx hash.
+      parameters:
+      - description: Swap details
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.SwapRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.SwapResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Swap USDC ⇄ USDT
+      tags:
+      - CaaS - Stablecoin (USDC)
+  /crypto/swaps/{id}:
+    get:
+      description: Returns a single USDC ⇄ USDT swap by id. Polls CaaS for the latest
+        status when the swap is still in-flight, so the response reflects the on-chain
+        result and tx hash once settled.
+      parameters:
+      - description: Swap UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.SwapResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get a stablecoin swap
       tags:
       - CaaS - Stablecoin (USDC)
   /crypto/transactions:
@@ -8625,18 +9064,19 @@ paths:
     post:
       consumes:
       - application/json
-      description: Receiver for Rach CaaS account/settlement events (funding, on-chain
-        credit, P2P transfer, off-ramp). Follows the standard Rach webhook signing
-        — header `X-Webhook-Signature` = hex HMAC-SHA256 of the raw request body,
-        keyed with the CaaS webhook secret (CAAS_WEBHOOK_SECRET), which is SEPARATE
-        from the WaaS secret. Verification also tolerates alternate header names and
-        base64 as a hardening fallback. On a credit/deposit event the owning user
-        (resolved by phone) is notified, always labeled USDC (name "Stablecoin").
-        Always returns 200 on business-logic issues so the provider does not retry.
+      description: 'Receiver for Rach CaaS transaction and account events. Each delivery
+        is an HTTP POST with a flat JSON body and header `X-Rach-Signature: sha256=<hex>`
+        — the hex HMAC-SHA256 of the raw request body keyed with the CaaS webhook
+        secret (CAAS_WEBHOOK_SECRET), which is SEPARATE from the WaaS secret. Handles
+        transfer.received (credit → notify + email the recipient, resolved by wallet
+        address), transfer.settled/failed and swap.settled/failed (update the recorded
+        transaction/swap + notify the initiator), and the user.linked / user.phone_changed
+        lifecycle events. Always returns 200 on business-logic issues so the provider
+        does not retry an already-accepted delivery.'
       parameters:
-      - description: hex HMAC-SHA256(rawBody, CaaS secret)
+      - description: sha256=<hex HMAC-SHA256(rawBody, CaaS secret)>
         in: header
-        name: X-Webhook-Signature
+        name: X-Rach-Signature
         required: true
         type: string
       - description: Webhook payload
@@ -8826,14 +9266,17 @@ paths:
     post:
       consumes:
       - application/json
-      description: 'Receiver for Rach WaaS on-chain deposit events. Fires `wallet.deposit.detected`
-        (seen on-chain, not credited) and `wallet.deposit.confirmed` (block-depth/settlement
-        threshold met). On a confirmed event the owning user (resolved by derived
-        address) is notified and the deposit is mirrored best-effort into their local
-        ledger; the WaaS balance API remains authoritative. Signature: header `X-Webhook-Signature`
-        = hex HMAC-SHA256 of the raw request body, keyed with the WaaS webhook secret
-        (PAYMENTS_WEBHOOK_SECRET). Always returns 200 on business-logic issues to
-        avoid provider retries.'
+      description: 'Receiver for Rach WaaS on-chain deposit events, delivered as a
+        two-stage flow plus a later hash resolution: `wallet.deposit.detected` (seen
+        on-chain — records a pending deposit, does NOT credit), `wallet.deposit.confirmed`
+        (credits the owning user''s local ledger, but only when `safe_to_credit` is
+        true), and `wallet.deposit.hash_resolved` (backfills the real on-chain tx_hash).
+        The owner is resolved by derived address; crediting is idempotent, keyed on
+        `deposit_id` (NOT tx_hash, which is a provisional placeholder until hash_resolved),
+        so a re-delivered event neither double-credits nor re-notifies. The WaaS balance
+        API remains authoritative. Signature: header `X-Webhook-Signature` = hex HMAC-SHA256
+        of the raw request body, keyed with the WaaS webhook secret (PAYMENTS_WEBHOOK_SECRET).
+        Always returns 200 on business-logic issues to avoid provider retries.'
       parameters:
       - description: hex HMAC-SHA256(rawBody, secret)
         in: header

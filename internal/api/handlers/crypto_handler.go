@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -9,6 +10,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
+	"go.uber.org/zap"
 
 	"github.com/rachfinance/digitalfx/internal/api/middleware"
 	"github.com/rachfinance/digitalfx/internal/clients/caas"
@@ -198,6 +200,18 @@ func (h *CaaSHandler) Send(w http.ResponseWriter, r *http.Request) {
 		Amount:          body.Amount,
 	})
 	if err != nil {
+		zap.L().Error("crypto send failed",
+			zap.String("user_id", userID.String()),
+			zap.String("sender_phone", phone),
+			zap.String("receiver_phone", body.ReceiverPhone),
+			zap.String("receiver_address", body.RecipientAddress),
+			zap.Error(err),
+		)
+		var apiErr *caas.APIError
+		if errors.As(err, &apiErr) {
+			response.BadRequest(w, "TRANSFER_FAILED", apiErr.Message)
+			return
+		}
 		response.InternalError(w)
 		return
 	}
@@ -221,6 +235,143 @@ func (h *CaaSHandler) Send(w http.ResponseWriter, r *http.Request) {
 	})
 
 	response.Created(w, tx)
+}
+
+// Swap godoc
+//
+//	@Summary      Swap USDC ⇄ USDT
+//	@Description  Swaps one stablecoin for the other on the user's Stablecoin (CaaS) smart-contract wallet via the Rach CaaS DEX router. Gas is sponsored and Rach's fee is deducted from the input amount. Settles asynchronously on-chain — the returned swap starts as `processing` and finalises via the `swap.settled` / `swap.failed` webhook. Poll GET /crypto/swaps/{id} or refresh for the terminal result and on-chain tx hash.
+//	@Tags         CaaS - Stablecoin (USDC)
+//	@Accept       json
+//	@Produce      json
+//	@Security     BearerAuth
+//	@Param        body  body      SwapRequest  true  "Swap details"
+//	@Success      200   {object}  SwapResponse
+//	@Failure      400   {object}  ErrorResponse
+//	@Failure      401   {object}  ErrorResponse
+//	@Failure      500   {object}  ErrorResponse
+//	@Router       /crypto/swaps [post]
+func (h *CaaSHandler) Swap(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	phone, _ := middleware.UserPhoneFromContext(r.Context())
+	if !ok {
+		response.Unauthorized(w, "unauthorized")
+		return
+	}
+
+	var body struct {
+		TokenIn  string `json:"token_in"`
+		TokenOut string `json:"token_out"`
+		Amount   string `json:"amount"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		response.BadRequest(w, "VALIDATION_ERROR", "invalid request body")
+		return
+	}
+
+	swap, err := h.svc.CaaS.Swap(r.Context(), services.SwapCryptoInput{
+		UserID:   userID,
+		Phone:    phone,
+		TokenIn:  body.TokenIn,
+		TokenOut: body.TokenOut,
+		Amount:   body.Amount,
+	})
+	if err != nil {
+		switch {
+		case errors.Is(err, services.ErrUnsupportedToken), errors.Is(err, services.ErrSameSwapToken):
+			response.BadRequest(w, "INVALID_TOKEN", err.Error())
+		case errors.Is(err, services.ErrSwapInvalidAmount):
+			response.BadRequest(w, "INVALID_AMOUNT", err.Error())
+		default:
+			var apiErr *caas.APIError
+			if errors.As(err, &apiErr) {
+				response.BadRequest(w, "SWAP_FAILED", apiErr.Message)
+				return
+			}
+			zap.L().Error("caas swap failed", zap.String("user_id", userID.String()), zap.Error(err))
+			response.InternalError(w)
+		}
+		return
+	}
+
+	h.svc.Notifications.Create(r.Context(), services.CreateNotificationInput{
+		UserID: userID,
+		Type:   services.NotifSwapSubmitted,
+		Title:  "Swap submitted",
+		Body:   fmt.Sprintf("Swapping %s %s to %s.", swap.AmountIn, swap.TokenIn, swap.TokenOut),
+		Metadata: map[string]string{
+			"reference": swap.Reference, "token_in": swap.TokenIn,
+			"token_out": swap.TokenOut, "amount": swap.AmountIn,
+		},
+	})
+	response.OK(w, swap)
+}
+
+// ListSwaps godoc
+//
+//	@Summary      List stablecoin swaps
+//	@Description  Returns a paginated list of the user's USDC ⇄ USDT swaps, most recent first.
+//	@Tags         CaaS - Stablecoin (USDC)
+//	@Produce      json
+//	@Security     BearerAuth
+//	@Param        page      query     int  false  "Page number (default 1)"
+//	@Param        per_page  query     int  false  "Results per page, max 100 (default 20)"
+//	@Success      200       {array}   SwapResponse
+//	@Failure      401       {object}  ErrorResponse
+//	@Router       /crypto/swaps [get]
+func (h *CaaSHandler) ListSwaps(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		response.Unauthorized(w, "unauthorized")
+		return
+	}
+	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
+	perPage, _ := strconv.Atoi(r.URL.Query().Get("per_page"))
+	if perPage > 100 {
+		perPage = 100
+	}
+	swaps, err := h.svc.CaaS.ListSwaps(r.Context(), userID, int32(page), int32(perPage))
+	if err != nil {
+		response.InternalError(w)
+		return
+	}
+	response.OK(w, swaps)
+}
+
+// GetSwap godoc
+//
+//	@Summary      Get a stablecoin swap
+//	@Description  Returns a single USDC ⇄ USDT swap by id. Polls CaaS for the latest status when the swap is still in-flight, so the response reflects the on-chain result and tx hash once settled.
+//	@Tags         CaaS - Stablecoin (USDC)
+//	@Produce      json
+//	@Security     BearerAuth
+//	@Param        id  path      string  true  "Swap UUID"
+//	@Success      200 {object}  SwapResponse
+//	@Failure      401 {object}  ErrorResponse
+//	@Failure      404 {object}  ErrorResponse
+//	@Router       /crypto/swaps/{id} [get]
+func (h *CaaSHandler) GetSwap(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		response.Unauthorized(w, "unauthorized")
+		return
+	}
+	id, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		response.BadRequest(w, "VALIDATION_ERROR", "invalid swap id")
+		return
+	}
+	// RefreshSwap returns the current record and polls CaaS when still in-flight.
+	swap, err := h.svc.CaaS.RefreshSwap(r.Context(), userID, id)
+	if err != nil {
+		if errors.Is(err, services.ErrSwapNotFound) {
+			response.NotFound(w, "swap not found")
+			return
+		}
+		response.InternalError(w)
+		return
+	}
+	response.OK(w, swap)
 }
 
 // isWalletAddress reports whether s is a 0x-prefixed 40-hex-character EVM/SCW address.

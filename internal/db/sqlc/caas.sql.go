@@ -279,6 +279,35 @@ func (q *Queries) GetCaasWithdrawalByIdempotencyKey(ctx context.Context, idempot
 	return i, err
 }
 
+const getCryptoTransactionByCaasTransferID = `-- name: GetCryptoTransactionByCaasTransferID :one
+SELECT id, reference, sender_user_id, receiver_phone, receiver_user_id, token, amount, tx_hash, status, created_at, updated_at, quote_id, caas_transfer_id, idempotency_key, local_fiat_amount, local_currency, receiver_address FROM crypto_transactions WHERE caas_transfer_id = $1 LIMIT 1
+`
+
+func (q *Queries) GetCryptoTransactionByCaasTransferID(ctx context.Context, caasTransferID *string) (CryptoTransaction, error) {
+	row := q.db.QueryRow(ctx, getCryptoTransactionByCaasTransferID, caasTransferID)
+	var i CryptoTransaction
+	err := row.Scan(
+		&i.ID,
+		&i.Reference,
+		&i.SenderUserID,
+		&i.ReceiverPhone,
+		&i.ReceiverUserID,
+		&i.Token,
+		&i.Amount,
+		&i.TxHash,
+		&i.Status,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.QuoteID,
+		&i.CaasTransferID,
+		&i.IdempotencyKey,
+		&i.LocalFiatAmount,
+		&i.LocalCurrency,
+		&i.ReceiverAddress,
+	)
+	return i, err
+}
+
 const getCryptoTransactionByIdempotencyKey = `-- name: GetCryptoTransactionByIdempotencyKey :one
 
 SELECT id, reference, sender_user_id, receiver_phone, receiver_user_id, token, amount, tx_hash, status, created_at, updated_at, quote_id, caas_transfer_id, idempotency_key, local_fiat_amount, local_currency, receiver_address FROM crypto_transactions WHERE idempotency_key = $1 LIMIT 1

@@ -8,6 +8,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/rachfinance/digitalfx/internal/clients/caas"
+	"github.com/rachfinance/digitalfx/internal/clients/didit"
 	"github.com/rachfinance/digitalfx/internal/clients/hub2"
 	"github.com/rachfinance/digitalfx/internal/clients/metamap"
 	"github.com/rachfinance/digitalfx/internal/clients/nilos"
@@ -52,7 +53,9 @@ type Services struct {
 	VTU            *VTUService
 	Limits         *LimitsService
 	Rates          *RatesService
-	ManualMomo     *ManualMomoService // manual mobile-money rails (parallel to Hub2)
+	ManualMomo     *ManualMomoService  // manual mobile-money rails (parallel to Hub2)
+	Transfer       *TransferService    // instant, free internal-ledger p2p (XAF/XOF)
+	AdminAccounts  *AdminAccountService // admin banking/balance/status management
 }
 
 func New(
@@ -83,18 +86,21 @@ func New(
 		logger.Info("FCM push notifications enabled")
 	}
 
-	notif := NewNotificationService(pool, fcm, logger)
+	notif := NewNotificationService(pool, fcm, emailClient, cfg.App.BaseURL, logger)
 	nilosSvc := NewNilosService(pool, nilosClient, notif, cfg.Nilos.WebhookSecret, logger)
 	hub2Svc := NewHUB2Service(pool, hub2Client, caasClient, logger)
 	limitsSvc := NewLimitsService(pool, DefaultLimitsResolver(), logger)
 	withdrawalSvc := NewWithdrawalService(pool, hub2Client, nilosClient, nombaClient, notif, limitsSvc, logger)
 	hub2Svc.SetWithdrawalService(withdrawalSvc)
 
-	// KYC provider is selected via KYC_PROVIDER ("metamap" default | "sumsub").
-	var kycProvider kyc.KYCProvider = kyc.NewMetaMapProvider(metamapClient, cfg.MetaMap.FlowID, cfg.MetaMap.WebhookSecret)
+	// KYC provider is selected via KYC_PROVIDER ("didit" default | "sumsub" | "metamap").
+	var kycProvider kyc.KYCProvider = kyc.NewDiditProvider(didit.New(
+		cfg.Didit.WorkflowID, cfg.Didit.VerifyURL, cfg.Didit.APIKey, cfg.Didit.WebhookSecret))
 	if cfg.KYCProvider == "sumsub" {
 		kycProvider = kyc.NewSumsubProvider(sumsub.New(
 			cfg.Sumsub.AppToken, cfg.Sumsub.SecretKey, cfg.Sumsub.LevelName, cfg.Sumsub.WebhookSecret))
+	} else if cfg.KYCProvider == "metamap" {
+		kycProvider = kyc.NewMetaMapProvider(metamapClient, cfg.MetaMap.FlowID, cfg.MetaMap.WebhookSecret)
 	}
 
 	return &Services{
@@ -129,5 +135,7 @@ func New(
 		Market:         NewMarketService(cfg, logger, notif),
 		Rates:          NewRatesService(pool),
 		ManualMomo:     NewManualMomoService(pool, notif, emailClient, cfg.App.AdminNotifyEmail, cfg.App.BaseURL, logger),
+		Transfer:       NewTransferService(pool, notif, emailClient, cfg.App.BaseURL, logger),
+		AdminAccounts:  NewAdminAccountService(pool, notif, logger),
 	}
 }

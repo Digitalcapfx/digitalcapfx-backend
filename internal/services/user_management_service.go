@@ -185,6 +185,59 @@ func (s *UserManagementService) DisableUser(ctx context.Context, userID uuid.UUI
 	return nil
 }
 
+// HardDeleteUser permanently removes a user and everything it entails, in a
+// single transaction. Most child tables cascade from users(id); the statements
+// below first clear the rows whose FKs are ON DELETE NO ACTION / RESTRICT (which
+// would otherwise block the cascade), in dependency order, then delete the user.
+// The FK graph was derived from the live schema — if a future migration adds a
+// new blocking FK, this fails cleanly and rolls back (no partial deletion).
+//
+// Ordering rationale (blockers, per information_schema):
+//   - hub2_payments.transaction_id → transactions   (2nd-level: clear before transactions)
+//   - transactions/vtu/manual_* .account_id → accounts
+//   - crypto_transactions/caas_withdrawals/fiat_withdrawals/fx_quotes/kyc_admin_actions → users
+func (s *UserManagementService) HardDeleteUser(ctx context.Context, userID uuid.UUID) error {
+	if _, err := db.New(s.pool).GetUserForAdmin(ctx, userID); err != nil {
+		return ErrUserNotFound
+	}
+
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("begin delete tx: %w", err)
+	}
+	defer tx.Rollback(ctx) //nolint:errcheck
+
+	stmts := []string{
+		// 2nd-level: hub2_payments points at the user's transactions.
+		`DELETE FROM hub2_payments WHERE transaction_id IN (
+			SELECT id FROM transactions WHERE account_id IN (SELECT id FROM accounts WHERE user_id = $1))`,
+		// account-referencing blockers.
+		`DELETE FROM transactions WHERE account_id IN (SELECT id FROM accounts WHERE user_id = $1)`,
+		`DELETE FROM vtu_transactions WHERE user_id = $1`,
+		`DELETE FROM manual_deposits WHERE user_id = $1`,
+		`DELETE FROM manual_withdrawals WHERE user_id = $1`,
+		// user-referencing blockers.
+		`DELETE FROM crypto_transactions WHERE sender_user_id = $1`,
+		`UPDATE crypto_transactions SET receiver_user_id = NULL WHERE receiver_user_id = $1`,
+		`DELETE FROM caas_withdrawals WHERE user_id = $1`,
+		`DELETE FROM fiat_withdrawals WHERE user_id = $1`,
+		`DELETE FROM fx_quotes WHERE user_id = $1`,
+		`DELETE FROM kyc_admin_actions WHERE admin_id = $1`,
+		// finally the user — cascades accounts, wallets, kyc, notifications, cards, etc.
+		`DELETE FROM users WHERE id = $1`,
+	}
+	for _, st := range stmts {
+		if _, err := tx.Exec(ctx, st, userID); err != nil {
+			return fmt.Errorf("hard delete step failed: %w", err)
+		}
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("commit delete: %w", err)
+	}
+	s.logger.Info("user hard-deleted", zap.String("user_id", userID.String()))
+	return nil
+}
+
 // EnableUser re-activates a disabled user account.
 func (s *UserManagementService) EnableUser(ctx context.Context, userID uuid.UUID) error {
 	q := db.New(s.pool)

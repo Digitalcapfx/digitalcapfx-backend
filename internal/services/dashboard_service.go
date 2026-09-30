@@ -303,7 +303,7 @@ func defaultFXRates() map[string]float64 {
 	return map[string]float64{
 		"USD": 1.0, "USDC": 1.0, "USDT": 1.0,
 		"EUR": 0.91, "GBP": 0.79,
-		"XAF": 609.0, "XOF": 609.0,
+		"XAF": 609.0, "XOF": 609.0, "NGN": 1600.0,
 		// Crypto — approximate crypto-units-per-USD fallbacks (DB rates override these)
 		"BTC": 0.000015, "ETH": 0.00033, "BSC": 0.0017,
 		"SOL": 0.0065, "LTC": 0.012, "TRX": 8.0,

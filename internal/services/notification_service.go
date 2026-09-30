@@ -10,6 +10,7 @@ import (
 	"go.uber.org/zap"
 
 	db "github.com/rachfinance/digitalfx/internal/db/sqlc"
+	"github.com/rachfinance/digitalfx/internal/pkg/email"
 )
 
 // Notification type constants — used by all callers to fire events.
@@ -28,6 +29,18 @@ const (
 	NotifCryptoRecvd      = "crypto_received"
 	NotifExchange         = "exchange_completed"
 
+	// Stablecoin swap (USDC ⇄ USDT via CaaS)
+	NotifSwapSubmitted = "swap_submitted"
+	NotifSwapSettled   = "swap_settled"
+	NotifSwapFailed    = "swap_failed"
+
+	// Admin ledger balance adjustment (set/adjust by an admin)
+	NotifBalanceAdjusted = "balance_adjusted"
+
+	// Admin account status changes
+	NotifAccountDisabled = "account_disabled"
+	NotifAccountEnabled  = "account_enabled"
+
 	// Manual mobile-money flow
 	NotifManualDepositSubmitted    = "manual_deposit_submitted"
 	NotifManualDepositConfirmed    = "manual_deposit_confirmed"
@@ -38,14 +51,19 @@ const (
 )
 
 type NotificationService struct {
-	pool   *pgxpool.Pool
-	fcm    *FCMService // nil when push is not configured
-	logger *zap.Logger
+	pool       *pgxpool.Pool
+	fcm        *FCMService   // nil when push is not configured
+	email      *email.Client // nil when SMTP is not configured
+	appBaseURL string
+	logger     *zap.Logger
 }
 
-func NewNotificationService(pool *pgxpool.Pool, fcm *FCMService, logger *zap.Logger) *NotificationService {
-	return &NotificationService{pool: pool, fcm: fcm, logger: logger}
+func NewNotificationService(pool *pgxpool.Pool, fcm *FCMService, emailClient *email.Client, appBaseURL string, logger *zap.Logger) *NotificationService {
+	return &NotificationService{pool: pool, fcm: fcm, email: emailClient, appBaseURL: appBaseURL, logger: logger}
 }
+
+// BaseURL is the customer-facing app URL, for building links inside emails.
+func (s *NotificationService) BaseURL() string { return s.appBaseURL }
 
 type CreateNotificationInput struct {
 	UserID   uuid.UUID
@@ -53,6 +71,11 @@ type CreateNotificationInput struct {
 	Title    string
 	Body     string
 	Metadata map[string]string // serialised to JSONB
+	// EmailSubject/EmailHTML, when both set, also deliver this notification by
+	// email — provided an SMTP client is configured and the user has an email on
+	// file. Sent best-effort and asynchronously.
+	EmailSubject string
+	EmailHTML    string
 }
 
 // Create records a notification. Errors are logged but never propagate to the
@@ -82,6 +105,70 @@ func (s *NotificationService) Create(ctx context.Context, in CreateNotificationI
 	// Best-effort and asynchronous — a push failure must never affect the caller.
 	if s.fcm.Enabled() {
 		go s.pushToUser(context.Background(), in)
+	}
+
+	// Also deliver by email. Best-effort and asynchronous. Callers may set
+	// EmailSubject/EmailHTML explicitly; otherwise, for the "emailable" event
+	// types (money movement + account outcomes) we auto-compose an email from the
+	// notification's title/body so every meaningful event reaches the customer's
+	// inbox without each call site having to build one.
+	subject, htmlBody := in.EmailSubject, in.EmailHTML
+	if (subject == "" || htmlBody == "") && emailableNotifTypes[in.Type] {
+		subject = in.Title
+		htmlBody = standardEmailHTML(in.Title, in.Body, s.appBaseURL)
+	}
+	if subject != "" && htmlBody != "" && s.email != nil {
+		go s.emailUser(context.Background(), in.UserID, subject, htmlBody)
+	}
+}
+
+// emailableNotifTypes are the notification types that should also be emailed to
+// the customer (meaningful money-movement outcomes and account status changes).
+// Noisy/interim types (login_detected, *_submitted, welcome) are intentionally
+// excluded to avoid inbox spam.
+var emailableNotifTypes = map[string]bool{
+	NotifTransferSent:              true,
+	NotifTransferRecvd:             true,
+	NotifCryptoSent:                true,
+	NotifCryptoRecvd:               true,
+	NotifSwapSettled:               true,
+	NotifSwapFailed:                true,
+	NotifDepositRecvd:              true,
+	NotifDepositConfirmed:          true,
+	NotifWithdrawal:                true,
+	NotifExchange:                  true,
+	NotifKYCApproved:               true,
+	NotifKYCRejected:               true,
+	NotifManualDepositConfirmed:    true,
+	NotifManualDepositRejected:     true,
+	NotifManualWithdrawalCompleted: true,
+	NotifManualWithdrawalRejected:  true,
+	NotifAccountDisabled:           true,
+	NotifAccountEnabled:            true,
+}
+
+// standardEmailHTML wraps a notification title + body in the DigitalFX email shell.
+func standardEmailHTML(title, body, baseURL string) string {
+	cta := ""
+	if baseURL != "" {
+		cta = fmt.Sprintf(`<p style="margin-top:24px"><a href="%s" style="background:#111;color:#fff;padding:10px 18px;border-radius:6px;text-decoration:none">Open DigitalFX</a></p>`, baseURL)
+	}
+	return fmt.Sprintf(`<div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto;color:#111">
+  <h2 style="margin:0 0 12px">%s</h2>
+  <p style="font-size:15px;line-height:1.5;color:#333">%s</p>
+  %s
+</div>`, title, body, cta)
+}
+
+// emailUser resolves a user's email and sends a message. No-op when the user has
+// no email on file. Runs synchronously — call via goroutine for fire-and-forget.
+func (s *NotificationService) emailUser(ctx context.Context, userID uuid.UUID, subject, htmlBody string) {
+	u, err := db.New(s.pool).GetUserByID(ctx, userID)
+	if err != nil || u.Email == nil || *u.Email == "" {
+		return
+	}
+	if err := s.email.Send(*u.Email, subject, htmlBody); err != nil {
+		s.logger.Warn("notification email failed", zap.String("user_id", userID.String()), zap.Error(err))
 	}
 }
 

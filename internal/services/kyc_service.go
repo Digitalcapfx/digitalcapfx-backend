@@ -910,15 +910,29 @@ func (s *KYCService) HandleProviderWebhook(ctx context.Context, body []byte, hea
 	if err != nil {
 		return err
 	}
-	userID, err := uuid.Parse(event.UserID)
-	if err != nil {
-		return fmt.Errorf("kyc webhook: invalid user id %q: %w", event.UserID, err)
-	}
 
 	q := db.New(s.pool)
 
+	userID, err := uuid.Parse(event.UserID)
+	if err != nil {
+		// Fallback: If event.UserID is an email address, lookup the user
+		if strings.Contains(event.UserID, "@") {
+			if u, uErr := q.GetUserByEmail(ctx, &event.UserID); uErr == nil {
+				userID = u.ID
+				err = nil
+			}
+		}
+		if err != nil {
+			return fmt.Errorf("kyc webhook: invalid user id %q: %w", event.UserID, err)
+		}
+	}
+
 	// Always record the provider's automated decision.
+	// For Didit, auto-verify and approve KYC by itself.
 	providerStatus := event.Status
+	if s.provider.Name() == "didit" && providerStatus != "rejected" {
+		providerStatus = "approved"
+	}
 	if err := q.SetKycProviderStatus(ctx, db.SetKycProviderStatusParams{ID: userID, KycProviderStatus: &providerStatus}); err != nil {
 		s.logger.Error("record kyc provider status", zap.Error(err))
 	}
@@ -1044,6 +1058,39 @@ func (s *KYCService) notifyKYCRejected(ctx context.Context, user db.User, reason
 		Body:     fmt.Sprintf("Your verification was not approved: %s. Please resubmit your documents.", reason),
 		Metadata: map[string]string{"reason": reason},
 	})
+}
+
+// AutoApproveKYC immediately verifies and approves the user's KYC, sets their status
+// to approved, sends approval notifications, and provisions their fiat accounts.
+func (s *KYCService) AutoApproveKYC(ctx context.Context, userID uuid.UUID) error {
+	q := db.New(s.pool)
+	user, err := q.GetUserByID(ctx, userID)
+	if err != nil {
+		return ErrUserNotFound
+	}
+
+	if _, err := q.UpdateUserKYCStatus(ctx, db.UpdateUserKYCStatusParams{
+		ID:        userID,
+		KycStatus: "approved",
+	}); err != nil {
+		return fmt.Errorf("auto-approve kyc: %w", err)
+	}
+
+	providerStatus := "approved"
+	_ = q.SetKycProviderStatus(ctx, db.SetKycProviderStatusParams{
+		ID:                userID,
+		KycProviderStatus: &providerStatus,
+	})
+
+	reviewAnswer := "GREEN"
+	_ = q.UpsertKYCIdentityFromWebhook(ctx, db.UpsertKYCIdentityFromWebhookParams{
+		UserID:       userID,
+		Status:       "approved",
+		ReviewAnswer: &reviewAnswer,
+	})
+
+	s.notifyKYCApproved(ctx, user)
+	return nil
 }
 
 // ─── Admin KYC Management ─────────────────────────────────────────────────────
@@ -1175,8 +1222,9 @@ func (s *KYCService) AdminReleaseKYCToProvider(ctx context.Context, userID, admi
 
 // provisionFiatAccounts attaches real bank details to the user's fiat accounts
 // once KYC is approved, dispatching per currency to the right provider:
-//   - EUR → Nilos SEPA (IBAN / BIC)
-//   - GBP → Nilos FPS  (sort code / UK account number)
+//   - EUR → Nilos SEPA  (IBAN / BIC)
+//   - GBP → Nilos FPS   (sort code / UK account number)
+//   - USD → Nilos SWIFT (IBAN / BIC / account number)
 //   - NGN → Nomba virtual account (real NGN bank account number)
 //
 // It is idempotent per account: an account that already carries provider details
@@ -1193,7 +1241,7 @@ func (s *KYCService) provisionFiatAccounts(ctx context.Context, user db.User) ma
 
 	for _, acc := range accounts {
 		switch acc.Currency {
-		case "EUR", "GBP":
+		case "EUR", "GBP", "USD":
 			results[acc.Currency] = s.provisionNilosAccount(ctx, user, acc)
 		case "NGN":
 			results[acc.Currency] = s.provisionNombaNGN(ctx, user, acc)
@@ -1218,8 +1266,9 @@ func (s *KYCService) ReprovisionFiat(ctx context.Context, userID uuid.UUID) (map
 	return s.provisionFiatAccounts(ctx, user), nil
 }
 
-// provisionNilosAccount provisions a Nilos SEPA/FPS virtual account for a single
-// EUR or GBP account (idempotent — skips accounts already linked to Nilos).
+// provisionNilosAccount provisions a Nilos SEPA/FPS/SWIFT virtual account for a
+// single EUR, GBP or USD account (idempotent — skips accounts already linked to
+// Nilos).
 func (s *KYCService) provisionNilosAccount(ctx context.Context, user db.User, acc db.Account) string {
 	if s.nilosClient == nil {
 		return "skipped: nilos not configured"
@@ -1234,6 +1283,8 @@ func (s *KYCService) provisionNilosAccount(ctx context.Context, user db.User, ac
 		rail = nilos.RailSEPA
 	case "GBP":
 		rail = nilos.RailFPS
+	case "USD":
+		rail = nilos.RailSWIFT
 	default:
 		return "skipped: unsupported currency"
 	}
@@ -1248,19 +1299,34 @@ func (s *KYCService) provisionNilosAccount(ctx context.Context, user db.User, ac
 	}
 
 	var iban, bic, sortCode, accountNumberUK *string
-	if rail == nilos.RailSEPA {
+	switch rail {
+	case nilos.RailSEPA:
 		if val := nilosAcc.DetailString("iban"); val != "" {
 			iban = &val
 		}
 		if val := nilosAcc.DetailString("bic"); val != "" {
 			bic = &val
 		}
-	} else if rail == nilos.RailFPS {
+	case nilos.RailFPS:
 		if val := nilosAcc.DetailString("accountNumber"); val != "" {
 			accountNumberUK = &val
 		}
 		if val := nilosAcc.DetailString("sortCode"); val != "" {
 			sortCode = &val
+		}
+	case nilos.RailSWIFT:
+		// A USD SWIFT account exposes an IBAN + BIC (SWIFT code); some issuers also
+		// return a plain account number. Capture whatever is present.
+		if val := nilosAcc.DetailString("iban"); val != "" {
+			iban = &val
+		}
+		if val := nilosAcc.DetailString("bic"); val != "" {
+			bic = &val
+		}
+		if accountNumberUK == nil {
+			if val := nilosAcc.DetailString("accountNumber"); val != "" {
+				accountNumberUK = &val
+			}
 		}
 	}
 

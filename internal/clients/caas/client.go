@@ -330,6 +330,69 @@ func (c *Client) Withdraw(ctx context.Context, req WithdrawRequest) (*WithdrawRe
 	return &out, nil
 }
 
+// ── Swap (USDC ⇄ USDT) ────────────────────────────────────────────────────────
+
+// SwapRequest swaps one stablecoin for the other on the user's SCW via the
+// FiatSwapV2 DEX router. Gas is sponsored by the paymaster and Rach's per-chain
+// fee is deducted from the input amount, all in one atomic UserOperation.
+// POST /v1/swaps
+type SwapRequest struct {
+	// SenderPhone identifies the wallet to swap on: an E.164 phone number OR a
+	// 0x wallet address (auto-detected).
+	SenderPhone string `json:"sender_phone"`
+	// TokenIn is the stablecoin to spend: USDC or USDT.
+	TokenIn Token `json:"token_in"`
+	// TokenOut is the stablecoin to receive: USDC or USDT (must differ from TokenIn).
+	TokenOut Token `json:"token_out"`
+	// Amount is the input token amount to swap (decimal string e.g. "100.00").
+	Amount string `json:"amount"`
+	// IdempotencyKey prevents duplicate submissions. Use a UUID or reference.
+	IdempotencyKey string `json:"idempotency_key"`
+}
+
+// SwapResponse is the 202 Accepted body returned when a swap is queued.
+type SwapResponse struct {
+	SwapID string `json:"swap_id"`
+	Status string `json:"status"`
+}
+
+// SwapStatusResponse is the in-flight or terminal status of a swap. Fields are
+// populated best-effort from CaaS's generic status object; TxHash is set once
+// the swap settles on-chain.
+type SwapStatusResponse struct {
+	SwapID    string `json:"swap_id"`
+	Status    string `json:"status"`
+	TokenIn   string `json:"token_in"`
+	TokenOut  string `json:"token_out"`
+	AmountIn  string `json:"amount_in"`
+	AmountOut string `json:"amount_out"`
+	TxHash    string `json:"tx_hash"`
+	CreatedAt string `json:"created_at"`
+}
+
+// Swap converts one stablecoin to the other on an end-user's SCW. CaaS returns
+// 202 with a swap_id and settles asynchronously — use the swap.settled /
+// swap.failed webhooks or poll GetSwapStatus for the terminal result.
+// POST /v1/swaps
+func (c *Client) Swap(ctx context.Context, req SwapRequest) (*SwapResponse, error) {
+	var out SwapResponse
+	if err := c.post(ctx, "/v1/swaps", req, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// GetSwapStatus fetches the current status (and on-chain tx hash once settled)
+// of a swap previously initiated by this business.
+// GET /v1/swaps/{id}
+func (c *Client) GetSwapStatus(ctx context.Context, swapID string) (*SwapStatusResponse, error) {
+	var out SwapStatusResponse
+	if err := c.get(ctx, "/v1/swaps/"+swapID, nil, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
 // ── UpdatePhone ───────────────────────────────────────────────────────────────
 
 // UpdatePhoneRequest re-links a user's SCW to a new phone number.

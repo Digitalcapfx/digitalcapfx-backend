@@ -135,6 +135,22 @@ type BusinessProfile struct {
 	UpdatedAt              time.Time `json:"updated_at"`
 }
 
+type CaasSwap struct {
+	ID             uuid.UUID `json:"id"`
+	Reference      string    `json:"reference"`
+	UserID         uuid.UUID `json:"user_id"`
+	TokenIn        string    `json:"token_in"`
+	TokenOut       string    `json:"token_out"`
+	AmountIn       string    `json:"amount_in"`
+	AmountOut      *string   `json:"amount_out"`
+	Status         string    `json:"status"`
+	CaasSwapID     *string   `json:"caas_swap_id"`
+	TxHash         *string   `json:"tx_hash"`
+	IdempotencyKey *string   `json:"idempotency_key"`
+	CreatedAt      time.Time `json:"created_at"`
+	UpdatedAt      time.Time `json:"updated_at"`
+}
+
 type CaasWallet struct {
 	ID                 uuid.UUID `json:"id"`
 	UserID             uuid.UUID `json:"user_id"`
@@ -192,6 +208,9 @@ type CryptoTransaction struct {
 	LocalCurrency   *string    `json:"local_currency"`
 	ReceiverAddress *string    `json:"receiver_address"`
 }
+
+// NOTE: CurrencyRate is hand-defined in currency_rates.sql.go (float64 rates).
+// Do not re-add the sqlc-generated struct here after `sqlc generate`.
 
 type DeviceToken struct {
 	ID        uuid.UUID `json:"id"`

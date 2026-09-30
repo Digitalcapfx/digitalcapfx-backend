@@ -43,6 +43,46 @@ UPDATE accounts
 SET status = 'frozen', updated_at = NOW()
 WHERE id = $1;
 
+-- name: SetAccountStatusByID :one
+-- Admin enable/disable of a single currency account. status is 'active' |
+-- 'inactive' (the API keeps returning all accounts; the frontend hides
+-- 'inactive' ones).
+UPDATE accounts
+SET status = $2, updated_at = NOW()
+WHERE id = $1
+RETURNING *;
+
+-- name: SetAccountBalanceByID :one
+-- Admin absolute balance set. amount applies to both ledger and available.
+UPDATE accounts
+SET balance = $2, available_balance = $2, updated_at = NOW()
+WHERE id = $1
+RETURNING *;
+
+-- name: AdjustAccountBalanceByID :one
+-- Admin delta adjustment (may be negative). No overdraft guard — an admin
+-- override can intentionally take a balance negative for reconciliation.
+UPDATE accounts
+SET balance = balance + $2, available_balance = available_balance + $2, updated_at = NOW()
+WHERE id = $1
+RETURNING *;
+
+-- name: AdminUpdateAccountBanking :one
+-- Partial update of a customer account's banking details. NULL args leave the
+-- existing value untouched.
+UPDATE accounts SET
+    account_number            = COALESCE(sqlc.narg('account_number'), account_number),
+    iban                      = COALESCE(sqlc.narg('iban'), iban),
+    bic                       = COALESCE(sqlc.narg('bic'), bic),
+    sort_code                 = COALESCE(sqlc.narg('sort_code'), sort_code),
+    account_number_uk         = COALESCE(sqlc.narg('account_number_uk'), account_number_uk),
+    nomba_bank_name           = COALESCE(sqlc.narg('nomba_bank_name'), nomba_bank_name),
+    nomba_bank_account_number = COALESCE(sqlc.narg('nomba_bank_account_number'), nomba_bank_account_number),
+    nomba_bank_account_name   = COALESCE(sqlc.narg('nomba_bank_account_name'), nomba_bank_account_name),
+    updated_at                = NOW()
+WHERE id = $1
+RETURNING *;
+
 -- name: UpdateNilosAccountDetails :exec
 UPDATE accounts
 SET nilos_account_id = $2,

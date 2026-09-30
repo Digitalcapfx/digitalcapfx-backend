@@ -38,7 +38,8 @@ type Config struct {
 	Brevo       BrevoConfig
 	MetaMap     MetaMapConfig
 	Sumsub      SumsubConfig
-	KYCProvider string // "metamap" (default) | "sumsub"
+	Didit       DiditConfig
+	KYCProvider string // "didit" (default) | "sumsub" | "metamap"
 	Google      GoogleConfig
 	Nilos       NilosConfig
 	Nomba       NombaConfig
@@ -68,6 +69,11 @@ type ServerConfig struct {
 	Port  string
 	Env   string
 	Debug bool
+	// MaintenanceMode, when true, makes the /maintenance endpoint report the service
+	// as under maintenance. Toggled purely via the MAINTENANCE_MODE env var (no
+	// redeploy needed): set MAINTENANCE_MODE=true to turn on, false to turn off.
+	MaintenanceMode    bool
+	MaintenanceMessage string
 }
 
 type DatabaseConfig struct {
@@ -148,6 +154,14 @@ type SumsubConfig struct {
 	WebhookSecret string
 }
 
+// DiditConfig holds credentials and workflow configuration for Didit identity verification.
+type DiditConfig struct {
+	WorkflowID    string
+	VerifyURL     string
+	APIKey        string
+	WebhookSecret string
+}
+
 // GoogleConfig holds credentials for Google Sign-In token verification.
 type GoogleConfig struct {
 	ClientID string // OAuth2 client ID — used to validate aud claim
@@ -197,6 +211,8 @@ func Load() (*Config, error) {
 	cfg.Server.Port = getEnv("PORT", "8080")
 	cfg.Server.Env = getEnv("ENV", "development")
 	cfg.Server.Debug = getEnv("DEBUG", "false") == "true"
+	cfg.Server.MaintenanceMode = getEnv("MAINTENANCE_MODE", "false") == "true"
+	cfg.Server.MaintenanceMessage = getEnv("MAINTENANCE_MESSAGE", "The service is currently undergoing scheduled maintenance. Please check back later.")
 
 	cfg.Database.URL = require("DATABASE_URL")
 	cfg.Database.MaxConns = int32(getEnvInt("DB_MAX_CONNS", 25))
@@ -233,7 +249,7 @@ func Load() (*Config, error) {
 	cfg.Brevo.FromEmail = getEnv("BREVO_FROM_EMAIL", "noreply@digitalfx.finance")
 	cfg.Brevo.SMTPUser = getEnv("BREVO_SMTP_USER", "")
 	cfg.Brevo.SMTPKey = getEnv("BREVO_SMTP_KEY", "")
-	cfg.Brevo.APIKey = getEnv("BREVO_API_KEY", "")        // REST v3 key for transactional SMS
+	cfg.Brevo.APIKey = getEnv("BREVO_API_KEY", "")                    // REST v3 key for transactional SMS
 	cfg.Brevo.SMSSenderName = getEnv("BREVO_SMS_SENDER", "DigitalFX") // max 11 chars
 
 	cfg.MetaMap.ClientID = getEnv("METAMAP_CLIENT_ID", "")
@@ -245,7 +261,13 @@ func Load() (*Config, error) {
 	cfg.Sumsub.SecretKey = getEnv("SUMSUB_SECRET_KEY", "")
 	cfg.Sumsub.LevelName = getEnv("SUMSUB_LEVEL_NAME", "basic-kyc-level")
 	cfg.Sumsub.WebhookSecret = getEnv("SUMSUB_WEBHOOK_SECRET", "")
-	cfg.KYCProvider = getEnv("KYC_PROVIDER", "metamap")
+
+	cfg.Didit.WorkflowID = getEnv("DIDIT_WORKFLOW_ID", "ca0c9e48-9723-41a4-a5c0-be98577c65c4")
+	cfg.Didit.VerifyURL = getEnv("DIDIT_VERIFY_URL", "https://verify.didit.me/u/ygyeSJcjQaSlwL6YV3xlxA")
+	cfg.Didit.APIKey = getEnv("DIDIT_API_KEY", "")
+	cfg.Didit.WebhookSecret = getEnv("DIDIT_WEBHOOK_SECRET", "")
+
+	cfg.KYCProvider = getEnv("KYC_PROVIDER", "didit")
 
 	cfg.OwnerPhones = splitCSV(getEnv("OWNER_PHONES", ""))
 	cfg.DefaultCountryCode = getEnv("DEFAULT_COUNTRY_CODE", "")

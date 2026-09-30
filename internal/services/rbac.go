@@ -51,6 +51,12 @@ const (
 	PermRatesView   = "rates:view"
 	PermRatesManage = "rates:manage"
 
+	// Accounts & banking (per-customer ledger accounts across currencies)
+	PermAccountsView    = "accounts:view"    // view a customer's accounts, banking details and balances
+	PermAccountsBanking = "accounts:banking" // edit banking details (IBAN/BIC/sort code/account number)
+	PermAccountsBalance = "accounts:balance" // set or adjust the internal ledger balance
+	PermAccountsStatus  = "accounts:status"  // enable/disable a currency account for a customer
+
 	// Staff management
 	PermStaffView    = "staff:view"
 	PermStaffInvite  = "staff:invite"
@@ -133,6 +139,15 @@ var permissionCatalogue = []PermissionGroup{
 			{PermTxView, "View transactions", "View any user's transactions.", "transactions", "view"},
 			{PermTxExport, "Export transactions", "Export transaction data.", "transactions", "export"},
 			{PermTxAdjust, "Adjust transactions", "Manual credit, debit or reversal.", "transactions", "adjust"},
+		},
+	},
+	{
+		Resource: "accounts", Label: "Accounts & Banking", Description: "Per-customer ledger accounts, banking details and balances across currencies.", Wildcard: "accounts:*",
+		Permissions: []PermissionMeta{
+			{PermAccountsView, "View accounts", "View a customer's accounts, banking details and balances (all currencies).", "accounts", "view"},
+			{PermAccountsBanking, "Edit banking details", "Update IBAN/BIC/sort code/account number and Nomba details for a customer's account.", "accounts", "banking"},
+			{PermAccountsBalance, "Adjust balances", "Set or adjust the internal ledger balance of a customer's account.", "accounts", "balance"},
+			{PermAccountsStatus, "Enable/disable accounts", "Enable or disable a specific currency account for a customer.", "accounts", "status"},
 		},
 	},
 	{

@@ -106,6 +106,11 @@ func (e *APIError) Error() string {
 	return fmt.Sprintf("nilos %d: %s", e.StatusCode, e.rawBody)
 }
 
+// RawBody returns the raw (unparsed) Nilos error response body — useful for
+// surfacing any provider-specific detail (required scope/permission, error code)
+// beyond the parsed message.
+func (e *APIError) RawBody() string { return e.rawBody }
+
 // ─── Account ─────────────────────────────────────────────────────────────────
 //
 // Nilos accounts live at the organisation level — not per user.

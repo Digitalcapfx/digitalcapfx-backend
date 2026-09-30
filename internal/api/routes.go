@@ -1,6 +1,7 @@
 package api
 
 import (
+	"encoding/json"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
@@ -53,6 +54,7 @@ func newRouter(cfg *config.Config, svc *services.Services, pool *pgxpool.Pool, l
 	insightsH := handlers.NewInsightsHandler(svc)
 	adminStaffH := handlers.NewAdminStaffHandler(svc)
 	adminUsersH := handlers.NewAdminUsersHandler(svc)
+	adminAccountsH := handlers.NewAdminAccountsHandler(svc)
 	adminLimitsH := handlers.NewAdminLimitsHandler(svc)
 	adminDeptH := handlers.NewAdminDepartmentsHandler(svc)
 	webhookH := handlers.NewWebhookHandler(svc, cfg.HUB2.SecretKey, logger)
@@ -82,14 +84,35 @@ func newRouter(cfg *config.Config, svc *services.Services, pool *pgxpool.Pool, l
 		_, _ = w.Write([]byte(`{"status":"ok"}`))
 	})
 
+	// Maintenance status — public, no auth so the app/frontend can poll it before
+	// login. Controlled by the MAINTENANCE_MODE env var; flip to false to turn off.
+	maintenanceHandler := func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		payload := map[string]any{
+			"maintenance_mode": cfg.Server.MaintenanceMode,
+			"message":          "",
+		}
+		if cfg.Server.MaintenanceMode {
+			payload["message"] = cfg.Server.MaintenanceMessage
+		}
+		_ = json.NewEncoder(w).Encode(payload)
+	}
+	r.Get("/maintenance", maintenanceHandler)
+	r.Get("/api/v1/maintenance", maintenanceHandler)
+
 	// Public webhooks — no JWT required
 	r.Post("/webhooks/hub2", webhookH.HUB2)
 	r.Post("/webhooks/metamap", kycH.MetaMapWebhook)
 	r.Post("/webhooks/kyc", kycH.ProviderWebhook)
+	r.Post("/webhooks/didit", kycH.ProviderWebhook)
 	r.Post("/webhooks/payments", paymentsWebhookH.Receive)
 	r.Post("/webhooks/caas", caasWebhookH.Receive)
 	r.Post("/webhooks/nomba", nombaWebhookH.Receive)
 	r.Post("/webhooks/nilos", nilosWebhookH.Receive)
+
+	r.Post("/api/v1/webhooks/kyc", kycH.ProviderWebhook)
+	r.Post("/api/v1/webhooks/didit", kycH.ProviderWebhook)
 
 	// Swagger UI
 	r.Get("/swagger/*", httpSwagger.Handler(
@@ -164,7 +187,9 @@ func newRouter(cfg *config.Config, svc *services.Services, pool *pgxpool.Pool, l
 				r.Post("/intake", kycH.SubmitIntake)            // submit our own KYC fields first
 				r.Get("/documents", kycH.ListDocuments)
 				r.Post("/documents", kycH.UploadDocument)
-				r.Post("/init", kycH.Initiate) // Generic KYC (Sumsub) — gated on intake
+				r.Post("/init", kycH.Initiate) // Generic KYC (Didit / Sumsub) — gated on intake
+				r.Post("/auto-approve", kycH.AutoApprove)
+				r.Post("/didit/complete", kycH.AutoApprove)
 				r.Post("/metamap/init", kycH.InitiateMetaMap)
 			})
 
@@ -236,10 +261,10 @@ func newRouter(cfg *config.Config, svc *services.Services, pool *pgxpool.Pool, l
 					r.Get("/transactions", walletH.GetWaasTransactions) // on-chain history
 					r.Post("/transfer", walletH.TransferCrypto)         // send on-chain
 					r.Post("/estimate-gas", walletH.EstimateGas)
-					r.Get("/seed", walletH.RevealSeed)                // sensitive
-					r.Post("/export-key", walletH.ExportPrivateKey)   // sensitive
-					r.Post("/deposit", walletH.InitiateDeposit)       // HUB2 mobile money
-					r.Post("/withdraw", walletH.InitiateWithdrawal)   // HUB2 mobile money
+					r.Get("/seed", walletH.RevealSeed)              // sensitive
+					r.Post("/export-key", walletH.ExportPrivateKey) // sensitive
+					r.Post("/deposit", walletH.InitiateDeposit)     // HUB2 mobile money
+					r.Post("/withdraw", walletH.InitiateWithdrawal) // HUB2 mobile money
 					// Legacy aliases → the unified Rach crypto swap handler.
 					// Kept for backward compatibility (existing mobile clients);
 					// /swap/* is the canonical, documented surface. Both accept the
@@ -263,6 +288,10 @@ func newRouter(cfg *config.Config, svc *services.Services, pool *pgxpool.Pool, l
 					r.Post("/withdraw", caasH.Withdraw)
 					r.Get("/transactions", caasH.ListTransactions)
 					r.Get("/transactions/{id}", caasH.GetTransaction)
+					// Stablecoin swap (USDC ⇄ USDT) on the user's SCW via CaaS.
+					r.Post("/swaps", caasH.Swap)
+					r.Get("/swaps", caasH.ListSwaps)
+					r.Get("/swaps/{id}", caasH.GetSwap)
 				})
 
 				// Manual mobile money (parallel to Hub2): pay the business numbers
@@ -416,12 +445,24 @@ func newRouter(cfg *config.Config, svc *services.Services, pool *pgxpool.Pool, l
 					Post("/admin/users/{id}/disable", adminUsersH.DisableUser)
 				r.With(middleware.RequirePermission(services.PermUsersEnable)).
 					Post("/admin/users/{id}/enable", adminUsersH.EnableUser)
+				r.With(middleware.RequirePermission(services.PermUsersDelete)).
+					Delete("/admin/users/{id}", adminUsersH.DeleteUser)
 				r.With(middleware.RequirePermission(services.PermUsersResetKYC)).
 					Post("/admin/users/{id}/kyc/reset", adminUsersH.ResetUserKYC)
 				r.With(middleware.RequirePermission(services.PermUsersManage)).
 					Post("/admin/users/{id}/reprovision-fiat", adminUsersH.ReprovisionFiat)
 				r.With(middleware.RequirePermission(services.PermTxView)).
 					Get("/admin/users/{id}/transactions", adminUsersH.ListUserTransactions)
+
+				// Customer banking / ledger accounts (all currencies)
+				r.With(middleware.RequirePermission(services.PermAccountsView)).
+					Get("/admin/customers/{id}/accounts", adminAccountsH.ListCustomerAccounts)
+				r.With(middleware.RequirePermission(services.PermAccountsBanking)).
+					Patch("/admin/customers/{id}/accounts/{currency}/banking", adminAccountsH.UpdateBanking)
+				r.With(middleware.RequirePermission(services.PermAccountsStatus)).
+					Post("/admin/customers/{id}/accounts/{currency}/status", adminAccountsH.SetAccountStatus)
+				r.With(middleware.RequirePermission(services.PermAccountsBalance)).
+					Post("/admin/customers/{id}/accounts/{currency}/balance", adminAccountsH.ChangeBalance)
 
 				// Per-user account type + limit overrides (granular control)
 				r.With(middleware.RequirePermission(services.PermUsersManage)).

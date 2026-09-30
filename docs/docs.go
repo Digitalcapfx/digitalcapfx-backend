@@ -301,7 +301,7 @@ const docTemplate = `{
                             "withdrawn"
                         ],
                         "type": "string",
-                        "description": "Filter",
+                        "description": "Filter tab — matches each item's returned 'type' value (raw ledger types are also accepted)",
                         "name": "type",
                         "in": "query"
                     },
@@ -502,6 +502,265 @@ const docTemplate = `{
                     },
                     "403": {
                         "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/customers/{id}/accounts": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns every ledger account for a customer across all currencies (USD/GBP/EUR/NGN/XAF/XOF), including banking details, balances and status. Nothing is filtered — disabled ('inactive') accounts are returned too, so you can re-enable them. Requires the ` + "`" + `accounts:view` + "`" + ` permission.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin"
+                ],
+                "summary": "List a customer's accounts (admin)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Customer user UUID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.AccountListResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/customers/{id}/accounts/{currency}/balance": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Sets an absolute balance (mode=\"set\") or applies a signed delta (mode=\"adjust\") to a customer's account. A reason is required. The change is audit-logged and records a matching ledger transaction so it appears in the customer's activity. Requires the ` + "`" + `accounts:balance` + "`" + ` permission.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin"
+                ],
+                "summary": "Set or adjust a customer's ledger balance (admin)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Customer user UUID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Currency code",
+                        "name": "currency",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Balance change",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.AdminBalanceChangeRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.AdminBalanceChangeResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/customers/{id}/accounts/{currency}/banking": {
+            "patch": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Partial update of a customer's banking details for one currency. Only the fields you send are changed. Requires the ` + "`" + `accounts:banking` + "`" + ` permission.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin"
+                ],
+                "summary": "Update a customer account's banking details (admin)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Customer user UUID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Currency code (USD/GBP/EUR/NGN/XAF/XOF)",
+                        "name": "currency",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Banking fields to update",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.AdminUpdateBankingRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.AccountResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/customers/{id}/accounts/{currency}/status": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Enables or disables a specific currency account for a customer. The account is still returned by the API; the ` + "`" + `status` + "`" + ` flag ('active'/'inactive') tells the frontend whether to show it. Requires the ` + "`" + `accounts:status` + "`" + ` permission.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin"
+                ],
+                "summary": "Enable/disable a customer's currency account (admin)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Customer user UUID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Currency code",
+                        "name": "currency",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Enable or disable",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.AdminAccountStatusRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.AccountResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
                         "schema": {
                             "$ref": "#/definitions/handlers.ErrorResponse"
                         }
@@ -2421,6 +2680,50 @@ const docTemplate = `{
                         }
                     }
                 }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Hard-deletes a user and EVERYTHING it entails — accounts, WaaS/CaaS wallets, transactions, swaps, KYC, notifications, cards, VTU, sessions, preferences, etc. — in a single transaction. Irreversible; intended for removing test users. If anything would be left dangling it rolls back and deletes nothing. Requires the ` + "`" + `users:delete` + "`" + ` permission.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin-users"
+                ],
+                "summary": "Permanently delete a user (admin)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "User ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.MessageResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    }
+                }
             }
         },
         "/admin/users/{id}/account-type": {
@@ -3928,6 +4231,155 @@ const docTemplate = `{
                     },
                     "500": {
                         "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/crypto/swaps": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns a paginated list of the user's USDC ⇄ USDT swaps, most recent first.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "CaaS - Stablecoin (USDC)"
+                ],
+                "summary": "List stablecoin swaps",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Page number (default 1)",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Results per page, max 100 (default 20)",
+                        "name": "per_page",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/handlers.SwapResponse"
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Swaps one stablecoin for the other on the user's Stablecoin (CaaS) smart-contract wallet via the Rach CaaS DEX router. Gas is sponsored and Rach's fee is deducted from the input amount. Settles asynchronously on-chain — the returned swap starts as ` + "`" + `processing` + "`" + ` and finalises via the ` + "`" + `swap.settled` + "`" + ` / ` + "`" + `swap.failed` + "`" + ` webhook. Poll GET /crypto/swaps/{id} or refresh for the terminal result and on-chain tx hash.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "CaaS - Stablecoin (USDC)"
+                ],
+                "summary": "Swap USDC ⇄ USDT",
+                "parameters": [
+                    {
+                        "description": "Swap details",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.SwapRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.SwapResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/crypto/swaps/{id}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns a single USDC ⇄ USDT swap by id. Polls CaaS for the latest status when the swap is still in-flight, so the response reflects the on-chain result and tx hash once settled.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "CaaS - Stablecoin (USDC)"
+                ],
+                "summary": "Get a stablecoin swap",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Swap UUID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.SwapResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
                         "schema": {
                             "$ref": "#/definitions/handlers.ErrorResponse"
                         }
@@ -8225,7 +8677,7 @@ const docTemplate = `{
         },
         "/webhooks/caas": {
             "post": {
-                "description": "Receiver for Rach CaaS account/settlement events (funding, on-chain credit, P2P transfer, off-ramp). Follows the standard Rach webhook signing — header ` + "`" + `X-Webhook-Signature` + "`" + ` = hex HMAC-SHA256 of the raw request body, keyed with the CaaS webhook secret (CAAS_WEBHOOK_SECRET), which is SEPARATE from the WaaS secret. Verification also tolerates alternate header names and base64 as a hardening fallback. On a credit/deposit event the owning user (resolved by phone) is notified, always labeled USDC (name \"Stablecoin\"). Always returns 200 on business-logic issues so the provider does not retry.",
+                "description": "Receiver for Rach CaaS transaction and account events. Each delivery is an HTTP POST with a flat JSON body and header ` + "`" + `X-Rach-Signature: sha256=\u003chex\u003e` + "`" + ` — the hex HMAC-SHA256 of the raw request body keyed with the CaaS webhook secret (CAAS_WEBHOOK_SECRET), which is SEPARATE from the WaaS secret. Handles transfer.received (credit → notify + email the recipient, resolved by wallet address), transfer.settled/failed and swap.settled/failed (update the recorded transaction/swap + notify the initiator), and the user.linked / user.phone_changed lifecycle events. Always returns 200 on business-logic issues so the provider does not retry an already-accepted delivery.",
                 "consumes": [
                     "application/json"
                 ],
@@ -8239,8 +8691,8 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "hex HMAC-SHA256(rawBody, CaaS secret)",
-                        "name": "X-Webhook-Signature",
+                        "description": "sha256=\u003chex HMAC-SHA256(rawBody, CaaS secret)\u003e",
+                        "name": "X-Rach-Signature",
                         "in": "header",
                         "required": true
                     },
@@ -8485,7 +8937,7 @@ const docTemplate = `{
         },
         "/webhooks/payments": {
             "post": {
-                "description": "Receiver for Rach WaaS on-chain deposit events. Fires ` + "`" + `wallet.deposit.detected` + "`" + ` (seen on-chain, not credited) and ` + "`" + `wallet.deposit.confirmed` + "`" + ` (block-depth/settlement threshold met). On a confirmed event the owning user (resolved by derived address) is notified and the deposit is mirrored best-effort into their local ledger; the WaaS balance API remains authoritative. Signature: header ` + "`" + `X-Webhook-Signature` + "`" + ` = hex HMAC-SHA256 of the raw request body, keyed with the WaaS webhook secret (PAYMENTS_WEBHOOK_SECRET). Always returns 200 on business-logic issues to avoid provider retries.",
+                "description": "Receiver for Rach WaaS on-chain deposit events, delivered as a two-stage flow plus a later hash resolution: ` + "`" + `wallet.deposit.detected` + "`" + ` (seen on-chain — records a pending deposit, does NOT credit), ` + "`" + `wallet.deposit.confirmed` + "`" + ` (credits the owning user's local ledger, but only when ` + "`" + `safe_to_credit` + "`" + ` is true), and ` + "`" + `wallet.deposit.hash_resolved` + "`" + ` (backfills the real on-chain tx_hash). The owner is resolved by derived address; crediting is idempotent, keyed on ` + "`" + `deposit_id` + "`" + ` (NOT tx_hash, which is a provisional placeholder until hash_resolved), so a re-delivered event neither double-credits nor re-notifies. The WaaS balance API remains authoritative. Signature: header ` + "`" + `X-Webhook-Signature` + "`" + ` = hex HMAC-SHA256 of the raw request body, keyed with the WaaS webhook secret (PAYMENTS_WEBHOOK_SECRET). Always returns 200 on business-logic issues to avoid provider retries.",
                 "consumes": [
                     "application/json"
                 ],
@@ -9355,6 +9807,55 @@ const docTemplate = `{
                 }
             }
         },
+        "handlers.AdminAccountStatusRequest": {
+            "type": "object",
+            "properties": {
+                "enabled": {
+                    "type": "boolean",
+                    "example": false
+                }
+            }
+        },
+        "handlers.AdminBalanceChangeRequest": {
+            "type": "object",
+            "properties": {
+                "amount": {
+                    "description": "set: absolute; adjust: signed delta",
+                    "type": "number",
+                    "example": 100
+                },
+                "mode": {
+                    "description": "\"set\" | \"adjust\"",
+                    "type": "string",
+                    "example": "adjust"
+                },
+                "reason": {
+                    "type": "string",
+                    "example": "Goodwill credit for support ticket #123"
+                }
+            }
+        },
+        "handlers.AdminBalanceChangeResponse": {
+            "type": "object",
+            "properties": {
+                "delta": {
+                    "type": "number",
+                    "example": 100
+                },
+                "new_balance": {
+                    "type": "number",
+                    "example": 150
+                },
+                "previous_balance": {
+                    "type": "number",
+                    "example": 50
+                },
+                "reference": {
+                    "type": "string",
+                    "example": "ADJ-1a2b3c4d"
+                }
+            }
+        },
         "handlers.AdminKYCRejectRequest": {
             "type": "object",
             "properties": {
@@ -9385,6 +9886,35 @@ const docTemplate = `{
                 },
                 "target_currency": {
                     "description": "e.g. \"XAF\"",
+                    "type": "string"
+                }
+            }
+        },
+        "handlers.AdminUpdateBankingRequest": {
+            "type": "object",
+            "properties": {
+                "account_number": {
+                    "type": "string"
+                },
+                "account_number_uk": {
+                    "type": "string"
+                },
+                "bic": {
+                    "type": "string"
+                },
+                "iban": {
+                    "type": "string"
+                },
+                "nomba_bank_account_name": {
+                    "type": "string"
+                },
+                "nomba_bank_account_number": {
+                    "type": "string"
+                },
+                "nomba_bank_name": {
+                    "type": "string"
+                },
+                "sort_code": {
                     "type": "string"
                 }
             }
@@ -9494,33 +10024,67 @@ const docTemplate = `{
         "handlers.CaasWebhookPayload": {
             "type": "object",
             "properties": {
-                "data": {
-                    "type": "object",
-                    "properties": {
-                        "amount": {
-                            "type": "string"
-                        },
-                        "blind_index": {
-                            "type": "string"
-                        },
-                        "currency": {
-                            "type": "string"
-                        },
-                        "phone": {
-                            "type": "string"
-                        },
-                        "reference": {
-                            "type": "string"
-                        },
-                        "status": {
-                            "type": "string"
-                        },
-                        "tx_hash": {
-                            "type": "string"
-                        }
-                    }
+                "amount_in": {
+                    "type": "string"
+                },
+                "amount_usdc": {
+                    "type": "string"
+                },
+                "changed_at": {
+                    "type": "string"
+                },
+                "changed_by_merchant_id": {
+                    "type": "string"
                 },
                 "event": {
+                    "type": "string"
+                },
+                "linked_at": {
+                    "type": "string"
+                },
+                "new_merchant_id": {
+                    "type": "string"
+                },
+                "reason": {
+                    "description": "present on *.failed",
+                    "type": "string"
+                },
+                "recipient_wallet": {
+                    "type": "string"
+                },
+                "settled_at": {
+                    "description": "Timestamps (RFC3339 UTC).",
+                    "type": "string"
+                },
+                "status": {
+                    "description": "Common terminal fields.",
+                    "type": "string"
+                },
+                "swap_id": {
+                    "description": "swap.* fields.",
+                    "type": "string"
+                },
+                "token": {
+                    "type": "string"
+                },
+                "token_in": {
+                    "type": "string"
+                },
+                "token_out": {
+                    "type": "string"
+                },
+                "transfer_id": {
+                    "description": "transfer.* — recipient is addressed by wallet, amount is amount_usdc.",
+                    "type": "string"
+                },
+                "tx_hash": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "wallet_address": {
+                    "description": "Account / membership events.",
                     "type": "string"
                 }
             }
@@ -10607,8 +11171,14 @@ const docTemplate = `{
                 "customer_id": {
                     "type": "string"
                 },
+                "deposit_id": {
+                    "type": "integer"
+                },
                 "detected_at": {
                     "type": "string"
+                },
+                "hash_pending": {
+                    "type": "boolean"
                 },
                 "network": {
                     "type": "string"
@@ -11224,6 +11794,68 @@ const docTemplate = `{
                 },
                 "to_token": {
                     "type": "string"
+                }
+            }
+        },
+        "handlers.SwapRequest": {
+            "type": "object",
+            "properties": {
+                "amount": {
+                    "type": "string",
+                    "example": "100.00"
+                },
+                "token_in": {
+                    "type": "string",
+                    "example": "USDC"
+                },
+                "token_out": {
+                    "type": "string",
+                    "example": "USDT"
+                }
+            }
+        },
+        "handlers.SwapResponse": {
+            "type": "object",
+            "properties": {
+                "amount_in": {
+                    "type": "string",
+                    "example": "100.00"
+                },
+                "amount_out": {
+                    "type": "string",
+                    "example": "99.80"
+                },
+                "caas_swap_id": {
+                    "type": "string",
+                    "example": "rach_swap_abc123"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string",
+                    "example": "7b2c…"
+                },
+                "reference": {
+                    "type": "string",
+                    "example": "SWAP-1a2b3c4d"
+                },
+                "status": {
+                    "description": "pending|processing|settled|failed",
+                    "type": "string",
+                    "example": "processing"
+                },
+                "token_in": {
+                    "type": "string",
+                    "example": "USDC"
+                },
+                "token_out": {
+                    "type": "string",
+                    "example": "USDT"
+                },
+                "tx_hash": {
+                    "type": "string",
+                    "example": "0x…"
                 }
             }
         },

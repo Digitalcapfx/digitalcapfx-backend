@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 
 	"github.com/rachfinance/digitalfx/internal/api/middleware"
@@ -48,9 +49,38 @@ func (h *TransferHandler) InternalTransfer(w http.ResponseWriter, r *http.Reques
 		response.BadRequest(w, "VALIDATION_ERROR", "invalid request body")
 		return
 	}
+	if body.ReceiverPhone == "" {
+		response.BadRequest(w, "VALIDATION_ERROR", "receiver_phone is required")
+		return
+	}
 
-	_ = userID
-	response.OK(w, map[string]string{"message": "not implemented"})
+	res, err := h.svc.Transfer.InternalTransfer(r.Context(), services.InternalTransferInput{
+		SenderID:      userID,
+		ReceiverPhone: body.ReceiverPhone,
+		Currency:      body.Currency,
+		Amount:        body.Amount,
+		Description:   body.Description,
+	})
+	if err != nil {
+		switch {
+		case errors.Is(err, services.ErrTransferInvalidAmount):
+			response.BadRequest(w, "INVALID_AMOUNT", err.Error())
+		case errors.Is(err, services.ErrUnsupportedCurrency):
+			response.BadRequest(w, "UNSUPPORTED_CURRENCY", "instant transfers are only available for XAF and XOF")
+		case errors.Is(err, services.ErrTransferReceiverNotFound):
+			response.BadRequest(w, "RECEIVER_NOT_FOUND", err.Error())
+		case errors.Is(err, services.ErrTransferToSelf):
+			response.BadRequest(w, "INVALID_RECEIVER", err.Error())
+		case errors.Is(err, services.ErrAccountNotFound):
+			response.BadRequest(w, "ACCOUNT_NOT_FOUND", "sender or receiver has no account in that currency")
+		case errors.Is(err, services.ErrInsufficientFunds):
+			response.BadRequest(w, "INSUFFICIENT_FUNDS", "insufficient balance")
+		default:
+			response.InternalError(w)
+		}
+		return
+	}
+	response.OK(w, res)
 }
 
 // Hub2Payment godoc

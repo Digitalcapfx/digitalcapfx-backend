@@ -24,7 +24,7 @@ func NewActivityHandler(svc *services.Services) *ActivityHandler {
 //	@Tags         activity
 //	@Produce      json
 //	@Security     BearerAuth
-//	@Param        type    query  string  false  "Filter"  Enums(sent, received, exchanged, deposited, withdrawn)
+//	@Param        type    query  string  false  "Filter tab — matches each item's returned 'type' value (raw ledger types are also accepted)"  Enums(sent, received, exchanged, deposited, withdrawn)
 //	@Param        search  query  string  false  "Search description, asset, or counterparty"
 //	@Param        page    query  int     false  "Page (default 1)"
 //	@Param        limit   query  int     false  "Results per page (default 20)"

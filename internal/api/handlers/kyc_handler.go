@@ -161,6 +161,7 @@ func (h *KYCHandler) Initiate(w http.ResponseWriter, r *http.Request) {
 	response.OK(w, map[string]string{
 		"token": result.AccessToken,
 		"flow":  result.FlowID,
+		"url":   result.AccessToken,
 	})
 }
 
@@ -426,4 +427,36 @@ func (h *KYCHandler) ProviderWebhook(w http.ResponseWriter, r *http.Request) {
 	}
 
 	response.OKWithMessage(w, "processed", nil)
+}
+
+// AutoApprove godoc
+//
+//	@Summary      Auto-approve KYC (Didit completion)
+//	@Description  Marks the authenticated user's KYC as approved immediately, triggers fiat accounts provisioning, and issues completion notifications.
+//	@Tags         kyc
+//	@Produce      json
+//	@Security     BearerAuth
+//	@Success      200  {object}  MessageResponse
+//	@Failure      401  {object}  ErrorResponse
+//	@Failure      500  {object}  ErrorResponse
+//	@Router       /kyc/auto-approve [post]
+func (h *KYCHandler) AutoApprove(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		response.Unauthorized(w, "unauthorized")
+		return
+	}
+
+	if err := h.svc.KYC.AutoApproveKYC(r.Context(), userID); err != nil {
+		if errors.Is(err, services.ErrUserNotFound) {
+			response.NotFound(w, "user not found")
+			return
+		}
+		response.InternalError(w)
+		return
+	}
+
+	response.OKWithMessage(w, "KYC verified and approved successfully", map[string]string{
+		"status": "approved",
+	})
 }
