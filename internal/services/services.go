@@ -95,7 +95,7 @@ func New(
 
 	// KYC provider is selected via KYC_PROVIDER ("didit" default | "sumsub" | "metamap").
 	var kycProvider kyc.KYCProvider = kyc.NewDiditProvider(didit.New(
-		cfg.Didit.WorkflowID, cfg.Didit.VerifyURL, cfg.Didit.APIKey, cfg.Didit.WebhookSecret))
+		cfg.Didit.WorkflowID, cfg.Didit.APIKey, cfg.Didit.WebhookSecret, cfg.Didit.CallbackURL))
 	if cfg.KYCProvider == "sumsub" {
 		kycProvider = kyc.NewSumsubProvider(sumsub.New(
 			cfg.Sumsub.AppToken, cfg.Sumsub.SecretKey, cfg.Sumsub.LevelName, cfg.Sumsub.WebhookSecret))

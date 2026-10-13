@@ -16,6 +16,7 @@ type VerificationSession struct {
 
 // VerificationEvent is a normalized event emitted by a vendor's webhook.
 type VerificationEvent struct {
+	EventID    string // Provider's unique id for THIS delivery, used to dedupe retries
 	ExternalID string // Provider's applicant or review ID
 	UserID     string // Our internal user ID (parsed from metadata)
 	Status     string // Normalized status: pending, processing, under_review, approved, rejected

@@ -5,22 +5,21 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"strings"
+	"time"
 
 	"github.com/rachfinance/digitalfx/internal/clients/didit"
 )
 
 type DiditProvider struct {
 	client *didit.Client
+	now    func() time.Time // injectable for tests
 }
 
 func NewDiditProvider(client *didit.Client) *DiditProvider {
-	return &DiditProvider{client: client}
+	return &DiditProvider{client: client, now: time.Now}
 }
 
-func (p *DiditProvider) Name() string {
-	return "didit"
-}
+func (p *DiditProvider) Name() string { return "didit" }
 
 func (p *DiditProvider) Initiate(ctx context.Context, userID, phone, email string) (*VerificationSession, error) {
 	sessionID, verifyURL, err := p.client.CreateSession(ctx, userID, email, phone)
@@ -30,22 +29,18 @@ func (p *DiditProvider) Initiate(ctx context.Context, userID, phone, email strin
 
 	return &VerificationSession{
 		ExternalID:  sessionID,
-		AccessToken: verifyURL, // Used by frontend as hosted verification URL or token
+		AccessToken: verifyURL, // hosted verification URL for the client to open
 		FlowID:      p.client.WorkflowID(),
 		Status:      "pending",
 	}, nil
 }
 
 func (p *DiditProvider) HandleWebhook(ctx context.Context, body []byte, headers http.Header) (*VerificationEvent, error) {
-	signature := headers.Get("X-Signature-V2")
-	if signature == "" {
-		signature = headers.Get("X-Signature")
-	}
-	if signature == "" {
-		signature = headers.Get("X-Didit-Signature")
-	}
-
-	if !p.client.VerifyWebhookSignature(signature, body) {
+	if !p.client.VerifyWebhookSignature(
+		headers.Get("X-Signature-V2"),
+		headers.Get("X-Signature"),
+		body,
+	) {
 		return nil, fmt.Errorf("didit provider: invalid webhook signature")
 	}
 
@@ -54,66 +49,57 @@ func (p *DiditProvider) HandleWebhook(ctx context.Context, body []byte, headers 
 		return nil, fmt.Errorf("didit provider: unmarshal webhook: %w", err)
 	}
 
-	userID := ""
-	statusStr := ""
-	sessionID := ""
-
-	if payload.Data != nil {
-		userID = payload.Data.VendorData
-		statusStr = payload.Data.Status
-		sessionID = payload.Data.SessionID
-		if userID == "" && payload.Data.Email != "" {
-			userID = payload.Data.Email
-		}
+	// Freshness is checked against the SIGNED body timestamp, never the
+	// unsigned X-Timestamp header, which a replayed request can freshen.
+	if !didit.IsFresh(payload.Timestamp, p.now()) {
+		return nil, fmt.Errorf("didit provider: stale webhook (timestamp %d)", payload.Timestamp)
 	}
 
-	if userID == "" {
-		userID = payload.VendorData
-	}
-	if statusStr == "" {
-		statusStr = payload.Status
-	}
-	if sessionID == "" {
-		sessionID = payload.SessionID
+	if payload.VendorData == "" {
+		return nil, fmt.Errorf("didit provider: webhook has no vendor_data, cannot attribute to a user (session %s)", payload.SessionID)
 	}
 
-	// Auto-verify and approve: map event status
-	status, identityStatus, reviewAnswer := mapDiditStatus(statusStr, payload.Event)
+	status, identityStatus, reviewAnswer, comment := mapDiditStatus(payload.Status)
 
 	return &VerificationEvent{
-		ExternalID:     sessionID,
-		UserID:         userID,
-		Status:         status,
-		RawPayload:     body,
-		IdentityStatus: identityStatus,
-		ReviewAnswer:   reviewAnswer,
+		EventID:           payload.EventID,
+		ExternalID:        payload.SessionID,
+		UserID:            payload.VendorData,
+		Status:            status,
+		RawPayload:        body,
+		IdentityStatus:    identityStatus,
+		ReviewAnswer:      reviewAnswer,
+		ModerationComment: comment,
 	}, nil
 }
 
-// mapDiditStatus maps Didit session status to our internal KYC status.
-// For automated self-approval on Didit, successful or submitted events auto-approve.
-func mapDiditStatus(status, event string) (canonicalStatus, identityStatus, reviewAnswer string) {
-	lower := strings.ToLower(status)
-	lowerEvent := strings.ToLower(event)
-
-	if strings.Contains(lower, "declined") || strings.Contains(lower, "reject") {
-		return "rejected", "rejected", "RED"
+// mapDiditStatus maps a Didit V3 session status to our internal KYC state.
+//
+// Matching is EXACT and case-sensitive against the documented literals. An
+// unrecognised status yields an empty canonical status, which leaves the user's
+// KYC decision untouched — the default must never be "approved", or a session
+// that merely started would verify someone who uploaded nothing.
+func mapDiditStatus(status string) (canonical, identity, reviewAnswer, comment string) {
+	switch status {
+	case "Approved":
+		return "approved", "approved", "GREEN", ""
+	case "Declined":
+		return "rejected", "rejected", "RED", "Your verification was not approved by our identity provider."
+	case "In Review":
+		return "under_review", "in_review", "", ""
+	case "Resubmitted":
+		return "under_review", "resubmit", "", "Additional information was requested for your verification."
+	case "In Progress", "Awaiting User":
+		return "processing", "in_progress", "", ""
+	case "Abandoned":
+		return "", "in_progress", "", ""
+	case "Not Started", "Expired":
+		return "", "not_started", "", ""
+	case "Kyc Expired":
+		// A previously verified identity has aged out of the retention policy.
+		// Revoking is the safe direction; the user re-verifies from scratch.
+		return "rejected", "rejected", "RED", "Your identity verification has expired. Please verify again."
+	default:
+		return "", "", "", ""
 	}
-
-	if strings.Contains(lower, "abandon") {
-		return "under_review", "in_progress", ""
-	}
-
-	// Any updated/approved/in-review event auto-approves:
-	// "Approved", "In Review", "status.updated", etc.
-	if strings.Contains(lower, "approv") ||
-		strings.Contains(lower, "review") ||
-		strings.Contains(lower, "success") ||
-		lowerEvent == "status.updated" ||
-		lowerEvent == "data.updated" ||
-		lower == "" {
-		return "approved", "approved", "GREEN"
-	}
-
-	return "approved", "approved", "GREEN"
 }

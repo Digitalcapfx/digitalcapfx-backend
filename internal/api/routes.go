@@ -188,8 +188,6 @@ func newRouter(cfg *config.Config, svc *services.Services, pool *pgxpool.Pool, l
 				r.Get("/documents", kycH.ListDocuments)
 				r.Post("/documents", kycH.UploadDocument)
 				r.Post("/init", kycH.Initiate) // Generic KYC (Didit / Sumsub) — gated on intake
-				r.Post("/auto-approve", kycH.AutoApprove)
-				r.Post("/didit/complete", kycH.AutoApprove)
 				r.Post("/metamap/init", kycH.InitiateMetaMap)
 			})
 

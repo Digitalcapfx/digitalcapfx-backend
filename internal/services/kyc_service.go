@@ -911,6 +911,25 @@ func (s *KYCService) HandleProviderWebhook(ctx context.Context, body []byte, hea
 		return err
 	}
 
+	// Idempotency. The INSERT itself is the check: event_id is the primary key,
+	// so two concurrent retries cannot both claim the same delivery. Applying a
+	// decision twice would re-send approval emails and re-trigger fiat account
+	// provisioning.
+	if event.EventID != "" {
+		tag, insErr := s.pool.Exec(ctx,
+			`INSERT INTO kyc_webhook_events (event_id, provider, session_id, vendor_data, status)
+			 VALUES ($1, $2, $3, $4, $5) ON CONFLICT (event_id) DO NOTHING`,
+			event.EventID, s.provider.Name(), event.ExternalID, event.UserID, event.Status)
+		if insErr != nil {
+			return fmt.Errorf("kyc webhook: record event %s: %w", event.EventID, insErr)
+		}
+		if tag.RowsAffected() == 0 {
+			s.logger.Info("kyc webhook ignored — already processed",
+				zap.String("event_id", event.EventID))
+			return nil
+		}
+	}
+
 	q := db.New(s.pool)
 
 	userID, err := uuid.Parse(event.UserID)
@@ -927,14 +946,18 @@ func (s *KYCService) HandleProviderWebhook(ctx context.Context, body []byte, hea
 		}
 	}
 
-	// Always record the provider's automated decision.
-	// For Didit, auto-verify and approve KYC by itself.
+	// Record the provider's automated decision exactly as the provider reported
+	// it. There is deliberately no per-provider coercion here: previously any
+	// non-rejected Didit event was rewritten to "approved", so a session that had
+	// merely started verified the user.
+	// An empty canonical status means "in flight or unrecognised" (Not Started /
+	// Expired / Abandoned). The identity sub-state below is still recorded so
+	// GET /kyc/status stays accurate, but the final decision is left alone.
 	providerStatus := event.Status
-	if s.provider.Name() == "didit" && providerStatus != "rejected" {
-		providerStatus = "approved"
-	}
-	if err := q.SetKycProviderStatus(ctx, db.SetKycProviderStatusParams{ID: userID, KycProviderStatus: &providerStatus}); err != nil {
-		s.logger.Error("record kyc provider status", zap.Error(err))
+	if providerStatus != "" {
+		if err := q.SetKycProviderStatus(ctx, db.SetKycProviderStatusParams{ID: userID, KycProviderStatus: &providerStatus}); err != nil {
+			s.logger.Error("record kyc provider status", zap.Error(err))
+		}
 	}
 
 	// Record the identity (Sumsub) sub-state + retry context so GET /kyc/status
@@ -1060,38 +1083,6 @@ func (s *KYCService) notifyKYCRejected(ctx context.Context, user db.User, reason
 	})
 }
 
-// AutoApproveKYC immediately verifies and approves the user's KYC, sets their status
-// to approved, sends approval notifications, and provisions their fiat accounts.
-func (s *KYCService) AutoApproveKYC(ctx context.Context, userID uuid.UUID) error {
-	q := db.New(s.pool)
-	user, err := q.GetUserByID(ctx, userID)
-	if err != nil {
-		return ErrUserNotFound
-	}
-
-	if _, err := q.UpdateUserKYCStatus(ctx, db.UpdateUserKYCStatusParams{
-		ID:        userID,
-		KycStatus: "approved",
-	}); err != nil {
-		return fmt.Errorf("auto-approve kyc: %w", err)
-	}
-
-	providerStatus := "approved"
-	_ = q.SetKycProviderStatus(ctx, db.SetKycProviderStatusParams{
-		ID:                userID,
-		KycProviderStatus: &providerStatus,
-	})
-
-	reviewAnswer := "GREEN"
-	_ = q.UpsertKYCIdentityFromWebhook(ctx, db.UpsertKYCIdentityFromWebhookParams{
-		UserID:       userID,
-		Status:       "approved",
-		ReviewAnswer: &reviewAnswer,
-	})
-
-	s.notifyKYCApproved(ctx, user)
-	return nil
-}
 
 // ─── Admin KYC Management ─────────────────────────────────────────────────────
 

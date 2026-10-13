@@ -131,7 +131,11 @@ type KYCInitResponse struct {
 // Initiate godoc
 //
 //	@Summary      Start or resume KYC verification
-//	@Description  Creates or resumes a KYC verification session for the authenticated user with the configured provider (Sumsub, level `id-and-liveness`). Returns a short-lived `token` (~30 min) to hand to the Sumsub Web/Mobile SDK to launch the ID + liveness flow, plus the `flow` (level) name. The final result is delivered asynchronously to `POST /webhooks/kyc` and, unless an admin overrides, applied automatically.
+//	@Description  Creates or resumes a KYC verification session for the authenticated user with the configured provider (`KYC_PROVIDER`, default `didit`). Requires the KYC intake to be submitted first (see POST /kyc/intake), otherwise returns 400.
+//	@Description
+//	@Description  For Didit the response `token` is the per-user hosted verification URL — open it in an iframe, a new tab, or the web SDK. The session is bound to this user via `vendor_data`, which is what lets the decision webhook be attributed back; there is no shared fallback link, so if a session cannot be minted this endpoint FAILS rather than returning something unusable. For Sumsub the `token` is a short-lived (~30 min) SDK access token and `flow` is the level name.
+//	@Description
+//	@Description  The decision itself arrives asynchronously at `POST /webhooks/kyc` and is the only source of truth — never treat the client-side completion callback as proof of approval.
 //	@Tags         kyc
 //	@Produce      json
 //	@Security     BearerAuth
@@ -401,13 +405,23 @@ func (h *KYCHandler) MetaMapWebhook(w http.ResponseWriter, r *http.Request) {
 
 // ProviderWebhook godoc
 //
-//	@Summary      KYC provider webhook (Sumsub)
-//	@Description  Receives verification result events from Sumsub (e.g. `applicantReviewed`). Verified via HMAC over the raw request body using the Sumsub webhook secret — the digest is read from the `X-Payload-Digest` header and its algorithm from `X-Payload-Digest-Alg` (`HMAC_SHA1_HEX` | `HMAC_SHA256_HEX` | `HMAC_SHA512_HEX`; defaults to SHA-256). On a `GREEN` review the user is auto-approved; other results are rejected — unless an admin has taken manual control, which always wins (hybrid KYC). Always acknowledges with 200 to prevent provider retries.
+//	@Summary      KYC provider webhook (Didit / Sumsub)
+//	@Description  Receives verification decisions from the configured KYC provider (`KYC_PROVIDER`, default `didit`). Also reachable at `/webhooks/didit`.
+//	@Description
+//	@Description  **Didit (V3).** The body is the flat V3 envelope — `event_id`, `webhook_type`, an INTEGER unix `timestamp`, `session_id`, `status`, `vendor_data` (our user id) and `decision`. Authentication is HMAC-SHA256 with the Didit webhook secret, read from `X-Signature-V2` (computed over the canonicalised body: whole-number floats shortened, keys sorted, re-serialised) or `X-Signature` (computed over the raw bytes). Verification FAILS CLOSED — with no secret configured nothing is accepted. A delivery is rejected if the SIGNED `timestamp` is more than 300s old (the unsigned `X-Timestamp` header is never used, since a replayed request can freshen it), or if it carries no `vendor_data` to attribute it to a user. Deliveries are deduped on `event_id`, so provider retries and console replays apply the decision once.
+//	@Description
+//	@Description  Status handling is exact and case-sensitive: only `Approved` approves. `Declined` and `Kyc Expired` reject; `In Review` and `Resubmitted` queue for review; `In Progress` / `Awaiting User` mark processing; `Not Started`, `Expired` and `Abandoned` leave the decision untouched.
+//	@Description
+//	@Description  **Sumsub.** HMAC over the raw body; digest in `X-Payload-Digest`, algorithm in `X-Payload-Digest-Alg` (`HMAC_SHA1_HEX` | `HMAC_SHA256_HEX` | `HMAC_SHA512_HEX`, default SHA-256). A `GREEN` review approves.
+//	@Description
+//	@Description  An admin manual override always wins (hybrid KYC). Always acknowledges with 200 to prevent provider retry storms.
 //	@Tags         webhooks
 //	@Accept       json
 //	@Produce      json
-//	@Param        X-Payload-Digest      header  string  true   "HMAC digest (hex) of the raw request body"
-//	@Param        X-Payload-Digest-Alg  header  string  false  "Digest algorithm: HMAC_SHA1_HEX | HMAC_SHA256_HEX | HMAC_SHA512_HEX (default SHA-256)"
+//	@Param        X-Signature-V2        header  string  false  "Didit: HMAC-SHA256 (hex) over the canonicalised body"
+//	@Param        X-Signature           header  string  false  "Didit: HMAC-SHA256 (hex) over the raw body"
+//	@Param        X-Payload-Digest      header  string  false  "Sumsub: HMAC digest (hex) of the raw request body"
+//	@Param        X-Payload-Digest-Alg  header  string  false  "Sumsub: HMAC_SHA1_HEX | HMAC_SHA256_HEX | HMAC_SHA512_HEX (default SHA-256)"
 //	@Success      200  {object}  MessageResponse
 //	@Router       /webhooks/kyc [post]
 func (h *KYCHandler) ProviderWebhook(w http.ResponseWriter, r *http.Request) {
@@ -429,34 +443,3 @@ func (h *KYCHandler) ProviderWebhook(w http.ResponseWriter, r *http.Request) {
 	response.OKWithMessage(w, "processed", nil)
 }
 
-// AutoApprove godoc
-//
-//	@Summary      Auto-approve KYC (Didit completion)
-//	@Description  Marks the authenticated user's KYC as approved immediately, triggers fiat accounts provisioning, and issues completion notifications.
-//	@Tags         kyc
-//	@Produce      json
-//	@Security     BearerAuth
-//	@Success      200  {object}  MessageResponse
-//	@Failure      401  {object}  ErrorResponse
-//	@Failure      500  {object}  ErrorResponse
-//	@Router       /kyc/auto-approve [post]
-func (h *KYCHandler) AutoApprove(w http.ResponseWriter, r *http.Request) {
-	userID, ok := middleware.UserIDFromContext(r.Context())
-	if !ok {
-		response.Unauthorized(w, "unauthorized")
-		return
-	}
-
-	if err := h.svc.KYC.AutoApproveKYC(r.Context(), userID); err != nil {
-		if errors.Is(err, services.ErrUserNotFound) {
-			response.NotFound(w, "user not found")
-			return
-		}
-		response.InternalError(w)
-		return
-	}
-
-	response.OKWithMessage(w, "KYC verified and approved successfully", map[string]string{
-		"status": "approved",
-	})
-}

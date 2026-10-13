@@ -157,9 +157,9 @@ type SumsubConfig struct {
 // DiditConfig holds credentials and workflow configuration for Didit identity verification.
 type DiditConfig struct {
 	WorkflowID    string
-	VerifyURL     string
 	APIKey        string
 	WebhookSecret string
+	CallbackURL   string
 }
 
 // GoogleConfig holds credentials for Google Sign-In token verification.
@@ -262,10 +262,26 @@ func Load() (*Config, error) {
 	cfg.Sumsub.LevelName = getEnv("SUMSUB_LEVEL_NAME", "basic-kyc-level")
 	cfg.Sumsub.WebhookSecret = getEnv("SUMSUB_WEBHOOK_SECRET", "")
 
+	// Didit identity verification.
+	//
+	// Both secrets come from the environment and are NOT defaulted in code: they
+	// are live credentials, and this repository is hosted publicly. They are set
+	// on the Cloud Run service (DIDIT_API_KEY, DIDIT_WEBHOOK_SECRET).
+	//
+	// An empty API key now DISABLES session creation rather than degrading to a
+	// shared hosted link that carries no vendor_data, and an empty webhook secret
+	// makes signature verification fail closed.
+	// "Free KYC" — the account default: OCR + PASSIVE liveness + face match,
+	// all inside Didit's 500/month free allowance, so min_price is $0.00 and
+	// sessions mint at a zero credit balance.
+	//
+	// Keep paid add-ons OFF on this workflow or it stops being free: white-label
+	// branding (+$0.20) alone pushes min_price above zero, and with no credit
+	// balance Didit then refuses session creation outright with a 400.
 	cfg.Didit.WorkflowID = getEnv("DIDIT_WORKFLOW_ID", "ca0c9e48-9723-41a4-a5c0-be98577c65c4")
-	cfg.Didit.VerifyURL = getEnv("DIDIT_VERIFY_URL", "https://verify.didit.me/u/ygyeSJcjQaSlwL6YV3xlxA")
 	cfg.Didit.APIKey = getEnv("DIDIT_API_KEY", "")
 	cfg.Didit.WebhookSecret = getEnv("DIDIT_WEBHOOK_SECRET", "")
+	cfg.Didit.CallbackURL = getEnv("DIDIT_CALLBACK_URL", "")
 
 	cfg.KYCProvider = getEnv("KYC_PROVIDER", "didit")
 
