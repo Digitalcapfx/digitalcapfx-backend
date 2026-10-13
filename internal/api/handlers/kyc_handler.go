@@ -434,8 +434,10 @@ func (h *KYCHandler) ProviderWebhook(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.svc.KYC.HandleProviderWebhook(r.Context(), body, r.Header); err != nil {
-		// Log-and-ack: return 200 so the provider doesn't retry-storm, except for
-		// signature failures which we surface as 401 to aid debugging.
+		// Ack with 200 regardless so the provider does not retry-storm. The
+		// failure is logged inside HandleProviderWebhook — nothing is swallowed
+		// silently, despite this response looking identical to a success.
+		// "received" vs "processed" is what distinguishes the two here.
 		response.OKWithMessage(w, "received", nil)
 		return
 	}

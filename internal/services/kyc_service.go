@@ -908,6 +908,18 @@ func mapMetaMapEvent(eventName string) string {
 func (s *KYCService) HandleProviderWebhook(ctx context.Context, body []byte, headers http.Header) error {
 	event, err := s.provider.HandleWebhook(ctx, body, headers)
 	if err != nil {
+		// Log before returning. The HTTP layer deliberately answers 200 to every
+		// delivery so the provider does not retry-storm, which means a rejected
+		// webhook is otherwise completely silent — a wrong webhook secret or a
+		// payload-shape change would look identical to a healthy endpoint from
+		// both sides. This line is the only place that failure is observable.
+		s.logger.Error("kyc provider webhook rejected",
+			zap.String("provider", s.provider.Name()),
+			zap.Int("body_bytes", len(body)),
+			zap.Bool("had_signature_v2", headers.Get("X-Signature-V2") != ""),
+			zap.Bool("had_signature", headers.Get("X-Signature") != ""),
+			zap.Error(err),
+		)
 		return err
 	}
 
