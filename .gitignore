@@ -4,7 +4,11 @@ bin/
 *.out
 
 # Environment
+# Every .env variant is ignored, not just bare .env: .env.cloud / .env.local
+# hold live production credentials and were previously committable.
 .env
+.env.*
+!.env.example
 *.local.env
 
 # Go
